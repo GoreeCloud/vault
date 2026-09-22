@@ -160,7 +160,7 @@ ENV ROCKET_PROFILE="release" \
 
 # Create data folder and Install needed libraries
 # Explicitly request security-fixed runtime packages so Debian upgrades vulnerable packages
-# already present in the pinned immutable base layer whenever fixed release candidates are available.
+# already present in the pinned immutable base layer whenever fixed versions are available.
 RUN mkdir /data && \
     apt-get update && apt-get install -y \
         --no-install-recommends \
