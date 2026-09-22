@@ -65,6 +65,7 @@ RUN apt-get update && \
         --no-install-recommends \
         libpq-dev \
         libpq5 \
+        libpcre2-8-0 \
         libssl-dev \
         libmariadb-dev \
         pkg-config \
@@ -167,16 +168,19 @@ RUN mkdir /data && \
         bsdutils \
         ca-certificates \
         curl \
+        gzip \
         libblkid1 \
         liblastlog2-2 \
         libmariadb3 \
         libmount1 \
         libpq5 \
         libsmartcols1 \
+        libsqlite3-0 \
         libuuid1 \
         login \
         mount \
         openssl \
+        perl-base \
         util-linux && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
