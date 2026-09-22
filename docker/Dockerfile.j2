@@ -93,7 +93,6 @@ RUN apt-get update && \
         --no-install-recommends \
         libpq-dev \
         libpq5 \
-        libpcre2-8-0 \
         libssl-dev \
         libmariadb-dev \
         pkg-config \
@@ -200,8 +199,8 @@ ENV ROCKET_PROFILE="release" \
 
 # Create data folder and Install needed libraries
 {% if base == "debian" %}
-# Explicitly request the util-linux runtime family so Debian upgrades vulnerable packages
-# already present in the immutable base layer whenever fixed release candidates are available.
+# Explicitly request vulnerable base-layer packages so Debian upgrades inherited versions
+# whenever fixed release candidates are available.
 {% endif %}
 RUN mkdir /data && \
 {% if base == "debian" %}
@@ -216,6 +215,7 @@ RUN mkdir /data && \
         libmariadb3 \
         libmount1 \
         libpq5 \
+        libpcre2-8-0 \
         libsmartcols1 \
         libsqlite3-0 \
         libuuid1 \
