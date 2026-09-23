@@ -91,7 +91,9 @@ Stable promotion requires current, independently validated applicability and acc
 - Everkeep;
 - Glaze UI;
 - GoreeCloud Mesh;
-- GoreeCloud Identity.
+- GoreeCloud Identity;
+- GoreeCloud Policy;
+- GoreeCloud Observability.
 
 The current Platform Contract records each applicable integration as blocked and overall conformance as nonconformant. Repository CI, compatibility tests, deployment validation, encryption, private networking, or another system's acceptance cannot substitute for missing per-system acceptance.
 
