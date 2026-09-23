@@ -22,6 +22,8 @@ Items here are planned, incomplete, blocked, transitional, or acceptance-gated. 
 - Establish current Stable GLAZE UI authority and product-specific server/client presentation acceptance where applicable.
 - Complete Privacy Shield, Wardveil Security, Everkeep, Mesh, Manager, Policy, and Observability runtime integration/evaluation with evidence-backed dispositions.
 - Complete real supported-client acceptance, WebAuthn/passkey acceptance, target-environment validation, migration/rollback, destructive isolated recovery rehearsal, monitoring, repository governance, exact-release evidence, production approval, and Stable qualification.
+- Support and validate the dedicated GoreeCloud Vault Firefox Extension as a first-party supported client, including authenticated synchronization, encrypted-client boundaries, secure autofill, configurable password/passphrase generation, save/update prompts, passkeys/WebAuthn, TOTP, origin-aware matching, private-window behavior, revocation, compatibility, signing/update/rollback, and exact-client release evidence. No Firefox extension implementation or Stable evidence is claimed by this record.
+- Provide the server/API, authorization, synchronization, and versioned client contracts required by GoreeCloud Browser's native Vault integration without exposing the Vault database, decryption keys, or plaintext credential material directly to Browser. Native Browser integration remains a separate Browser client implementation obligation.
 
 ## Security and continuity obligations
 
