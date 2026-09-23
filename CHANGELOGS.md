@@ -38,6 +38,7 @@ This security remediation does not establish Release Candidate, production appro
 - Removed the obsolete requirement to synchronize feature-roadmap authority with Google Drive.
 - Recorded migration from the obsolete Platform Contract 0.2/seven-system declaration as an explicit open stabilization obligation rather than silently treating it as current conformance.
 - Preserved `FEATURES.md` as a product-facing feature description rather than lifecycle authority.
+- Preserved the legacy roadmap's explicit first-party GoreeCloud Vault Firefox Extension and GoreeCloud Browser native-integration obligations in `PLANNED-FEATURES.md` while discarding obsolete synchronized-Drive control semantics.
 
 ### Lifecycle boundary
 
