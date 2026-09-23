@@ -53,7 +53,9 @@ A GoreeCloud Stable claim also requires independent applicable acceptance for ev
 - **Everkeep** — backup, restore, continuity, recovery, and verification boundary;
 - **Glaze UI** — controlled presentation and accessibility conformance;
 - **GoreeCloud Mesh** — private connectivity/service-publication boundary where applicable;
-- **GoreeCloud Identity** — identity/SSO/account boundary where applicable.
+- **GoreeCloud Identity** — identity/SSO/account boundary where applicable;
+- **GoreeCloud Policy** — shared policy evaluation, distribution, enforcement coordination, explanation, freshness, exception handling, and evidence where applicable;
+- **GoreeCloud Observability** — privacy-minimized health, metrics, diagnostics, dependency state, alerting, operational evidence, and incident visibility where applicable.
 
 Each system must prove its own acceptance. Another system's pass, repository CI, encryption, private networking, or a successful deployment cannot substitute for a missing acceptance record. Until qualifying evidence changes an individual state, `goreecloud.platform.yaml` must remain fail-closed and overall conformance must remain nonconformant.
 
