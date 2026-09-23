@@ -280,6 +280,14 @@ Use `goreecloud.platform.yaml` to determine applicable systems for this exact ca
   - authoritative evidence reference:
   - accepted scope/version:
   - accepted at and timezone:
+- GoreeCloud Policy state: NOT VERIFIED
+  - authoritative evidence reference:
+  - accepted scope/version:
+  - accepted at and timezone:
+- GoreeCloud Observability state: NOT VERIFIED
+  - authoritative evidence reference:
+  - accepted scope/version:
+  - accepted at and timezone:
 - All applicable Integral Platform Systems independently accepted for this candidate: NO
 
 The current schema-version-2 `goreevault-stable-evidence.json` has no dedicated fields for these per-system records. Do not add ad hoc fields to that strict JSON. Retain the authoritative system evidence separately and cross-reference it here until a governed Stable-evidence schema revision formally incorporates it.

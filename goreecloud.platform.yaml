@@ -1,14 +1,13 @@
-schema_version: '0.2'
+schema_version: '0.4'
 
 component:
   type: service
   id: goreecloud-vault-server
   product_name: GoreeCloud Vault Server
-  product_family: GoreeCloud Vault
-  repository: GoreeCloud/goreecloud-vault-server
+  repository: GoreeCloud/vault
 
 lifecycle: development
-version: null
+version: '1.0.0'
 
 supported_platforms:
   - linux
@@ -17,7 +16,9 @@ supported_platforms:
 api:
   versions: []
   endpoints:
-    - /alive
+    - name: alive
+      url: /alive
+      purpose: Non-sensitive service liveness interface.
 
 platform_systems:
   manager:
@@ -50,12 +51,12 @@ platform_systems:
       - docs/PRODUCTION-READINESS.md
     notes: Backup, destructive restore, migration and rollback tooling exist, but current Everkeep integration and exact-candidate continuity acceptance are incomplete.
   glaze_ui:
-    result: applicable-blocked
-    version: null
+    result: applicable-migration-required
+    version: '1.3.0'
     evidence:
       - docs/GLAZE-UI.md
       - README.md
-    notes: Server-owned presentation has source-level Glaze checks, but current applicable Stable Glaze UI 1.3.0 product-wide acceptance is not established and the upstream-compatible browser vault remains transitional.
+    notes: Server-owned presentation retains source-level Glaze UI 1.3.0 mapping and checks. Current shared Stable authority is Glaze UI 1.6.0; deliberate V1.6 migration plus product-wide rendered, accessibility, browser-client, representative-environment, performance, rollback, and production acceptance remain incomplete, and the upstream-compatible browser vault remains transitional.
   mesh:
     result: applicable-blocked
     version: null
@@ -74,6 +75,22 @@ platform_systems:
       - README.md
       - docs/SECURITY-MODEL.md
     notes: Identity integration must remain separate from Vault encryption and application authorization; accepted production GoreeCloud Identity integration is incomplete.
+
+  policy:
+    result: applicable-blocked
+    version: null
+    evidence:
+      - README.md
+      - docs/PRODUCTION-READINESS.md
+    notes: GoreeCloud Policy is applicable to administrative, authorization, retention, sharing, recovery, and operational policy decisions, but no accepted Policy runtime evaluation, enforcement coordination, explanation, freshness, exception, or evidence integration exists.
+
+  observability:
+    result: applicable-blocked
+    version: null
+    evidence:
+      - README.md
+      - docs/PRODUCTION-READINESS.md
+    notes: Vault has local health, security, release, and operational evidence tooling, but no accepted GoreeCloud Observability health, metrics, diagnostics, dependency-health, freshness, alerting, privacy-minimized telemetry, or production operational acceptance exists.
 
 health:
   health_endpoint: /alive
@@ -110,11 +127,11 @@ external_dependencies:
     version_constraint: null
 
 compatibility:
-  platform_contract: '0.2'
-  glaze_ui_required: '1.3.0'
+  platform_contract: '0.4'
+  glaze_ui_required: '1.6.0'
   requires:
-    - goreecloud-platform-contract==0.2
-    - glaze-ui==1.3.0
+    - goreecloud-platform-contract==0.4
+    - glaze-ui==1.6.0
   provides:
     - goreecloud-vault-server
     - vault-secrets-capability
@@ -138,9 +155,11 @@ conformance:
     - Privacy Shield runtime integration and current privacy acceptance are incomplete.
     - Wardveil Security runtime integration and current security acceptance are incomplete.
     - Everkeep current exact-candidate continuity acceptance is incomplete.
-    - Current applicable Stable Glaze UI 1.3.0 product-wide acceptance is incomplete.
+    - Current shared Stable Glaze UI 1.6.0 is the required consumer baseline; the retained 1.3.0 source mapping is migration evidence only, and product-wide V1.6 migration and acceptance are incomplete.
     - GoreeCloud Mesh runtime integration and acceptance are incomplete.
     - GoreeCloud Identity runtime integration and acceptance are incomplete.
+    - GoreeCloud Policy runtime evaluation, enforcement coordination, explanation, freshness, exception handling, and evidence integration are incomplete.
+    - GoreeCloud Observability health, metrics, diagnostics, dependency-health, freshness, alerting, privacy-minimized telemetry, and production operational acceptance are incomplete.
     - Real supported-client and WebAuthn/passkey acceptance are incomplete.
     - Target-environment deployment, recovery, migration, rollback and monitoring acceptance are incomplete.
     - Repository governance and final exact-release approval evidence are incomplete.

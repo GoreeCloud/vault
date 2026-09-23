@@ -7,7 +7,7 @@ GoreeCloud Vault Server is the synchronized backend for **GoreeCloud Vault**, Go
 
 ## Canonical identity
 
-The canonical product family is **GoreeCloud Vault**. The canonical backend is **GoreeCloud Vault Server**, and this repository is `GoreeCloud/goreecloud-vault-server`.
+The canonical product family is **GoreeCloud Vault**. The canonical backend is **GoreeCloud Vault Server**, and this repository is `GoreeCloud/vault`.
 
 The former product name **GoreeVault is retired**. It may appear only where required to preserve historical evidence or a compatibility-sensitive legacy implementation identifier. It must not be presented as a current product, client family, application, service, or brand.
 
@@ -35,7 +35,7 @@ Protected vault contents remain client-encrypted where required by the compatibl
 
 The native foundation is intentionally narrow and source-only. Its `native_foundation=true` status means the reviewed development boundary exists; every production and platform acceptance gate remains false.
 
-The native readiness model explicitly includes GoreeCloud Manager, Privacy Shield, Wardveil Security, Everkeep, Glaze UI, GoreeCloud Mesh, and GoreeCloud Identity, plus persistent storage, real supported clients, WebAuthn/passkey acceptance, migration/rollback acceptance, repository/release governance, target-environment acceptance, and production approval. The repository-root `goreecloud.platform.yaml` remains authoritative for Platform Contract state and currently records all seven Integral Platform Systems as `applicable-blocked` with overall conformance `nonconformant`.
+The native readiness model explicitly includes GoreeCloud Manager, Privacy Shield, Wardveil Security, Everkeep, Glaze UI, GoreeCloud Mesh, and GoreeCloud Identity, plus persistent storage, real supported clients, WebAuthn/passkey acceptance, migration/rollback acceptance, repository/release governance, target-environment acceptance, and production approval. The repository-root `goreecloud.platform.yaml` remains authoritative for Platform Contract state and currently records all nine Integral Platform Systems as `applicable-blocked` with overall conformance `nonconformant`.
 
 See `native/README.md`, `FEATURES.md`, and `SPECIFICATIONS.md` for the bounded development contract. Green native CI is evidence that this source foundation builds and remains fail closed; it is not evidence of production or platform acceptance.
 
@@ -45,7 +45,7 @@ GoreeCloud Vault Server is a multi-user service. Stable qualification requires e
 
 ## GoreeCloud Integral Platform Systems
 
-Every release and migration review must evaluate all seven current GoreeCloud Integral Platform Systems:
+Every release and migration review must evaluate all nine current GoreeCloud Integral Platform Systems:
 
 - **GoreeCloud Manager** — operational, lifecycle, administrative, and health visibility;
 - **Privacy Shield** — data minimization, privacy authorization, retention, telemetry, logging, deletion, and privacy-state controls;
@@ -53,7 +53,9 @@ Every release and migration review must evaluate all seven current GoreeCloud In
 - **Everkeep** — backup, restore, rollback, preservation, migration, portability, and continuity;
 - **Glaze UI** — current GoreeCloud presentation, accessibility, adaptive behavior, and interaction requirements;
 - **GoreeCloud Mesh** — governed capability, coordination, and interoperability interfaces where applicable;
-- **GoreeCloud Identity** — identity and account integration without collapsing Vault's encryption or application-authorization boundaries.
+- **GoreeCloud Identity** — identity and account integration without collapsing Vault's encryption or application-authorization boundaries;
+- **GoreeCloud Policy** — shared policy evaluation, distribution, enforcement coordination, explanation, freshness, exception handling, and evidence;
+- **GoreeCloud Observability** — privacy-minimized health, metrics, diagnostics, dependency state, alerting, operational evidence, and incident visibility.
 
 Current platform state is recorded fail-closed in `goreecloud.platform.yaml`. Missing or unaccepted integration keeps this service nonconformant and non-Stable.
 
@@ -115,4 +117,4 @@ GoreeCloud Vault Server is not affiliated with or endorsed by Bitwarden, Inc. Bi
 
 ## Release boundary
 
-Stable remains blocked until the exact release candidate satisfies the required native-development, security, privacy, accessibility, multi-user, supported-client, WebAuthn/passkey, migration, rollback, target-environment, repository-governance, recovery, Glaze UI, and seven-system platform acceptance gates. No documentation, naming change, or native source merge can waive those requirements.
+Stable remains blocked until the exact release candidate satisfies the required native-development, security, privacy, accessibility, multi-user, supported-client, WebAuthn/passkey, migration, rollback, target-environment, repository-governance, recovery, Glaze UI, and nine-system platform acceptance gates. No documentation, naming change, or native source merge can waive those requirements.
