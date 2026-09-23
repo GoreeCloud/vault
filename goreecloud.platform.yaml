@@ -4,7 +4,6 @@ component:
   type: service
   id: goreecloud-vault-server
   product_name: GoreeCloud Vault Server
-  product_family: GoreeCloud Vault
   repository: GoreeCloud/vault
 
 lifecycle: development
@@ -17,7 +16,9 @@ supported_platforms:
 api:
   versions: []
   endpoints:
-    - /alive
+    - name: alive
+      url: /alive
+      purpose: Non-sensitive service liveness interface.
 
 platform_systems:
   manager:
