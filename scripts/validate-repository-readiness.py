@@ -52,6 +52,8 @@ PLATFORM_SYSTEMS = (
     "Glaze UI",
     "GoreeCloud Mesh",
     "GoreeCloud Identity",
+    "GoreeCloud Policy",
+    "GoreeCloud Observability",
 )
 
 
@@ -325,13 +327,14 @@ def validate_mutable_production_examples() -> None:
 def validate_platform_contract() -> None:
     text = read("goreecloud.platform.yaml")
     for token in (
-        "schema_version: '0.2'", "id: goreecloud-vault-server", "product_name: GoreeCloud Vault Server",
-        "product_family: GoreeCloud Vault", "lifecycle: development", "manager:", "privacy_shield:",
-        "wardveil_security:", "everkeep:", "glaze_ui:", "mesh:", "identity:",
-        "glaze_ui_required: '1.3.0'", "status: nonconformant",
+        "schema_version: '0.4'", "id: goreecloud-vault-server", "product_name: GoreeCloud Vault Server",
+        "repository: GoreeCloud/vault", "lifecycle: development", "manager:", "privacy_shield:",
+        "wardveil_security:", "everkeep:", "glaze_ui:", "mesh:", "identity:", "policy:", "observability:",
+        "glaze_ui_required: '1.6.0'", "status: nonconformant",
     ):
         require(token in text, f"platform contract is missing required token: {token}")
-    require(text.count("result: applicable-blocked") >= 7, "all seven current platform systems must remain explicitly blocked until accepted")
+    require(text.count("result: applicable-blocked") >= 8, "all currently blocked platform systems must remain explicitly blocked until accepted")
+    require("result: applicable-migration-required" in text, "Glaze UI migration-required state must remain explicit until current-baseline acceptance")
     require("No Stable or production-approved release evidence is declared" in text, "platform contract must preserve the release boundary")
 
 
