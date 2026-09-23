@@ -54,6 +54,9 @@ PLATFORM_SYSTEMS = (
     "GoreeCloud Identity",
 )
 
+CANONICAL_REPOSITORY = "GoreeCloud/goreecloud-vault"
+RETIRED_REPOSITORY = "GoreeCloud/goreecloud-vault-server"
+
 
 class ReadinessError(ValueError):
     pass
@@ -87,6 +90,8 @@ def validate_readme() -> None:
     require("docs/SERVER-IDENTITY.md" in text, "README.md must link the canonical server identity contract")
     require("docs/REPOSITORY-STRUCTURE.md" in text, "README.md must link the repository structure contract")
     require("VAULT.md" in text, "README.md must link the current product-family record")
+    require(CANONICAL_REPOSITORY in text, "README.md must identify the canonical GoreeCloud Vault product-family repository")
+    require("product-family source-control boundary" in text, "README.md must document the shared repository component boundary")
     require("GoreeVault is retired" in text, "README.md must record retirement of the former product name")
     require("GoreeCloud Vault Web" in text and "GoreeCloud Vault CLI" in text, "README.md must use current Vault family names")
     require("multi-user" in text.lower(), "README.md must document GoreeCloud Vault Server multi-user readiness")
@@ -102,6 +107,8 @@ def validate_server_identity() -> None:
     require("former server name **GoreeVault Server**" in human, "server identity must record the retired server name")
     require("former product name **GoreeVault** is retired" in human, "server identity must record retirement of the former product name")
     require("GoreeCloud Vault Web" in human and "GoreeCloud Vault CLI" in human, "server identity must use current family names")
+    require(CANONICAL_REPOSITORY in human, "server identity must identify the canonical product-family repository")
+    require("previous repository slug `GoreeCloud/goreecloud-vault-server` is retired" in human, "server identity must classify the prior repository slug as historical")
 
     try:
         data = json.loads(read("docs/server-identity.json"))
@@ -113,7 +120,7 @@ def validate_server_identity() -> None:
         "canonical_name": "GoreeCloud Vault Server",
         "product_family_name": "GoreeCloud Vault",
         "short_name": "Vault Server",
-        "repository": "GoreeCloud/goreecloud-vault-server",
+        "repository": CANONICAL_REPOSITORY,
         "canonical_service_url": "https://vault.goreecloud.com",
         "former_server_name": "GoreeVault Server",
         "retired_product_name": "GoreeVault",
@@ -220,12 +227,13 @@ def validate_canonical_product_records() -> None:
             "GoreeCloud Vault Browser foundation",
             "GoreeCloud Vault Desktop foundation",
             "GoreeCloud Vault Mobile foundation",
-            "GoreeCloud/goreecloud-vault-web",
+            CANONICAL_REPOSITORY,
+            "web-client/",
         ),
         "docs/OPEN-READINESS-BLOCKERS.md": (
             "GoreeVault is retired",
             "GoreeCloud Vault Web completion",
-            "GoreeCloud/goreecloud-vault-web",
+            CANONICAL_REPOSITORY,
             "compatibility-sensitive `GoreeVault`/`goreevault` identifiers",
             "Blocker 7 — Integral Platform System acceptance",
             "overall service conformance as nonconformant",
@@ -245,7 +253,8 @@ def validate_canonical_product_records() -> None:
             "### `VAULT.md`",
             "### `goreecloud.platform.yaml`",
             "### `web-client/`",
-            "GoreeCloud/goreecloud-vault-web",
+            CANONICAL_REPOSITORY,
+            "Future client component directories",
         ),
         "docs/PRODUCTION-READINESS.md": (
             "GoreeVault is retired",
@@ -292,6 +301,7 @@ def validate_canonical_product_records() -> None:
         "## v0.5.0 — GoreeVault Desktop foundation",
         "## v0.6.0 — GoreeVault Mobile foundation",
         "GoreeCloud/goreevault-web",
+        "GoreeCloud/goreecloud-vault-web",
         "### `GOREVAULT.md`",
     )
     for path, text in records.items():

@@ -10,11 +10,13 @@ module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)
 
+REPOSITORY = "GoreeCloud/goreecloud-vault"
+
 
 class FakeClient:
     def __init__(self, overrides=None):
         self.responses = {
-            "/repos/GoreeCloud/goreecloud-vault-server/branches/main/protection": (
+            f"/repos/{REPOSITORY}/branches/main/protection": (
                 200,
                 {
                     "required_status_checks": {"checks": [{"context": "GoreeVault CI"}], "contexts": []},
@@ -24,7 +26,7 @@ class FakeClient:
                     },
                 },
             ),
-            "/repos/GoreeCloud/goreecloud-vault-server/environments/release": (
+            f"/repos/{REPOSITORY}/environments/release": (
                 200,
                 {
                     "protection_rules": [
@@ -36,15 +38,15 @@ class FakeClient:
                     ]
                 },
             ),
-            "/repos/GoreeCloud/goreecloud-vault-server/actions/permissions/workflow": (
+            f"/repos/{REPOSITORY}/actions/permissions/workflow": (
                 200,
                 {
                     "default_workflow_permissions": "read",
                     "can_approve_pull_request_reviews": False,
                 },
             ),
-            "/repos/GoreeCloud/goreecloud-vault-server/vulnerability-alerts": (204, None),
-            "/repos/GoreeCloud/goreecloud-vault-server": (
+            f"/repos/{REPOSITORY}/vulnerability-alerts": (204, None),
+            f"/repos/{REPOSITORY}": (
                 200,
                 {
                     "security_and_analysis": {
@@ -53,7 +55,7 @@ class FakeClient:
                     }
                 },
             ),
-            "/repos/GoreeCloud/goreecloud-vault-server/private-vulnerability-reporting": (
+            f"/repos/{REPOSITORY}/private-vulnerability-reporting": (
                 200,
                 {"enabled": True},
             ),
@@ -71,7 +73,7 @@ class GovernanceCollectorTests(unittest.TestCase):
     def collect(self, overrides=None):
         return module.collect(
             FakeClient(overrides),
-            "GoreeCloud/goreecloud-vault-server",
+            REPOSITORY,
             "main",
             "release",
         )
@@ -109,7 +111,7 @@ class GovernanceCollectorTests(unittest.TestCase):
         self.assertEqual(result["private_vulnerability_reporting"], "pass")
 
     def test_missing_required_checks_fails(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/branches/main/protection"
+        path = f"/repos/{REPOSITORY}/branches/main/protection"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -127,7 +129,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_codeowner_review_must_be_enforced(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/branches/main/protection"
+        path = f"/repos/{REPOSITORY}/branches/main/protection"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -145,7 +147,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_approval_count_must_be_positive(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/branches/main/protection"
+        path = f"/repos/{REPOSITORY}/branches/main/protection"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -163,7 +165,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_release_self_review_must_be_prevented(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/environments/release"
+        path = f"/repos/{REPOSITORY}/environments/release"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -183,7 +185,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_actions_default_must_be_read_only(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/actions/permissions/workflow"
+        path = f"/repos/{REPOSITORY}/actions/permissions/workflow"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -198,7 +200,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_actions_cannot_approve_pull_requests(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server/actions/permissions/workflow"
+        path = f"/repos/{REPOSITORY}/actions/permissions/workflow"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {
@@ -213,7 +215,7 @@ class GovernanceCollectorTests(unittest.TestCase):
             )
 
     def test_disabled_secret_scanning_fails(self):
-        path = "/repos/GoreeCloud/goreecloud-vault-server"
+        path = f"/repos/{REPOSITORY}"
         with self.assertRaises(module.EvidenceError):
             self.collect(
                 {

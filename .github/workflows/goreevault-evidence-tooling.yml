@@ -64,7 +64,7 @@ jobs:
       - name: Verify governance collector fails closed without a token
         run: |
           if env -u GITHUB_TOKEN python3 scripts/collect-github-governance-evidence.py \
-            --repository GoreeCloud/goreecloud-vault-server \
+            --repository GoreeCloud/goreecloud-vault \
             --output /tmp/governance.json; then
             echo 'governance collector unexpectedly succeeded without a GitHub token' >&2
             exit 1

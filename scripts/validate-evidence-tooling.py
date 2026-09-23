@@ -167,11 +167,13 @@ def validate_web_contract() -> None:
         "Accessibility acceptance",
         "Migration and fallback",
         "Stable-release gate",
-        "Creating a repository or rendering a Glaze shell does not close this blocker by itself.",
+        "Creating a component directory or rendering a Glaze shell does not close this blocker by itself.",
     )
     missing = [phrase for phrase in required_phrases if phrase not in text]
     require(not missing, f"GoreeCloud Vault Web contract is missing required security/readiness language: {', '.join(missing)}")
     require("former GoreeVault product identity is retired" in text, "Web client contract must record retirement of the former product identity")
+    require("GoreeCloud/goreecloud-vault" in text, "Web client contract must identify the canonical product-family repository")
+    require("web-client/" in text, "Web client contract must identify its in-repository component boundary")
 
 
 def validate_tests() -> None:

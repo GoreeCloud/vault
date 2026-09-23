@@ -6,9 +6,11 @@ Every GoreeCloud-controlled Vault interface must follow the current applicable S
 
 The current product identity is **GoreeCloud Vault**. The former GoreeVault identity is retired and must not appear as current controlled presentation. Historical and compatibility-sensitive implementation identifiers may remain only where a controlled migration is safer than immediate replacement.
 
+The canonical product-family repository is `GoreeCloud/goreecloud-vault`. It may contain Vault Server, Vault Web, and supported client components, but shared source control does not make one component's Glaze UI evidence or release acceptance valid for another component.
+
 ## GoreeCloud-controlled server surfaces
 
-Server administration pages, authentication/error presentation owned by this repository, transactional email, and future server-owned presentation must use GoreeCloud Vault or GoreeCloud Vault Server as appropriate.
+Server administration pages, authentication/error presentation owned by the Vault Server component, transactional email, and future server-owned presentation must use GoreeCloud Vault or GoreeCloud Vault Server as appropriate.
 
 Current transactional email is shared product presentation and therefore uses **GoreeCloud Vault**. Email presentation must remain readable without images, use local/text identity, avoid tracking pixels, remote scripts, remote fonts, analytics resources, and unnecessary sensitive detail.
 
@@ -24,6 +26,7 @@ Stable product readiness is blocked until the primary supported browser vault is
 - `src/static/scripts/admin.css` and `admin.js` — server-owned presentation and local appearance behavior.
 - `src/static/templates/404.hbs` and `src/static/scripts/404.css` — server-owned error presentation.
 - `src/static/templates/email/email_header.hbs`, `email_footer.hbs`, and `email_footer_text.hbs` — GoreeCloud Vault transactional presentation.
+- `web-client/` — in-repository GoreeCloud Vault Web development boundary with independent browser-client acceptance requirements.
 - `scripts/validate-glaze-ui.py` — source-level presentation checks.
 
 The existing local-storage key `goreecloud-goreevault-theme` is a compatibility-era identifier retained temporarily to avoid unnecessary local preference loss. It is not current product identity, is not sent to the server, and must be migrated only through a controlled compatibility-safe change.

@@ -3,7 +3,7 @@
   "canonical_name": "GoreeCloud Vault Server",
   "product_family_name": "GoreeCloud Vault",
   "short_name": "Vault Server",
-  "repository": "GoreeCloud/goreecloud-vault-server",
+  "repository": "GoreeCloud/goreecloud-vault",
   "canonical_service_url": "https://vault.goreecloud.com",
   "former_server_name": "GoreeVault Server",
   "retired_product_name": "GoreeVault",

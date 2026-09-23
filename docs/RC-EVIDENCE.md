@@ -6,6 +6,8 @@ This record complements, but does not replace, the machine-readable `goreevault-
 
 **GoreeCloud Vault** is the single canonical current product/client family and **GoreeCloud Vault Server** is its canonical backend. **GoreeVault is retired** as a current product identity. Existing workflow display names may retain GoreeVault only as legacy automation identifiers until a separately validated workflow-identity migration is completed; those labels do not define the current product name.
 
+The canonical product-family repository is `GoreeCloud/goreecloud-vault`. GoreeCloud Vault Web and other supported client components may share that source-control umbrella, but each component must retain independently verifiable artifact, compatibility, security, release, rollback, and acceptance evidence.
+
 ## Evidence-state vocabulary
 
 Use only:
@@ -21,6 +23,7 @@ Do not convert an unsupported or untested requirement to `PASS` merely to comple
 
 - RC tag:
 - Target Stable version:
+- Source repository: `GoreeCloud/goreecloud-vault`
 - Source commit SHA:
 - GoreeCloud Vault Server OCI image: `ghcr.io/goreecloud/goreecloud-vault-server@sha256:`
 - Exact OCI manifest digest:
@@ -233,7 +236,7 @@ After the work actually occurs, `scripts/collect-target-evidence.py` may be used
 
 The current bundled upstream-compatible browser vault is a temporary compatibility dependency. Under the current approved GoreeCloud path, it does **not** satisfy product-wide Stable Glaze UI ownership.
 
-`docs/WEB-CLIENT-CONTRACT.md` defines the future **GoreeCloud Vault Web** boundary. Until that separate client is implemented and accepted, record:
+`docs/WEB-CLIENT-CONTRACT.md` defines the in-repository **GoreeCloud Vault Web** component boundary under `web-client/`. Until that component is fully implemented and independently accepted, record:
 
 - Primary production browser vault is GoreeCloud-owned: NO
 - Product-wide Glaze UI conformance proven: NO

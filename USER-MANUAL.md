@@ -4,6 +4,8 @@
 
 **GoreeCloud Vault** is the canonical current product family and **GoreeCloud Vault Server** is its backend service. **GoreeVault is retired** as a current product identity. Historical and compatibility-sensitive `GoreeVault`/`goreevault` identifiers may remain only where preserving them is necessary for evidence, migration, rollback, interoperability, or historical truth.
 
+The canonical product-family repository is `GoreeCloud/goreecloud-vault`. It may maintain Vault Server, Vault Web, and supported Vault client components under one source-control umbrella, but shared repository history does not make any component production-ready or allow one component's evidence to substitute for another component's acceptance.
+
 The server is under active pre-Stable development and acceptance work. Repository source, CI success, validation tooling, deployment scaffolding, or candidate evidence must not be interpreted as a production or Stable claim.
 
 ## Service boundary
@@ -47,7 +49,7 @@ The repository's validation harnesses and synthetic test paths do not by themsel
 
 ## GoreeCloud Vault Web Argon2id work
 
-The repository contains validation-only browser-target Argon2id WebAssembly work, deterministic artifact evidence, controlled HTTPS browser harnesses, and fail-closed browser-evidence validation for the future **GoreeCloud Vault Web** client boundary.
+The repository contains validation-only browser-target Argon2id WebAssembly work, deterministic artifact evidence, controlled HTTPS browser harnesses, and fail-closed browser-evidence validation for the in-repository **GoreeCloud Vault Web** component boundary under `web-client/`.
 
 These foundations remain separate from production credential processing until the exact generated browser artifacts, runtime registration, CSP/performance/memory/compatibility behavior, release inclusion, and final acceptance have all been reviewed for the selected candidate.
 

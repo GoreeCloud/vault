@@ -2,6 +2,8 @@
 
 This roadmap uses **GoreeCloud Vault** as the single canonical current product family and **GoreeCloud Vault Server** as its canonical backend service. **GoreeVault is retired** as a current product identity. Historical records and compatibility-sensitive identifiers may retain `GoreeVault`/`goreevault` only where preservation is necessary for migration, release evidence, interoperability, rollback, or historical truth. See `SERVER-IDENTITY.md` and `../VAULT.md` for the current naming boundary.
 
+The canonical product-family repository is **`GoreeCloud/goreecloud-vault`**. It is intended to maintain Vault Server, Vault Web, and supported Vault client applications while keeping each component's implementation, security, compatibility, release, and acceptance lifecycle independently provable.
+
 ## v0.1.0 — Foundation
 
 Established:
@@ -70,7 +72,7 @@ This milestone is required for the current product-wide Stable path because Gore
 
 ### Foundation contract established
 
-`docs/WEB-CLIENT-CONTRACT.md` defines the implementation boundary before a dedicated client repository is created. The contract establishes:
+`docs/WEB-CLIENT-CONTRACT.md` defines the implementation boundary inside the canonical product-family repository. The contract establishes:
 
 - Role and Purpose for the browser client;
 - separation between GoreeCloud Vault Web and GoreeCloud Vault Server responsibilities;
@@ -82,13 +84,13 @@ This milestone is required for the current product-wide Stable path because Gore
 - restrictive CSP and local-only presentation dependency direction;
 - no analytics/behavioral tracking by default;
 - immutable release, dependency, SBOM, migration, and rollback requirements;
-- an explicit rule that creating a shell or repository does not close the Stable blocker by itself.
+- an explicit rule that repository co-location or creating a shell does not close the Stable blocker by itself.
 
-The dedicated **`GoreeCloud/goreecloud-vault-web`** repository/application remains to be created and implemented.
+The current implementation boundary is `web-client/` in **`GoreeCloud/goreecloud-vault`**. A separate Web repository is not required by the approved product-family repository model unless a later authoritative architecture decision explicitly introduces one.
 
 ### Required implementation foundation
 
-- dedicated GoreeCloud-native UI repository/application boundary;
+- dedicated in-repository GoreeCloud Vault Web component boundary with independent release evidence;
 - **Glaze UI Design Language** as the complete GoreeCloud Vault Web presentation and interaction system;
 - local-only browser presentation dependencies under GoreeCloud Privacy by Default;
 - accessible System/Light/Dark behavior, responsive layouts, keyboard/focus behavior, contrast and forced-colors support;
@@ -105,7 +107,7 @@ The existing bundled upstream web vault remains a temporary compatibility asset 
 
 ## v0.4.0 — GoreeCloud Vault Browser foundation
 
-- Firefox and Chromium extension;
+- in-repository client component for Firefox and Chromium extension work;
 - Glaze UI adapted to browser-extension platform conventions;
 - individual-user authentication/session lifecycle;
 - URI matching and autofill;
@@ -113,26 +115,29 @@ The existing bundled upstream web vault remains a temporary compatibility asset 
 - capture/update credentials;
 - secure local lock/unlock lifecycle;
 - GoreeCloud Vault client SDK reuse;
-- compatibility and threat-model review.
+- compatibility and threat-model review;
+- independent extension artifact and release acceptance despite shared repository history.
 
 ## v0.5.0 — GoreeCloud Vault Desktop foundation
 
-- GoreeCloud-native desktop client;
+- in-repository GoreeCloud-native desktop client component;
 - Glaze UI adapted to desktop accessibility and windowing conventions;
 - individual-user authentication/session lifecycle;
 - secure local encrypted state and lock lifecycle;
 - browser/desktop handoff strategy where appropriate;
-- update/distribution and code-signing plan.
+- update/distribution and code-signing plan;
+- independent desktop artifact and release acceptance despite shared repository history.
 
 ## v0.6.0 — GoreeCloud Vault Mobile foundation
 
-- Android-first GoreeCloud Vault mobile client, with iOS planning as applicable;
+- in-repository Android-first GoreeCloud Vault mobile client component, with iOS planning as applicable;
 - Glaze UI adapted to native mobile conventions;
 - individual-user authentication/session lifecycle;
 - biometric/device-keystore integration using platform security APIs;
 - autofill/credential-provider integration;
 - secure background/lock behavior;
-- mobile client compatibility matrix.
+- mobile client compatibility matrix;
+- independent mobile artifact and release acceptance despite shared repository history.
 
 ## v1.0.0 — Stable production release
 
@@ -152,4 +157,4 @@ Stable promotion requires the exact candidate artifact to satisfy `docs/PRODUCTI
 
 Under the current approved path, **GoreeCloud Vault Web** must reach its security, compatibility, accessibility, and Glaze UI gates before v1.0 Stable promotion. A future formally approved material exception could alter that dependency only if it satisfies the GoreeCloud exception standard; no such exception is currently approved.
 
-No semantic version or green build can bypass these gates.
+No semantic version, repository rename, component co-location, or green build can bypass these gates.

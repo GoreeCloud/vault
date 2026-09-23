@@ -7,7 +7,9 @@ GoreeCloud Vault Server is the synchronized backend for **GoreeCloud Vault**, Go
 
 ## Canonical identity
 
-The canonical product family is **GoreeCloud Vault**. The canonical backend is **GoreeCloud Vault Server**, and this repository is `GoreeCloud/goreecloud-vault-server`.
+The canonical product family is **GoreeCloud Vault**. The canonical backend is **GoreeCloud Vault Server**, and the canonical product-family repository is `GoreeCloud/goreecloud-vault`.
+
+The repository is intended to maintain GoreeCloud Vault Server, GoreeCloud Vault Web, and supported GoreeCloud Vault client applications under one product-family source-control boundary. Individual components still retain independent implementation, security, compatibility, release, and acceptance lifecycles; repository co-location does not collapse those gates.
 
 The former product name **GoreeVault is retired**. It may appear only where required to preserve historical evidence or a compatibility-sensitive legacy implementation identifier. It must not be presented as a current product, client family, application, service, or brand.
 
@@ -61,7 +63,7 @@ Current platform state is recorded fail-closed in `goreecloud.platform.yaml`. Mi
 
 Every GoreeCloud-controlled Vault interface must follow the current applicable Stable Glaze UI contract. The server-owned Admin and error surfaces are governed by `docs/GLAZE-UI.md`. The bundled upstream-compatible web vault is transitional and is not a permanent production presentation exception.
 
-The primary GoreeCloud browser experience is planned as **GoreeCloud Vault Web**. Product-wide Glaze UI acceptance remains separate from source-level server-surface validation.
+The primary GoreeCloud browser experience is planned as **GoreeCloud Vault Web** under the repository's `web-client/` product component boundary. Product-wide Glaze UI acceptance remains separate from source-level server-surface validation.
 
 ## Security and privacy posture
 
@@ -87,6 +89,7 @@ native/        development-only original GoreeCloud-owned server foundation
 scripts/       validation, evidence, migration and release tooling
 src/           transitional Rust server runtime plus GoreeCloud-owned server presentation
 tests/         compatibility and release-blocking regression coverage
+web-client/    in-repository GoreeCloud Vault Web development and release boundary
 ```
 
 See `docs/REPOSITORY-STRUCTURE.md` before changing a product-defining or compatibility-sensitive boundary.

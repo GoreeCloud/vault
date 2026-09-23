@@ -48,17 +48,17 @@ class RepositoryReadinessTests(unittest.TestCase):
         self.write(
             "docs/ROADMAP.md",
             "GoreeVault is retired.\n"
+            "GoreeCloud/goreecloud-vault\nweb-client/\n"
             "## v0.3.0 — GoreeCloud Vault Web foundation\n"
             "## v0.4.0 — GoreeCloud Vault Browser foundation\n"
             "## v0.5.0 — GoreeCloud Vault Desktop foundation\n"
-            "## v0.6.0 — GoreeCloud Vault Mobile foundation\n"
-            "GoreeCloud/goreecloud-vault-web\n",
+            "## v0.6.0 — GoreeCloud Vault Mobile foundation\n",
         )
         self.write(
             "docs/OPEN-READINESS-BLOCKERS.md",
             "GoreeVault is retired. Historical compatibility-sensitive `GoreeVault`/`goreevault` identifiers may remain.\n"
+            "GoreeCloud/goreecloud-vault\n"
             "## Blocker 5 — Product-wide Glaze UI ownership and GoreeCloud Vault Web completion\n"
-            "GoreeCloud/goreecloud-vault-web\n"
             "## Blocker 7 — Integral Platform System acceptance\n"
             "overall service conformance as nonconformant\n",
         )
@@ -75,8 +75,9 @@ class RepositoryReadinessTests(unittest.TestCase):
         )
         self.write(
             "docs/REPOSITORY-STRUCTURE.md",
-            "GoreeVault is retired.\n### `VAULT.md`\n### `goreecloud.platform.yaml`\n"
-            "### `web-client/`\nGoreeCloud/goreecloud-vault-web\n",
+            "GoreeVault is retired.\nGoreeCloud/goreecloud-vault\n"
+            "### `VAULT.md`\n### `goreecloud.platform.yaml`\n### `web-client/`\n"
+            "### Future client component directories\n",
         )
         self.write(
             "docs/PRODUCTION-READINESS.md",
@@ -129,14 +130,18 @@ class RepositoryReadinessTests(unittest.TestCase):
         with self.assertRaisesRegex(VALIDATOR.ReadinessError, "GoreeCloud Vault Server identity"):
             VALIDATOR.validate_readme()
 
-    def identity_json(self, canonical_name: str = "GoreeCloud Vault Server") -> str:
+    def identity_json(
+        self,
+        canonical_name: str = "GoreeCloud Vault Server",
+        repository: str = "GoreeCloud/goreecloud-vault",
+    ) -> str:
         return (
             "{\n"
             '  "schema_version": 2,\n'
             f'  "canonical_name": "{canonical_name}",\n'
             '  "product_family_name": "GoreeCloud Vault",\n'
             '  "short_name": "Vault Server",\n'
-            '  "repository": "GoreeCloud/goreecloud-vault-server",\n'
+            f'  "repository": "{repository}",\n'
             '  "canonical_service_url": "https://vault.goreecloud.com",\n'
             '  "former_server_name": "GoreeVault Server",\n'
             '  "retired_product_name": "GoreeVault",\n'
@@ -159,12 +164,20 @@ class RepositoryReadinessTests(unittest.TestCase):
             "The former server name **GoreeVault Server** is retired.\n"
             "The former product name **GoreeVault** is retired.\n"
             "GoreeCloud Vault Web and GoreeCloud Vault CLI are current family names.\n"
+            "GoreeCloud/goreecloud-vault is canonical.\n"
+            "The previous repository slug `GoreeCloud/goreecloud-vault-server` is retired.\n"
         )
 
     def test_server_identity_manifest_requires_canonical_name(self) -> None:
         self.write("docs/SERVER-IDENTITY.md", self.identity_human())
         self.write("docs/server-identity.json", self.identity_json("GoreeVault Server"))
         with self.assertRaisesRegex(VALIDATOR.ReadinessError, "canonical_name"):
+            VALIDATOR.validate_server_identity()
+
+    def test_server_identity_manifest_requires_current_repository(self) -> None:
+        self.write("docs/SERVER-IDENTITY.md", self.identity_human())
+        self.write("docs/server-identity.json", self.identity_json(repository="GoreeCloud/goreecloud-vault-server"))
+        with self.assertRaisesRegex(VALIDATOR.ReadinessError, "repository"):
             VALIDATOR.validate_server_identity()
 
     def test_server_identity_manifest_accepts_canonical_contract(self) -> None:
@@ -232,10 +245,25 @@ class RepositoryReadinessTests(unittest.TestCase):
             "docs/OPEN-READINESS-BLOCKERS.md",
             "GoreeVault is retired. Historical compatibility-sensitive `GoreeVault`/`goreevault` identifiers may remain.\n"
             "`GoreeVault` remains the broader client-family.\n"
+            "GoreeCloud/goreecloud-vault\n"
             "## Blocker 5 — Product-wide Glaze UI ownership and GoreeCloud Vault Web completion\n"
-            "GoreeCloud/goreecloud-vault-web\n"
             "## Blocker 7 — Integral Platform System acceptance\n"
             "overall service conformance as nonconformant\n",
+        )
+        with self.assertRaisesRegex(VALIDATOR.ReadinessError, "retired current-product wording"):
+            VALIDATOR.validate_canonical_product_records()
+
+    def test_canonical_product_records_reject_separate_web_repository_requirement(self) -> None:
+        self.write_canonical_product_records()
+        self.write(
+            "docs/ROADMAP.md",
+            "GoreeVault is retired.\n"
+            "GoreeCloud/goreecloud-vault\nweb-client/\n"
+            "GoreeCloud/goreecloud-vault-web\n"
+            "## v0.3.0 — GoreeCloud Vault Web foundation\n"
+            "## v0.4.0 — GoreeCloud Vault Browser foundation\n"
+            "## v0.5.0 — GoreeCloud Vault Desktop foundation\n"
+            "## v0.6.0 — GoreeCloud Vault Mobile foundation\n",
         )
         with self.assertRaisesRegex(VALIDATOR.ReadinessError, "retired current-product wording"):
             VALIDATOR.validate_canonical_product_records()

@@ -8,18 +8,21 @@ It is an implementation tracker, not authorization to bypass `docs/PRODUCTION-RE
 
 **GoreeCloud Vault** is the single canonical current product and client-family identity. **GoreeVault is retired** as a current product identity. Historical records and compatibility-sensitive `GoreeVault`/`goreevault` identifiers may remain only where preservation is necessary for evidence, migration, rollback, interoperability, or historical truth; they do not define the current product name.
 
+The canonical product-family repository is **`GoreeCloud/goreecloud-vault`**. The previous repository slug `GoreeCloud/goreecloud-vault-server` is historical after the verified rename and must not be used as current repository metadata. Server/service/image identifiers that legitimately use `goreecloud-vault-server` remain separate compatibility or component identifiers and are not renamed by this repository change.
+
 ## Current state
 
 **Status:** Stable blocked
 
-**Recorded:** August 21, 2026
+**Recorded:** September 11, 2026
 
-The current server stabilization chain has strong automated compatibility, security, recovery, migration, deployment, release-image, Stable-evidence, Glaze UI, repository-readiness, and evidence-tooling source checks. **GoreeCloud Vault Web** also has a Glaze UI incubation shell, deterministic release/SBOM evidence, a client SDK boundary, fail-closed prelogin/authentication architecture, a reviewed Rust Argon2id core, build-only WebAssembly identity evidence, an isolated pinned `wasm-bindgen` ABI path with deterministic generated-binding evidence, and a validation-only JavaScript runtime adapter exercised against the actual generated bindings and the legacy `goreevault` authentication-material compatibility path. None of those source milestones substitutes for the real-world gates below.
+The current server stabilization chain has strong automated compatibility, security, recovery, migration, deployment, release-image, Stable-evidence, Glaze UI, repository-readiness, and evidence-tooling source checks. **GoreeCloud Vault Web** also has a Glaze UI development shell, deterministic release/SBOM evidence, a client SDK boundary, fail-closed prelogin/authentication architecture, a reviewed Rust Argon2id core, build-only WebAssembly identity evidence, an isolated pinned `wasm-bindgen` ABI path with deterministic generated-binding evidence, and a validation-only JavaScript runtime adapter exercised against the actual generated bindings and the legacy `goreevault` authentication-material compatibility path. None of those source milestones substitutes for the real-world gates below.
 
 ## Blocker 1 — GitHub repository governance
 
 ### Current verified state
 
+- The canonical repository is `GoreeCloud/goreecloud-vault`; the prior repository URL redirects to it after the verified rename.
 - GitHub repository rulesets endpoint returns no rulesets.
 - GitHub Actions environments endpoint returns no environments.
 - `main` is currently reported by GitHub as unprotected.
@@ -29,7 +32,7 @@ The current server stabilization chain has strong automated compatibility, secur
 ### Required completion evidence
 
 - protect `main` against direct/unreviewed release-source changes;
-- enforce required GoreeCloud Vault Server release-blocking checks;
+- enforce required GoreeCloud Vault release-blocking checks;
 - enforce CODEOWNERS review for protected surfaces;
 - create the protected `release` environment;
 - require at least one release reviewer;
@@ -90,19 +93,19 @@ The bundled upstream-compatible web vault remains a temporary development/compat
 
 Under the current GoreeCloud mandatory Glaze UI baseline, Stable is blocked until GoreeCloud owns the primary browser-vault presentation and product-wide Glaze UI conformance is proven.
 
-The approved current path is **GoreeCloud Vault Web** as defined in `docs/ROADMAP.md`.
+The approved current path is **GoreeCloud Vault Web** as defined in `docs/ROADMAP.md` and `docs/WEB-CLIENT-CONTRACT.md`.
 
 ### Current implementation status
 
 `docs/WEB-CLIENT-CONTRACT.md` defines the GoreeCloud Vault Web Role and Purpose, server/client ownership boundary, client-side zero-knowledge rules, multi-user browser isolation, browser storage policy, compatible workflow baseline, Glaze UI requirements, accessibility acceptance, CSP/dependency direction, privacy/telemetry rules, immutable release evidence, and reversible migration/fallback requirements.
 
-The temporary `web-client/` incubation boundary now includes a GoreeCloud-owned GoreeCloud Vault Web Glaze UI application shell, deterministic static release/SPDX evidence, a GoreeCloud Vault client SDK facade, SDK-backed email-only prelogin, account-scoped memory-only session/sync foundations, reviewed PBKDF2 and low-level vault-cryptography primitives, a fail-closed Argon2id provider contract, a pinned RustCrypto Argon2id core, exact build-only WebAssembly identity evidence, an isolated pinned `wasm-bindgen` ABI path with deterministic generated-binding evidence, and a validation-only JavaScript runtime adapter. The adapter copies and clears caller-controlled secret/salt buffers, clears controllable generated-binding output after copying it into independent memory, propagates failures without PBKDF2 fallback, and is continuously exercised against the actual generated `wasm-bindgen` module and the legacy `goreevault` authentication-material compatibility path. Production registration, browser-bundle inclusion, and credential processing remain explicitly unapproved.
+The in-repository `web-client/` component inside `GoreeCloud/goreecloud-vault` now contains a GoreeCloud-owned GoreeCloud Vault Web Glaze UI application shell, deterministic static release/SPDX evidence, a GoreeCloud Vault client SDK facade, SDK-backed email-only prelogin, account-scoped memory-only session/sync foundations, reviewed PBKDF2 and low-level vault-cryptography primitives, a fail-closed Argon2id provider contract, a pinned RustCrypto Argon2id core, exact build-only WebAssembly identity evidence, an isolated pinned `wasm-bindgen` ABI path with deterministic generated-binding evidence, and a validation-only JavaScript runtime adapter. The adapter copies and clears caller-controlled secret/salt buffers, clears controllable generated-binding output after copying it into independent memory, propagates failures without PBKDF2 fallback, and is continuously exercised against the actual generated `wasm-bindgen` module and the legacy `goreevault` authentication-material compatibility path. Production registration, browser-bundle inclusion, and credential processing remain explicitly unapproved.
 
-The planned standalone **`GoreeCloud/goreecloud-vault-web`** repository has not yet been created. The current GitHub connector cannot create repositories, so this source-separation requirement remains open rather than being simulated inside the server repository.
+The repository rename and product-family monorepo decision remove the former requirement to create a separate Web repository. This does **not** close the browser-ownership blocker: the Web component still requires its own exact source/artifact identity, release evidence, security/privacy/accessibility acceptance, compatibility proof, rollback evidence, and production cutover approval.
 
 Remaining completion evidence includes:
 
-- standalone GoreeCloud-owned browser-vault repository and independent release lifecycle;
+- finalized in-repository GoreeCloud Vault Web component boundary and independent release lifecycle/evidence;
 - reviewed production browser loading and runtime registration of the Argon2id provider;
 - immutable browser release/SBOM coverage for the final WebAssembly module and generated glue;
 - real browser performance, memory, CSP, and compatibility evidence for the generated WebAssembly path;

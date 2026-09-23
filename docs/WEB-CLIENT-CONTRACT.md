@@ -8,7 +8,7 @@ The former GoreeVault product identity is retired. Historical and compatibility-
 
 GoreeCloud Vault Web is required on the current path to product-wide Stable readiness because the bundled upstream-compatible web vault is a temporary compatibility dependency and does not establish native GoreeCloud browser ownership or current Glaze UI acceptance.
 
-This contract does not authorize a browser-vault cutover and does not claim that a standalone GoreeCloud Vault Web repository already exists.
+The canonical source-control umbrella is `GoreeCloud/goreecloud-vault`. GoreeCloud Vault Web is maintained as an independently governed product component inside that repository, currently under `web-client/`. Repository co-location does not authorize browser-vault cutover and does not collapse Web, Server, or other client release and acceptance lifecycles.
 
 ## Role and Purpose
 
@@ -23,6 +23,8 @@ GoreeCloud Vault Web must not become a server-side decryption layer, credential-
 GoreeCloud Vault Web owns browser presentation and interaction, Glaze UI behavior, client-side vault encryption/decryption, client key lifecycle and lock state, encrypted local state, browser session handling, Vault Server API integration, accessibility, client import/export UX, and browser release/supply-chain controls.
 
 GoreeCloud Vault Server owns authenticated API behavior, persistence, authorization, organizations and collections, encrypted object and attachment persistence, token lifecycle, server-side WebAuthn/passkey protocol participation, rate limiting, backend policy, migrations, and server recovery.
+
+Both components may live in `GoreeCloud/goreecloud-vault`, but their authority boundaries remain separate. Shared repository history, CI infrastructure, or release tooling must not be used as evidence that one component's acceptance automatically accepts another component.
 
 Neither boundary authorizes the server to receive or retain plaintext master passwords, decrypted vault contents, derived encryption keys, decrypted attachments, TOTP seeds, passkey private material, or other client-side plaintext secrets beyond what an explicitly reviewed compatible protocol requires.
 
@@ -78,10 +80,12 @@ Production cutover requires representative browser acceptance for keyboard-only 
 
 A GoreeCloud Vault Web Release Candidate must have exact source identity, locked dependencies, automated tests, security/dependency scanning, Glaze UI and accessibility gates, exact Vault Server compatibility tests, immutable browser artifact identity, an SBOM or equivalent inventory, rollback documentation, and exact-candidate evidence.
 
+The Web component must retain its own versioned release evidence and accepted artifact identity even when its source is stored in the same repository as Vault Server and other Vault clients.
+
 ## Migration and fallback
 
 The upstream-compatible web vault remains only as a transitional compatibility/fallback asset until GoreeCloud Vault Web passes required compatibility, security, privacy, accessibility, migration, recovery, and release gates. Cutover must be reversible and must not require database downgrade or plaintext export merely to restore the previously accepted browser client.
 
 ## Stable-release gate
 
-GoreeCloud Vault Web closes the browser-ownership blocker only when the primary production browser vault is GoreeCloud-owned, current Glaze UI conformance is accepted, zero-knowledge boundaries are preserved, the supported browser workflow matrix passes against the exact server candidate, accessibility passes, release artifacts are immutable and traceable, rollback is proven, and final Stable evidence identifies the accepted browser artifact. Creating a repository or rendering a Glaze shell does not close this blocker by itself.
+GoreeCloud Vault Web closes the browser-ownership blocker only when the primary production browser vault is GoreeCloud-owned, current Glaze UI conformance is accepted, zero-knowledge boundaries are preserved, the supported browser workflow matrix passes against the exact server candidate, accessibility passes, release artifacts are immutable and traceable, rollback is proven, and final Stable evidence identifies the accepted browser artifact. Creating a component directory or rendering a Glaze shell does not close this blocker by itself.
