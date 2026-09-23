@@ -16,7 +16,7 @@ The native crate records explicit production gates for GoreeCloud Manager, Goree
 
 All current production gates are false. The native `ready` command exits unsuccessfully until the required gates are accepted.
 
-The repository-root `goreecloud.platform.yaml` remains the authoritative machine-readable Platform Contract. All seven Integral Platform Systems remain `applicable-blocked`; the native source must not independently convert those states to accepted.
+The repository-root `goreecloud.platform.yaml` currently declares the obsolete Platform Contract 0.2 seven-system model. It remains truthful machine-readable repository state, but it is **migration-required** under current Platform Contract 0.4 authority and must not be represented as current platform conformance. Current governance requires evaluation of exactly nine Integral Platform Systems: GoreeCloud Manager, Privacy Shield, Wardveil Security, Everkeep, Glaze UI, GoreeCloud Mesh, GoreeCloud Identity, GoreeCloud Policy, and GoreeCloud Observability. GoreeCloud Sync remains separately governed. Existing declared integrations remain blocked, Policy and Observability still require explicit manifest evaluation, and the native source must not independently convert any platform-system state to accepted.
 
 ### Owner-scoped opaque encrypted-record development store
 
@@ -71,6 +71,8 @@ The following remain incomplete in the native path:
 - Privacy Shield integration;
 - Everkeep integration;
 - GoreeCloud Mesh integration;
+- GoreeCloud Policy integration/evaluation;
+- GoreeCloud Observability integration/evaluation;
 - real-client acceptance;
 - production approval;
 - Stable release.
