@@ -8,7 +8,7 @@ Use `PROJECT-SPECIFICATIONS.md` for authoritative product requirements, `PLANNED
 
 ## Immediate engineering boundary
 
-Before adding any credential or secret persistence/retrieval operation, complete a dedicated threat model and reviewed design for:
+Before adding any protected-record persistence or retrieval operation, complete a dedicated threat model and reviewed design for:
 
 - key derivation and hierarchy;
 - encryption envelope and algorithm/library selection;
