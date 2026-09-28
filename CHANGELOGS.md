@@ -4,6 +4,12 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Repository governance hardening
+
+- Added fail-closed repository-governance validation for mandatory Vault project/security records.
+- Added automated checks preserving the 54-item planned-capability baseline, planned-versus-implemented feature boundary, human cryptographic-review gate, nine Integral Platform System assessment, retired roadmap rule, and sensitive-file ignore baseline.
+- Added exact-source GitHub Actions validation for the repository-governance script.
+
 ### Security CI hardening
 
 - Added exact-source Go vulnerability reachability scanning using pinned `govulncheck v1.8.0`.
