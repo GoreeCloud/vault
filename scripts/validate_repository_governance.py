@@ -10,6 +10,7 @@ REQUIRED_FILES = (
     "README.md",
     "SPECIFICATIONS.md",
     "PROJECT-SPECIFICATIONS.md",
+    "MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md",
     "PROJECT-RECORD.md",
     "FEATURES.md",
     "IMPLEMENTED-FEATURES.md",
@@ -50,6 +51,14 @@ REQUIRED_TEXT = {
     "SPECIFICATIONS.md": (
         "PROJECT-SPECIFICATIONS.md",
         "must not become a parallel or conflicting authority",
+    ),
+    "PROJECT-SPECIFICATIONS.md": (
+        "MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md",
+        "must not be silently discarded",
+    ),
+    "MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md": (
+        "Complete text migrated from the former Google Drive file",
+        "not current implementation evidence",
     ),
     "IMPLEMENTED-FEATURES.md": (
         "No numbered GoreeCloud Vault product capability",
