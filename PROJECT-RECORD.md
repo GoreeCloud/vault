@@ -1,5 +1,16 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — CI provenance and repository-governance hardening candidate
+
+- Added `scripts/validate_repository_governance.py` to fail closed when mandatory Vault records are missing, the retired `FEATURE-ROADMAP.md` reappears, Development lifecycle language is lost, or the current human security-review gate is removed unexpectedly.
+- Added a repository-governance workflow with exact-source verification.
+- Hardened the main Go CI and vulnerability workflow to use the GoreeCloud-established pinned `actions/checkout` v7.0.1 commit, disable persisted checkout credentials, and run on Ubuntu 24.04.
+- Added exact-source, Go module-integrity, and tidy-metadata validation to the primary Go CI.
+
+### Verification boundary
+
+This milestone is CI/provenance hardening only. It does not alter Vault runtime behavior, cryptographic design, authentication, authorization, secret handling, network exposure, or the human review requirement tracked in GitHub issue #4.
+
 ## 2026-09-27 — Security review workflow and vulnerability scanning established
 
 - Opened GitHub issue #4 to obtain explicit human security review of the Security Design 0.2 threat model and cryptographic architecture at exact commit `3dfcb2ac6264efe9e5f929f83a28f010374199c1`.

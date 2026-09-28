@@ -4,6 +4,12 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Security CI provenance
+
+- Added a fail-closed repository-governance validator for mandatory Vault records, the retired roadmap filename, Development lifecycle truthfulness, and the current human security-review gate.
+- Added a dedicated repository-governance workflow with exact-source verification.
+- Pinned `actions/checkout` to the GoreeCloud-established v7.0.1 commit, disabled persisted checkout credentials, moved validation jobs to Ubuntu 24.04, and added exact-source/module-integrity/tidy checks to the main Go CI.
+
 ### Security CI hardening
 
 - Added exact-source Go vulnerability reachability scanning using pinned `govulncheck v1.8.0`.
