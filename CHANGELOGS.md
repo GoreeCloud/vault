@@ -4,6 +4,14 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Repository baseline completion
+
+- Added the mandatory root specification pointer, feature, benefits, competitive-objectives, branding, and user-manual records.
+- Extended fail-closed repository governance to require the complete baseline, all nine Integral Platform Systems, sensitive-file ignore patterns, and the active human security-review blocker.
+- Retained the Platform Contract and editor baseline already merged through PR #9.
+- This change does not alter runtime behavior, cryptographic design, protected storage, authentication, authorization, deployment, or Stable eligibility.
+
+
 
 ### Platform Contract governance
 

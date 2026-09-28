@@ -54,10 +54,13 @@ Non-loopback addresses are rejected by design in this foundation.
 
 ## Authoritative repository records
 
+- `SPECIFICATIONS.md` — compatibility pointer to the authoritative project specification.
 - `PROJECT-SPECIFICATIONS.md` — governing project requirements and capability specification.
 - `PLANNED-FEATURES.md` — required/planned capabilities awaiting verified implementation.
 - `IMPLEMENTED-FEATURES.md` — capabilities or non-feature foundations verified in source, with scope limits stated explicitly.
 - `PROJECT-RECORD.md` — significant verified project history and decisions.
+- `FEATURES.md`, `BENEFITS.md`, and `COMPETITIVE-OBJECTIVES.md` — feature-state summary, product value, and target objectives.
+- `BRANDING.md` and `USER-MANUAL.md` — product identity and current Development-use guidance.
 - `CHANGELOGS.md` — repository change history.
 - `NOTES.md` — maintained development and implementation notes.
 - `ARCHITECTURE.md` — architecture and trust-boundary baseline.

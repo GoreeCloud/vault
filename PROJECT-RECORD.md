@@ -1,5 +1,17 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Repository baseline completion candidate
+
+- Added the remaining mandatory repository-root controls: `SPECIFICATIONS.md`, `FEATURES.md`, `BENEFITS.md`, `COMPETITIVE-OBJECTIVES.md`, `BRANDING.md`, and `USER-MANUAL.md`.
+- Preserved the `.editorconfig` and `goreecloud.platform.yaml` baseline already merged through PR #9.
+- Extended the repository-governance validator so the complete root baseline, all nine Integral Platform Systems, sensitive-file ignore patterns, and the issue #4 protected-storage blocker fail closed if removed.
+- Kept `FEATURE-ROADMAP.md` retired and absent.
+
+### Verification boundary
+
+This is repository-governance and documentation hardening only. It does not change runtime behavior, approve cryptography, authorize protected secret persistence, establish authentication or authorization, change exposure, or alter release/Stable status. GitHub issue #4 remains the human security-review gate.
+
+
 ## 2026-09-27 — Platform Contract governance baseline
 
 - Added `goreecloud.platform.yaml` with Development lifecycle truthfulness, loopback health/readiness evidence, all nine applicable Integral Platform Systems in blocked state, and explicit nonconformance blockers.
