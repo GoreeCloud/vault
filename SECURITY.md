@@ -37,6 +37,14 @@ Never commit active secret values. Examples and templates must use placeholders.
 
 The repository now contains `THREAT-MODEL.md` and `CRYPTOGRAPHY.md` as Development security-design candidates. They are reviewable inputs, not security approval. GoreeCloud secure-coding instructions require explicit human review for cryptographic trust decisions, so protected secret persistence remains blocked until that review is recorded against an exact repository revision.
 
+## Current human-review gate
+
+GitHub issue #4 tracks the required explicit human review of the exact Security Design 0.2 candidate on commit `3dfcb2ac6264efe9e5f929f83a28f010374199c1`. The issue must record acceptance or required changes against an exact revision before protected storage may proceed.
+
+## Automated vulnerability reachability
+
+The repository includes a dedicated Go vulnerability workflow that verifies the exact source revision, module integrity and tidy metadata, then runs pinned `govulncheck v1.8.0` against reachable code. Scanner success is supporting evidence only and does not substitute for human security review.
+
 ## Security review gates before secret handling
 
 Before the repository implements protected-record storage or retrieval as an accepted security foundation, the relevant change must define and receive explicit human security review for at least:
