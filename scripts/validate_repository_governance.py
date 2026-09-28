@@ -46,7 +46,7 @@ REQUIRED_TEXT = {
     "SECURITY.md": (
         "GitHub issue #4",
         "protected secret persistence remains blocked",
-        "Scanner success is supporting evidence only",
+        "supporting evidence only and does not substitute for human security review",
     ),
     "THREAT-MODEL.md": (
         "pending explicit human security review",
