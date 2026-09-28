@@ -1,5 +1,15 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Security review workflow and vulnerability scanning established
+
+- Opened GitHub issue #4 to obtain explicit human security review of the Security Design 0.2 threat model and cryptographic architecture at exact commit `3dfcb2ac6264efe9e5f929f83a28f010374199c1`.
+- Added a dedicated vulnerability-reachability workflow modeled on the current GoreeCloud Gateway pattern: exact-source checkout verification, Go module integrity, tidy metadata enforcement, pinned `govulncheck v1.8.0`, and reachable-vulnerability scanning.
+- The workflow hardens repository evidence without changing runtime behavior, cryptographic design, authorization logic, network exposure, or protected-data handling.
+
+### Verification boundary
+
+Automated vulnerability scanning can identify reachable known Go vulnerabilities but cannot approve cryptographic trust, authorization, protected storage, deployment, or Stable status. VLT-005 remains blocked until GitHub issue #4 records explicit human acceptance for an exact reviewed revision.
+
 ## 2026-09-27 — Threat model and cryptographic architecture candidate established
 
 - Added `THREAT-MODEL.md` with explicit assets, adversaries, trust boundaries, security invariants, abuse/failure cases, and twenty primary threat cases spanning offline theft, cross-vault substitution, rollback/replay, browser-origin phishing, compromised clients, logging/memory disclosure, recovery, sharing, machine secrets, backups, downgrade, stale devices, administrative bypass, deletion ambiguity, and supply-chain compromise.
