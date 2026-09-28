@@ -11,6 +11,13 @@
 
 Feature lifecycle state is maintained in **PLANNED-FEATURES.md** and **IMPLEMENTED-FEATURES.md**. Significant verified project history is maintained in **PROJECT-RECORD.md**.
 
+
+## Migrated specification source
+
+The complete former Google Drive project specification dated September 15, 2026 is preserved in **MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md** as a migration source. Its requirements and historical context must not be silently discarded. Where that source contains requirements not yet represented below, they remain specification inputs pending explicit reconciliation.
+
+The migrated source is not implementation evidence. Any claims in it about predecessor source, deployment, validation, or architecture must be revalidated against the current `GoreeCloud/vault` repository lineage before they can support an implemented, production, or Stable claim.
+
 GoreeCloud Vault will be GoreeCloud's authoritative platform for securely storing, managing, generating, using, sharing, and protecting passwords, passkeys, authentication secrets, identities, payment information, developer secrets, and other sensitive information.
 
 It will combine strong password-management capabilities with passkey management, authentication, secure sharing, developer tooling, enterprise controls, offline operation, self-hosting, and GoreeCloud-native privacy and security architecture.
