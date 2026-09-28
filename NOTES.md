@@ -2,6 +2,8 @@
 
 ## Current repository state
 
+The repository-governance validation candidate adds fail-closed checks for mandatory Vault records and lifecycle/security-review boundaries. It is repository-integrity automation only and does not change the protected-storage gate.
+
 The repository contains an initial Development service foundation plus the authoritative project specification. The executable surface remains intentionally small and does not handle protected Vault records.
 
 Use `PROJECT-SPECIFICATIONS.md` for authoritative product requirements, `PLANNED-FEATURES.md` for requirements awaiting verified implementation, `IMPLEMENTED-FEATURES.md` for verified implementation scope, and `PROJECT-RECORD.md` for significant verified history.
