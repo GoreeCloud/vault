@@ -4,6 +4,12 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Security CI hardening
+
+- Added exact-source Go vulnerability reachability scanning using pinned `govulncheck v1.8.0`.
+- Added module-integrity and tidy-metadata checks to the vulnerability workflow.
+- Opened GitHub issue #4 as the explicit human-review gate for the Security Design 0.2 threat model and cryptographic architecture.
+
 ### Security design candidate
 
 - Added a Vault threat model covering remote, local, browser, sync, recovery, administrator, supply-chain, and cross-vault threat cases.
