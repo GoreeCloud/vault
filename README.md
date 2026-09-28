@@ -64,6 +64,8 @@ Non-loopback addresses are rejected by design in this foundation.
 - `SECURITY.md` — project security policy and development gates.
 - `PRIVACY.md` — privacy architecture and current behavior.
 - `PLATFORM-INTEGRATIONS.md` — nine-system applicability/conformance assessment.
+- `THREAT-MODEL.md` — security threat-model candidate pending explicit human review.
+- `CRYPTOGRAPHY.md` — cryptographic architecture candidate pending explicit human review.
 
 ## Core authority boundary
 
