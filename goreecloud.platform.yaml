@@ -1,0 +1,92 @@
+schema_version: "0.4"
+
+component:
+  type: service
+  id: goreecloud-vault
+  product_name: GoreeCloud Vault
+  repository: GoreeCloud/vault
+
+lifecycle: development
+version: unreleased-development
+
+supported_platforms:
+  - linux
+
+api:
+  versions: []
+  endpoints: []
+
+platform_systems:
+  manager:
+    result: applicable-blocked
+    version: null
+    evidence: [README.md, PLATFORM-INTEGRATIONS.md]
+  privacy_shield:
+    result: applicable-blocked
+    version: null
+    evidence: [PRIVACY.md, PLATFORM-INTEGRATIONS.md]
+  wardveil_security:
+    result: applicable-blocked
+    version: null
+    evidence: [SECURITY.md, THREAT-MODEL.md, PLATFORM-INTEGRATIONS.md]
+  everkeep:
+    result: applicable-blocked
+    version: null
+    evidence: [ARCHITECTURE.md, PLATFORM-INTEGRATIONS.md]
+  glaze_ui:
+    result: applicable-blocked
+    version: null
+    evidence: [PROJECT-SPECIFICATIONS.md, PLATFORM-INTEGRATIONS.md]
+  mesh:
+    result: applicable-blocked
+    version: null
+    evidence: [PLATFORM-INTEGRATIONS.md]
+    capabilities: []
+    dependencies: []
+    published_events: []
+    consumed_events: []
+  identity:
+    result: applicable-blocked
+    version: null
+    evidence: [PLATFORM-INTEGRATIONS.md]
+  policy:
+    result: applicable-blocked
+    version: null
+    evidence: [PLATFORM-INTEGRATIONS.md]
+  observability:
+    result: applicable-blocked
+    version: null
+    evidence: [PLATFORM-INTEGRATIONS.md]
+
+health:
+  health_endpoint: "http://127.0.0.1:8787/healthz"
+  readiness_endpoint: "http://127.0.0.1:8787/readyz"
+
+external_dependencies: []
+
+compatibility:
+  platform_contract: "0.4"
+  requires:
+    - goreecloud-platform-contract==0.4
+  provides: []
+
+evidence:
+  acceptance_tests: []
+  release: []
+
+conformance:
+  status: nonconformant
+  validated_at: null
+  evidence:
+    - README.md
+    - ARCHITECTURE.md
+    - SECURITY.md
+    - PRIVACY.md
+    - PLATFORM-INTEGRATIONS.md
+    - THREAT-MODEL.md
+    - CRYPTOGRAPHY.md
+  blockers:
+    - Protected secret persistence remains blocked pending the explicit human security review tracked in GitHub issue #4.
+    - All nine applicable Integral Platform System integrations remain unaccepted.
+    - Production-representative security, privacy, recovery, and rollback evidence is incomplete.
+    - No Stable or production-approved release evidence exists.
