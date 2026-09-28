@@ -1,5 +1,16 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Platform Contract governance baseline
+
+- Added `goreecloud.platform.yaml` with Development lifecycle truthfulness, loopback health/readiness evidence, all nine applicable Integral Platform Systems in blocked state, and explicit nonconformance blockers.
+- Added `.editorconfig` for consistent repository text handling.
+- Extended fail-closed repository-governance validation to require those controls and preserve GitHub issue #4 as the protected-storage security-review gate.
+
+### Verification boundary
+
+This milestone changes repository governance only. It does not alter Vault runtime behavior, cryptography, authentication, authorization, protected data handling, network exposure, release state, or Stable eligibility. Protected secret persistence remains blocked pending explicit human review.
+
+
 ## 2026-09-27 — CI provenance and repository-governance hardening established
 
 - Added `scripts/validate_repository_governance.py` to fail closed when mandatory Vault records are missing, the retired `FEATURE-ROADMAP.md` reappears, Development lifecycle language is lost, or the current human security-review gate is removed unexpectedly.
