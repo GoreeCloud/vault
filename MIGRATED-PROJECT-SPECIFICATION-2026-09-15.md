@@ -4,6 +4,8 @@
 >
 > **Authority boundary:** This file preserves source requirements and historical context so no project-specification information is lost during the mandatory Drive-to-GitHub migration. It is **not** current implementation evidence and does not override newer repository-local lifecycle, security-review, or feature-state records. The active target specification remains `PROJECT-SPECIFICATIONS.md`. Statements about predecessor implementations, deployments, or verification remain historical unless revalidated against the current repository lineage.
 >
+> This migrated source is not current implementation evidence.
+>
 > **Reconciliation rule:** Requirements in this migrated source that are not yet represented in the active specification remain migration inputs and must not be silently discarded. Any future conflict must be resolved explicitly in repository history.
 
 ---
