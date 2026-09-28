@@ -2,9 +2,23 @@
 
 ## Current repository state
 
-The repository documentation baseline defines what GoreeCloud Vault must become. It does not establish that the specified product capabilities have been implemented.
+The repository contains an initial Development service foundation plus the authoritative project specification. The executable surface remains intentionally small and does not handle protected Vault records.
 
-Use PROJECT-SPECIFICATIONS.md for authoritative product requirements, PLANNED-FEATURES.md for requirements awaiting verified implementation, IMPLEMENTED-FEATURES.md for verified completed capabilities, and PROJECT-RECORD.md for significant verified history.
+Use `PROJECT-SPECIFICATIONS.md` for authoritative product requirements, `PLANNED-FEATURES.md` for requirements awaiting verified implementation, `IMPLEMENTED-FEATURES.md` for verified implementation scope, and `PROJECT-RECORD.md` for significant verified history.
+
+## Immediate engineering boundary
+
+Before adding any protected-record persistence or retrieval operation, complete a dedicated threat model and reviewed design for:
+
+- key derivation and hierarchy;
+- encryption envelope and algorithm/library selection;
+- unlock and reauthentication state;
+- storage and local-cache protection;
+- account/vault/organization authorization isolation;
+- synchronization and conflict semantics;
+- record history and secure deletion limitations;
+- backup/recovery and disaster-recovery key handling;
+- redacted diagnostics and security evidence.
 
 ## Security-sensitive documentation
 
