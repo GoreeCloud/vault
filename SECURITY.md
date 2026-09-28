@@ -41,9 +41,11 @@ The repository now contains `THREAT-MODEL.md` and `CRYPTOGRAPHY.md` as Developme
 
 GitHub issue #4 tracks the required explicit human review of the exact Security Design 0.2 candidate on commit `3dfcb2ac6264efe9e5f929f83a28f010374199c1`. The issue must record acceptance or required changes against an exact revision before protected storage may proceed.
 
-## Automated vulnerability reachability
+## Automated security assurance
 
-The repository includes a dedicated Go vulnerability workflow that verifies the exact source revision, module integrity and tidy metadata, then runs pinned `govulncheck v1.8.0` against reachable code. Scanner success is supporting evidence only and does not substitute for human security review.
+The repository includes dedicated CI for Go validation, vulnerability reachability, and repository governance. The workflows verify the exact source revision, use a GoreeCloud-established pinned `actions/checkout` revision with persisted credentials disabled, validate module integrity and tidy metadata, and run pinned `govulncheck v1.8.0` against reachable Go code. Repository-governance CI also fails closed if mandatory Vault records or the current human-review gate disappear unexpectedly.
+
+These controls strengthen provenance and regression evidence. Scanner or governance success is supporting evidence only and does not substitute for human security review, cryptographic approval, authorization review, target-environment validation, or production acceptance.
 
 ## Security review gates before secret handling
 
