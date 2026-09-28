@@ -1,5 +1,15 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Threat model and cryptographic architecture candidate established
+
+- Added `THREAT-MODEL.md` with explicit assets, adversaries, trust boundaries, security invariants, abuse/failure cases, and twenty primary threat cases spanning offline theft, cross-vault substitution, rollback/replay, browser-origin phishing, compromised clients, logging/memory disclosure, recovery, sharing, machine secrets, backups, downgrade, stale devices, administrative bypass, deletion ambiguity, and supply-chain compromise.
+- Added `CRYPTOGRAPHY.md` with a candidate per-vault envelope architecture using Argon2id for passphrase-derived unlock keys, XChaCha20-Poly1305 for authenticated encryption, HKDF-SHA-256 for domain-separated subkeys, random Vault Root Keys and Data Encryption Keys, versioned key slots, explicit associated-data binding, recovery/device-factor boundaries, rotation semantics, and documented Go memory-erasure limitations.
+- The candidate is intentionally **not cryptographically approved**. GoreeCloud secure-coding instructions require explicit human review for cryptographic trust decisions, and protected storage remains blocked until that review identifies the exact accepted repository revision.
+
+### Verification boundary
+
+Repository source can prove that the review candidate exists and CI can validate repository integrity, but neither AI authorship nor CI can substitute for the required human security review. No protected secret persistence, encryption implementation, production exposure, release, deployment, or Stable claim is established by this milestone.
+
 ## 2026-09-27 — Development foundation established
 
 - Added the first executable source foundation for the recreated `GoreeCloud/vault` repository.

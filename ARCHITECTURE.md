@@ -57,9 +57,11 @@ The following boundaries are security significant:
 
 Foundation 0.1 is loopback-only and fails closed for non-loopback listen addresses. Network exposure through GoreeCloud Gateway, GoreeCloud Network, containers, reverse proxies, or other infrastructure is not authorized by this foundation and requires a later governed design and validation stage.
 
-## Cryptography rule
+## Security-design gate
 
-Vault will use established cryptographic libraries and reviewed constructions. The project must not create custom cryptographic primitives. Algorithm selection, key derivation, key hierarchy, recovery, rotation, device binding, and synchronization constructions require explicit design review and tests before implementation is promoted as secure.
+`THREAT-MODEL.md` and `CRYPTOGRAPHY.md` now contain the Development threat-model and cryptographic-architecture candidates for the next Vault milestone. They are intentionally marked **pending explicit human security review**. Their presence in source does not authorize secret persistence or establish cryptographic approval.
+
+Vault will use established cryptographic libraries and reviewed constructions. The project must not create custom cryptographic primitives. Algorithm selection, key derivation, key hierarchy, recovery, rotation, device binding, and synchronization constructions require explicit human security review and implementation tests before protected storage is accepted.
 
 ## Evidence rule
 
