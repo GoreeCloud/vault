@@ -4,6 +4,14 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+
+### Platform Contract governance
+
+- Added `goreecloud.platform.yaml` declaring Development lifecycle, loopback health endpoints, all nine applicable Integral Platform Systems as blocked, and explicit nonconformance blockers.
+- Added `.editorconfig` for repository text-format consistency.
+- Extended fail-closed repository-governance validation to require the manifest/editor baseline and preserve the human security-review blocker.
+- No Vault runtime, cryptographic, protected-storage, authentication, authorization, or network-exposure behavior changed.
+
 ### Security CI provenance
 
 - Added a fail-closed repository-governance validator for mandatory Vault records, the retired roadmap filename, Development lifecycle truthfulness, and the current human security-review gate.
