@@ -20,6 +20,8 @@ REQUIRED_FILES = (
     "PLATFORM-INTEGRATIONS.md",
     "THREAT-MODEL.md",
     "CRYPTOGRAPHY.md",
+    "goreecloud.platform.yaml",
+    ".editorconfig",
     "go.mod",
     "cmd/goreecloud-vault/main.go",
     "internal/app/server.go",
@@ -59,6 +61,12 @@ REQUIRED_TEXT = {
     "ARCHITECTURE.md": (
         "pending explicit human security review",
         "does not authorize secret persistence",
+    ),
+    "goreecloud.platform.yaml": (
+        'schema_version: "0.4"',
+        "lifecycle: development",
+        "status: nonconformant",
+        "GitHub issue #4",
     ),
 }
 
