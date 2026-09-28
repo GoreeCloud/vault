@@ -1,5 +1,14 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Drive project-specification migration completed
+
+- Migrated the complete former Google Drive `Project Specification — GoreeCloud Vault.docx` text into the repository as `MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md`.
+- Preserved `PROJECT-SPECIFICATIONS.md` as the current authoritative target specification and linked the migrated source as a reconciliation input.
+- Added fail-closed repository-governance checks requiring the migrated source so it cannot disappear silently.
+- Historical predecessor implementation/verification claims in the migrated source are not current implementation evidence.
+- The migration does not change runtime behavior, cryptographic trust, protected-storage authorization, production acceptance, or Stable status; GitHub issue #4 remains the human security-review gate.
+
+
 ## 2026-09-27 — Repository baseline completion candidate
 
 - Added the remaining mandatory repository-root controls: `SPECIFICATIONS.md`, `FEATURES.md`, `BENEFITS.md`, `COMPETITIVE-OBJECTIVES.md`, `BRANDING.md`, and `USER-MANUAL.md`.

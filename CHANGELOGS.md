@@ -4,6 +4,14 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Drive project-specification migration
+
+- Preserved the complete former Google Drive Vault project specification in `MIGRATED-PROJECT-SPECIFICATION-2026-09-15.md`.
+- Linked the migrated source from the active `PROJECT-SPECIFICATIONS.md` and made repository-governance validation require the preserved migration source.
+- Historical predecessor implementation/verification statements in the migrated source remain non-authoritative unless revalidated against the current repository lineage.
+- This migration changes documentation/governance only; it does not authorize protected storage or alter the human security-review gate in GitHub issue #4.
+
+
 ### Repository baseline completion
 
 - Added the mandatory root specification pointer, feature, benefits, competitive-objectives, branding, and user-manual records.
