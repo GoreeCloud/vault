@@ -1,5 +1,16 @@
 # GoreeCloud Vault — Project Record
 
+## 2026-09-27 — Repository governance validation candidate established
+
+- Added a fail-closed repository-governance validator for the current Vault baseline.
+- The validator checks mandatory project/security records for presence, regular-file status, expected identity headings, and non-skeletal content.
+- It also protects the 54 numbered planned-capability entries, the explicit planned-versus-implemented boundary, the pending human cryptographic-review gate, representation of all nine Integral Platform Systems, the retirement of `FEATURE-ROADMAP.md`, and sensitive local-file ignore patterns.
+- Added an exact-source GitHub Actions workflow using the already-established GoreeCloud checkout action revision used by Gateway repository-governance validation.
+
+### Verification boundary
+
+This automation checks repository-governance invariants only. It does not establish cryptographic approval, protected storage, release, deployment, production acceptance, or Stable status. GitHub issue #4 remains the human security-review gate for VLT-003/VLT-004, and VLT-005 remains blocked.
+
 ## 2026-09-27 — Security review workflow and vulnerability scanning established
 
 - Opened GitHub issue #4 to obtain explicit human security review of the Security Design 0.2 threat model and cryptographic architecture at exact commit `3dfcb2ac6264efe9e5f929f83a28f010374199c1`.
