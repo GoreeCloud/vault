@@ -1,11 +1,12 @@
 # GoreeCloud Vault — Project Record
 
-## 2026-09-27 — CI provenance and repository-governance hardening candidate
+## 2026-09-27 — CI provenance and repository-governance hardening established
 
 - Added `scripts/validate_repository_governance.py` to fail closed when mandatory Vault records are missing, the retired `FEATURE-ROADMAP.md` reappears, Development lifecycle language is lost, or the current human security-review gate is removed unexpectedly.
 - Added a repository-governance workflow with exact-source verification.
 - Hardened the main Go CI and vulnerability workflow to use the GoreeCloud-established pinned `actions/checkout` v7.0.1 commit, disable persisted checkout credentials, and run on Ubuntu 24.04.
 - Added exact-source, Go module-integrity, and tidy-metadata validation to the primary Go CI.
+- Merged the hardening through PR #7 to main commit `7033ab49294d875c1a1db4b89192560a1c5deaa8`. Exact PR-head CI, vulnerability, and repository-governance workflows passed on `514182e1a02273d084c48cef6f7ec5e6ce10c6a1`; post-merge runs `36363628842`, `36363628867`, and `36363628862` passed on the authoritative merge commit.
 
 ### Verification boundary
 
