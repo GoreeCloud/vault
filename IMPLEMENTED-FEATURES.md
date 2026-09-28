@@ -14,7 +14,11 @@ The repository source contains the following bounded non-product foundation:
 - operational `/healthz` and `/readyz` endpoints;
 - bounded HTTP server timeouts and header size;
 - graceful shutdown handling;
-- automated Go formatting, test, vet, and build validation in CI.
+- automated Go formatting, test, vet, and build validation in CI;
+- exact-source CI checkout verification with persisted checkout credentials disabled;
+- Go module-integrity and tidy-metadata enforcement;
+- pinned `govulncheck v1.8.0` reachable-vulnerability scanning;
+- fail-closed repository-governance validation for mandatory records, Development lifecycle truthfulness, and the active human security-review gate.
 
 This foundation does not implement protected record storage, encryption, authentication, authorization, password management, passkeys, TOTP, autofill, sharing, synchronization, import/export, organization controls, or other numbered Vault capability areas.
 
