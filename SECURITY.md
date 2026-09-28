@@ -33,9 +33,13 @@ This restriction must not be relaxed merely to make development easier. Broader 
 
 Never commit active secret values. Examples and templates must use placeholders. Development tests must use synthetic data that cannot authenticate to real systems.
 
+## Security design candidate
+
+The repository now contains `THREAT-MODEL.md` and `CRYPTOGRAPHY.md` as Development security-design candidates. They are reviewable inputs, not security approval. GoreeCloud secure-coding instructions require explicit human review for cryptographic trust decisions, so protected secret persistence remains blocked until that review is recorded against an exact repository revision.
+
 ## Security review gates before secret handling
 
-Before the repository implements credential storage or retrieval, the relevant change must define and review at least:
+Before the repository implements protected-record storage or retrieval as an accepted security foundation, the relevant change must define and receive explicit human security review for at least:
 
 - threat model and trust boundaries;
 - key hierarchy and cryptographic library choices;
