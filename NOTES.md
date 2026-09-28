@@ -8,7 +8,9 @@ Use `PROJECT-SPECIFICATIONS.md` for authoritative product requirements, `PLANNED
 
 ## Immediate engineering boundary
 
-Before adding any protected-record persistence or retrieval operation, complete a dedicated threat model and reviewed design for:
+A Development threat model and cryptographic architecture candidate now exist in `THREAT-MODEL.md` and `CRYPTOGRAPHY.md`. Protected-record persistence/retrieval must not proceed beyond non-secret scaffolding until those exact designs receive explicit human security review.
+
+That review must cover:
 
 - key derivation and hierarchy;
 - encryption envelope and algorithm/library selection;
