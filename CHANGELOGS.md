@@ -4,6 +4,12 @@ All notable repository changes are recorded here. Feature implementation entries
 
 ## Unreleased
 
+### Security design candidate
+
+- Added a Vault threat model covering remote, local, browser, sync, recovery, administrator, supply-chain, and cross-vault threat cases.
+- Added a candidate cryptographic architecture defining per-vault root keys, Argon2id factor derivation, XChaCha20-Poly1305 envelope encryption, HKDF key separation, recovery/device key slots, rotation, downgrade resistance, and memory-handling limits.
+- Kept protected secret persistence blocked pending explicit human security review of the exact candidate revision.
+
 ### Development foundation
 
 - Added a standard-library Go service shell for bounded Development use.
