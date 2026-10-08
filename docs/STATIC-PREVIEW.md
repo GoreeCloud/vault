@@ -6,6 +6,12 @@
 
 Open `preview/index.html` from a local checkout. The page is intentionally static and works offline without installing dependencies or running a server. It includes planned category cards and truthful, unavailable/pending release gates. It has no JavaScript.
 
+## Optional loopback HTTP QA
+
+The optional `tools/serve-preview.mjs` script starts a **development-only** local preview at `http://127.0.0.1:8765/`. Start it with `node tools/serve-preview.mjs` in the repository root and stop it with Ctrl+C. It serves only the static concept HTML and CSS, with restrictive HTTP headers; it does not provide a Vault account, backend, storage, encryption, authentication or credential submission.
+
+Do **not** expose this preview by public reverse proxy, LAN binding or tunnel. Do not enter real secrets. Four tests in `test/preview-server.test.mjs` cover the allowlisted assets, security headers, denied mutation and traversal requests, and Host-header rejection. The owner laptop and exact-head CI passed 72 tests at `df34c1ae`. These tests do not establish full browser CSP enforcement or Glaze/assistive-technology acceptance.
+
 ## Current checks
 
 The repository's `npm test` suite includes `test/static-preview.test.mjs`, which checks absent input/executable elements, a blocking CSP, no remote dependencies, meaningful labels and local navigation anchors, visible focus styling, responsive layout rules, reduced-motion preference and forced-colors handling. These are **source-level assertions only**. They do not constitute actual browser visual review, assistive-technology testing or device acceptance.
