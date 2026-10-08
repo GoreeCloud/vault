@@ -28,7 +28,7 @@ for (const item of lock.upstream) {
     }
   }
 }
-for (const file of ["docs/ARCHITECTURE.md", "docs/SECURITY-GATES.md", "docs/PLATFORM-CONFORMANCE.md", "docs/GLAZE-EXPERIENCE.md", "docs/SOURCE-AND-LICENSING.md", "docs/ROADMAP.md"]) {
+for (const file of ["docs/ARCHITECTURE.md", "docs/SECURITY-GATES.md", "docs/THREAT-MODEL.md", "docs/SECURE-GENERATION.md", "docs/PLATFORM-CONFORMANCE.md", "docs/GLAZE-EXPERIENCE.md", "docs/SOURCE-AND-LICENSING.md", "docs/ROADMAP.md"]) {
   assert.ok(fs.existsSync(path.join(root, file)), "required governance document missing: " + file);
 }
 console.log("PASS: imported source notice, commercial-module exclusion, and governance baseline checks");

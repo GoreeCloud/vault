@@ -13,6 +13,7 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 - `upstream/bitwarden/server/` — pinned Bitwarden server snapshot, **reference/transition only**
 - `upstream/bitwarden/clients/` — pinned Bitwarden web, browser, desktop, and CLI snapshot, **reference/transition only**
 - `src/origin-policy.mjs` — small first-party prototype of fail-closed exact-origin matching, not connected to any browser or credential database
+- `src/password-generator.mjs` — isolated CSPRNG-based local password-generation prototype; never persists credentials
 - `test/` — tests for explicitly implemented GoreeCloud code
 - `docs/` — architecture, security gates, conformance, Glaze requirements, phased migration, legal/provenance record
 - `source-lock.json` — upstream source revisions for the imported snapshots
@@ -27,7 +28,7 @@ Requires Node.js 20+ (no npm dependencies):
 npm test
 ```
 
-This tests repository import boundaries and the isolated origin-matching prototype. It **does not** test the upstream server/clients, cryptography, password storage, autofill integration, or production readiness.
+This tests repository import boundaries, isolated origin-matching behavior, and an unapproved local password-generation prototype. It **does not** test the upstream server/clients, deployed cryptography, password storage, browser autofill integration, or production readiness.
 
 ## Security default
 
@@ -35,4 +36,4 @@ No credential ingestion, key storage, public enrollment, extension permissions, 
 
 ## Next work
 
-See [Roadmap](docs/ROADMAP.md), [security gates](docs/SECURITY-GATES.md), [platform conformance](docs/PLATFORM-CONFORMANCE.md), [Glaze experience](docs/GLAZE-EXPERIENCE.md), and [source licensing](docs/SOURCE-AND-LICENSING.md). Prior GoreeCloud Vault repository IDs, pull requests, and CI evidence **do not establish this repository's implementation state**.
+See [Roadmap](docs/ROADMAP.md), [security gates](docs/SECURITY-GATES.md), [threat model](docs/THREAT-MODEL.md), [password-generation prototype](docs/SECURE-GENERATION.md), [platform conformance](docs/PLATFORM-CONFORMANCE.md), [Glaze experience](docs/GLAZE-EXPERIENCE.md), and [source licensing](docs/SOURCE-AND-LICENSING.md). Prior GoreeCloud Vault repository IDs, pull requests, and CI evidence **do not establish this repository's implementation state**.
