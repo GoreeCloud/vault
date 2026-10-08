@@ -18,23 +18,40 @@ const AMBIGUOUS = new Set("0O1lI");
 const KEYS = new Set(["length", "lowercase", "uppercase", "digits", "symbols", "excludeAmbiguous"]);
 const MIN_TARGET_BITS = 128;
 
+// Snapshot *own data properties* before using caller-controlled configuration.
+// Proxy traps can still lie, so this is robustness, not a security attestation.
+function snapshotOptions(input) {
+  try {
+    if (input === null || typeof input !== "object" || Array.isArray(input)) {
+      throw new TypeError();
+    }
+    const proto = Object.getPrototypeOf(input);
+    if (proto !== Object.prototype && proto !== null) throw new TypeError();
+    const safe = Object.create(null);
+    for (const key of Reflect.ownKeys(input)) {
+      if (typeof key !== "string" || !KEYS.has(key)) throw new TypeError();
+      const property = Object.getOwnPropertyDescriptor(input, key);
+      if (!property || !Object.hasOwn(property, "value")) throw new TypeError();
+      safe[key] = property.value;
+    }
+    return safe;
+  } catch {
+    throw new TypeError("Invalid generator options");
+  }
+}
+
 export function generatePassword(options = {}) {
-  if (options === null || typeof options !== "object" || Array.isArray(options)) {
-    throw new TypeError("Options must be an object");
-  }
-  for (const key of Object.keys(options)) {
-    if (!KEYS.has(key)) throw new TypeError("Unsupported option");
-  }
-  const length = options.length ?? 28;
+  const safe = snapshotOptions(options);
+  const length = safe.length ?? 28;
   if (!Number.isSafeInteger(length) || length < 16 || length > 256) {
     throw new RangeError("Password length must be an integer between 16 and 256");
   }
-  const excludeAmbiguous = options.excludeAmbiguous ?? false;
+  const excludeAmbiguous = safe.excludeAmbiguous ?? false;
   if (typeof excludeAmbiguous !== "boolean") throw new TypeError("Invalid excludeAmbiguous option");
 
   const groups = [];
   for (const [name, original] of Object.entries(CLASSES)) {
-    const enabled = options[name] ?? true;
+    const enabled = safe[name] ?? true;
     if (typeof enabled !== "boolean") throw new TypeError("Character class options must be boolean");
     if (!enabled) continue;
     const alphabet = excludeAmbiguous ? [...original].filter(c => !AMBIGUOUS.has(c)).join("") : original;
