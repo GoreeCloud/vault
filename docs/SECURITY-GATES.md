@@ -19,7 +19,7 @@
 
 No public listener, deployment secrets, account creation, API migration, browser host permissions, credential persistence, AI secret access, or release signing is provided in this phase. Upstream code is **unreviewed** under GoreeCloud's trust model and must not be run against personal vaults.
 
-The first-party origin-matching sample in `src/` rejects unsafe URLs and cross-origin matches, but is **not** an end-to-end phishing or autofill security boundary and must not be integrated before review.
+The first-party origin-matching sample in `src/` rejects unsafe URLs and cross-origin matches, but is **not** an end-to-end phishing or autofill security boundary and must not be integrated before review. The `opaque-sync-preflight` module is a **non-operational synthetic shape check only**: candidate schema v0 does not establish ciphertext authentication, server authorization, key custody, or any right to store or synchronize secrets.
 
 ## Human acceptance
 

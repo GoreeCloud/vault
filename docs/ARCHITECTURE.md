@@ -37,4 +37,6 @@ Client-held vault material must remain outside server and central AI visibility 
 5. Implement testable clients and hardened server in slices.
 6. Test migration, rollbacks, target runtimes, security, licensing, and release gates; retire inherited product shell.
 
+A Development-only candidate opaque-sync shape contract and cryptographic review questions are documented in [NATIVE-SYNC-CONTRACT](NATIVE-SYNC-CONTRACT.md) and [CRYPTOGRAPHY-CANDIDATE](CRYPTOGRAPHY-CANDIDATE.md). Neither is a deployed service or a reviewed cryptographic protocol.
+
 This architecture is a **proposal**. The imported Bitwarden code is not proof of any of these native integration capabilities.
