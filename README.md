@@ -31,6 +31,8 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 
 Open [the local static preview](preview/index.html) from your checkout. It has no forms, accounts, encryption or credential entry and is **not a password manager**. The design target is Glaze 1.7.0, but the runtime and consumer acceptance are not implemented. See [preview limitations](docs/STATIC-PREVIEW.md).
 
+For optional loopback-only HTTP/header QA, run `npm run preview` and open `http://127.0.0.1:8765/` on that machine. Stop it with Ctrl+C. This server is for local development, not deployment; never tunnel it or provide credentials. The QA server's tests are included in `npm test`.
+
 ## Check the foundation
 
 Requires Node.js 20+ (no npm dependencies):
