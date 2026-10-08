@@ -24,6 +24,12 @@ The **exact Git blobs** for `preview/index.html` (`f66e099146736e9fa4a0af70e815d
 
 **Scope limitation:** this QA sandbox blocks direct `file://` and loopback URL navigation with `ERR_BLOCKED_BY_ADMINISTRATOR`, so markup was injected into Chromium's document and the byte-identical stylesheet was injected with CSP bypass **solely to inspect rendering**. This does **not** validate HTTP serving, browser CSP enforcement, dependency loading, actual browser installation on owner devices, independent assistive-technology testing, real 200–400% browser zoom or formal WCAG conformance. The existing source-level safety tests independently check the CSP and absence of dynamic credential-entry fields. No Glaze consumer acceptance is claimed.
 
+## Owner desktop screenshot review (8 October 2026)
+
+The owner supplied a **light-mode desktop screenshot** of the loopback preview after running the development harness. The screenshot visibly shows the sidebar, overview, four planned-category cards, and truthful security/release gates; it also revealed **low-contrast glyphs on dark category tiles** and undersized auxiliary labels. A subsequent style-only revision assigns explicit light/dark tile foreground/background colors and slightly increases the navigation, section-description, status and tag type sizes. Automated tests require **4.5:1 or better tile-glyph contrast** for both themes.
+
+This screenshot is useful visual feedback, **not** evidence of browser-enforced CSP, responsive layouts on other devices, assistive-technology compatibility, Glaze runtime adoption, or production acceptance. The revised style requires fresh owner-browser inspection; screenshots are not stored as application data in the repository.
+
 ## Design authority and pending qualification
 
 Glaze V1.7 / `1.7.0` is the **intended Stable consumer target**. This locally styled sketch **does not import or qualify the Glaze runtime** and does not consume proven canonical semantic tokens or official identity assets. The inherited Glaze 1.7.0 Stable runtime is distinct from the unfinished 1.7.1 Development scope.
