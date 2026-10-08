@@ -22,6 +22,8 @@ The trusted-context object must provide `expectedVaultId`, `expectedPreviousRevi
 
 **Important:** A random, unencrypted, or malicious byte string will pass the sealed-payload *shape* check if encoded correctly. This is deliberately not a cryptographic validation, nor evidence of zero-knowledge security. Real protected records must not pass through this code path.
 
+The independent [synthetic access-boundary screening contract](SYNTHETIC-ACCESS-BOUNDARY.md) models only candidate tenant/item/role constraints with fabricated context and does not provide real authorization.
+
 ## Proposed future trust boundaries — not implemented
 
 1. Authenticated user/device claims issued and revoked by GoreeCloud Identity; each mutation needs server-side collection membership and item scope checks independent of input IDs.
