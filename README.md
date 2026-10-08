@@ -20,11 +20,16 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 - `src/synthetic-offline-queue.mjs` — bounded metadata-only sequencing of fabricated offline edits; no storage or retries
 - `src/synthetic-access-boundary.mjs` — non-operational single-owner role/scope screening for synthetic fixtures only
 - `src/synthetic-client-item-schema.mjs` — client-private field-name templates only, with no credential values, persistence or encryption
+- `preview/` — noninteractive, offline visual concept, not a usable Vault client or Glaze acceptance
 - `test/` — tests for explicitly implemented GoreeCloud code
 - `docs/` — architecture, security gates, conformance, Glaze requirements, phased migration, legal/provenance record
 - `source-lock.json` — upstream source revisions for the imported snapshots
 
 **Do not run inherited deployment scripts or containers as GoreeCloud Vault**. Imported source has not passed GoreeCloud deployment, secrets-management, crypto, tenant-isolation, or licensing acceptance gates.
+
+## Explore the read-only interface concept
+
+Open [the local static preview](preview/index.html) from your checkout. It has no forms, accounts, encryption or credential entry and is **not a password manager**. The design target is Glaze 1.7.0, but the runtime and consumer acceptance are not implemented. See [preview limitations](docs/STATIC-PREVIEW.md).
 
 ## Check the foundation
 
@@ -42,4 +47,4 @@ No credential ingestion, key storage, public enrollment, extension permissions, 
 
 ## Next work
 
-See [Roadmap](docs/ROADMAP.md), [security gates](docs/SECURITY-GATES.md), [threat model](docs/THREAT-MODEL.md), [password-generation prototype](docs/SECURE-GENERATION.md), [autofill safeguards](docs/AUTOFILL-SAFETY.md), [non-operational sync contract](docs/NATIVE-SYNC-CONTRACT.md), [synthetic conflict model](docs/SYNTHETIC-REVISION-MODEL.md), [offline queue prototype](docs/SYNTHETIC-OFFLINE-QUEUE.md), [synthetic access boundary](docs/SYNTHETIC-ACCESS-BOUNDARY.md), [client-private item schemas](docs/SYNTHETIC-CLIENT-ITEM-SCHEMA.md), [cryptographic review candidate](docs/CRYPTOGRAPHY-CANDIDATE.md), [platform conformance](docs/PLATFORM-CONFORMANCE.md), [Glaze experience](docs/GLAZE-EXPERIENCE.md), and [source licensing](docs/SOURCE-AND-LICENSING.md). Prior GoreeCloud Vault repository IDs, pull requests, and CI evidence **do not establish this repository's implementation state**.
+See [static preview](docs/STATIC-PREVIEW.md), [Roadmap](docs/ROADMAP.md), [security gates](docs/SECURITY-GATES.md), [threat model](docs/THREAT-MODEL.md), [password-generation prototype](docs/SECURE-GENERATION.md), [autofill safeguards](docs/AUTOFILL-SAFETY.md), [non-operational sync contract](docs/NATIVE-SYNC-CONTRACT.md), [synthetic conflict model](docs/SYNTHETIC-REVISION-MODEL.md), [offline queue prototype](docs/SYNTHETIC-OFFLINE-QUEUE.md), [synthetic access boundary](docs/SYNTHETIC-ACCESS-BOUNDARY.md), [client-private item schemas](docs/SYNTHETIC-CLIENT-ITEM-SCHEMA.md), [cryptographic review candidate](docs/CRYPTOGRAPHY-CANDIDATE.md), [platform conformance](docs/PLATFORM-CONFORMANCE.md), [Glaze experience](docs/GLAZE-EXPERIENCE.md), and [source licensing](docs/SOURCE-AND-LICENSING.md). Prior GoreeCloud Vault repository IDs, pull requests, and CI evidence **do not establish this repository's implementation state**.
