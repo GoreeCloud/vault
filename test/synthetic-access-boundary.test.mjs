@@ -10,7 +10,7 @@ const ITEM = "55555555-5555-4555-8555-555555555555";
 const OTHER = "66666666-6666-4666-8666-666666666666";
 const request = (operation = "read") => ({ vaultId: V, itemId: ITEM, operation });
 const state = () => ({
-  principalId: P, tenantId: T, vaultId: V, vaultOwnerId: P,
+  principalId: P, tenantId: T, vaultTenantId: T, vaultId: V, vaultOwnerId: P,
   resourceItemId: ITEM, resourceVaultId: V, resourceTenantId: T,
   sessionActive: true, sessionNotRevoked: true, membershipActive: true,
   policyCurrent: true, grantVerified: true, grantedRole: "owner",
@@ -54,6 +54,7 @@ test("screening declines cross-vault, tenant, item and ownership mixups", () => 
     { ...state(), resourceTenantId: OTHER },
     { ...state(), principalId: OTHER },
     { ...state(), tenantId: OTHER },
+    { ...state(), vaultTenantId: OTHER },
     { ...state(), grantedRole: "owner", vaultOwnerId: OTHER }
   ]) assert.equal(screenSyntheticVaultAccess(request(), s).candidate, false);
   assert.equal(screenSyntheticVaultAccess(request("create"), state()).candidate, false);
@@ -71,6 +72,7 @@ test("synthetic sessions reject revocations, stale policy, unknown evidence and 
     { ...state(), sessionPolicyVersion: "3" },
     { ...state(), grantedRole: "administrator" },
     { ...state(), grantVerified: null },
+    { ...state(), grantVerified: false },
     { ...state(), sessionActive: 1 },
     { ...state(), policyCurrent: undefined },
     { ...state(), principalId: A, grantedRole: "viewer", grantVerified: false }
@@ -104,4 +106,22 @@ test("screen output never reflects identifiers or sensitive input", () => {
   assert.equal(good.includes(V), false);
   assert.equal(good.includes(P), false);
   assert.equal(bad.includes("fixture"), false);
+});
+
+test("create cannot bypass tenant-to-vault ownership scope", () => {
+  const requestToCreate = request("create");
+  const syntheticContext = noResource();
+  assert.equal(screenSyntheticVaultAccess(requestToCreate, syntheticContext).candidate, true);
+  for (const context of [
+    { ...syntheticContext, vaultTenantId: OTHER },
+    { ...syntheticContext, tenantId: OTHER },
+    { ...syntheticContext, grantVerified: false },
+    { ...syntheticContext, sessionPolicyVersion: 999 }
+  ]) assert.equal(screenSyntheticVaultAccess(requestToCreate, context).candidate, false);
+});
+
+test("owner requires explicit synthetic grant evidence, not merely matching IDs", () => {
+  assert.equal(screenSyntheticVaultAccess(request(), { ...state(), grantVerified: false }).candidate, false);
+  assert.equal(screenSyntheticVaultAccess(request(), { ...state(), grantVerified: undefined }).candidate, false);
+  assert.equal(screenSyntheticVaultAccess(request(), { ...state(), grantVerified: true }).candidate, true);
 });

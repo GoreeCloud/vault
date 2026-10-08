@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | F0: source baseline | Source-locked server/client snapshots; commercial-only modules excluded; licensing and upstream notices | Check script and provenance readback |
 | F1: architecture | Threat model; domain/data/identity contracts; source/license audit; security review | Human approved trust boundary for exact revision |
-| F2: secure core | Native item model, permission engine, approved encrypted client/server protocols, migration adapters | Real crypto and isolation test suites |
+| F2: secure core | Synthetic client-private item templates and non-authoritative tenant/role screening exist; real native item storage, permission engine, approved encrypted client/server protocols and migration adapters remain unimplemented | Human-approved crypto and real isolation test suites |
 | F3: experience | Glaze web/desktop/extension/native browser; Android and iOS credential providers; accessible onboarding | Device/browser/accessibility suites |
 | F4: ecosystem | Nine Integral Systems and optional bounded GoreeCloud app integrations | Contract, privacy and failure-mode tests |
 | F5: migration | Verified import/export, backup restore, previous format compatibility, reversible cutover | End-to-end migration and rollback on representative vaults |

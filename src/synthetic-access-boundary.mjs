@@ -9,7 +9,7 @@
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const REQUEST_KEYS = Object.freeze(["vaultId", "itemId", "operation"]);
 const CONTEXT_KEYS = Object.freeze([
-  "principalId", "tenantId", "vaultId", "vaultOwnerId",
+  "principalId", "tenantId", "vaultTenantId", "vaultId", "vaultOwnerId",
   "resourceItemId", "resourceVaultId", "resourceTenantId",
   "sessionActive", "sessionNotRevoked", "membershipActive",
   "policyCurrent", "grantVerified", "grantedRole",
@@ -46,6 +46,7 @@ export function screenSyntheticVaultAccess(request, context) {
 
     if (!validId(request.vaultId) || !validId(request.itemId) ||
         !validId(context.principalId) || !validId(context.tenantId) ||
+        !validId(context.vaultTenantId) ||
         !validId(context.vaultId) || !validId(context.vaultOwnerId) ||
         !OPERATIONS.has(request.operation) || !ROLES.has(context.grantedRole)) {
       return deny("invalid-identity-or-operation");
@@ -60,6 +61,7 @@ export function screenSyntheticVaultAccess(request, context) {
     }
 
     if (request.vaultId !== context.vaultId) return deny("vault-mismatch");
+    if (context.tenantId !== context.vaultTenantId) return deny("tenant-mismatch");
 
     if (request.operation === "create") {
       if (context.resourceItemId !== null ||
@@ -72,13 +74,13 @@ export function screenSyntheticVaultAccess(request, context) {
     }
 
     if (context.grantedRole === "none") return deny("no-candidate-grant");
+    if (context.grantVerified !== true) return deny("unverified-grant");
 
     if (context.grantedRole === "owner") {
       if (context.principalId !== context.vaultOwnerId) {
         return deny("owner-identity-mismatch");
       }
-    } else if (context.principalId === context.vaultOwnerId ||
-               context.grantVerified !== true) {
+    } else if (context.principalId === context.vaultOwnerId) {
       return deny("unverified-delegated-grant");
     }
 
@@ -88,7 +90,6 @@ export function screenSyntheticVaultAccess(request, context) {
     if (context.grantedRole === "editor" && request.operation === "delete") {
       return deny("role-operation-mismatch");
     }
-    if (typeof context.grantVerified !== "boolean") return deny("invalid-grant-evidence");
 
     return Object.freeze({ candidate: true, reason: "synthetic-screen-only" });
   } catch {

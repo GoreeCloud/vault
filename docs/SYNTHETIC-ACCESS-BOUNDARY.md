@@ -7,10 +7,10 @@ The first-party module `src/synthetic-access-boundary.mjs` screens a small **syn
 ## Evaluated synthetic inputs
 
 - A request names a canonical lower-case UUID-shaped `vaultId` and `itemId`, with the proposed operation `read`, `create`, `replace` or `delete`.
-- A supplied **context sketch** includes principal, tenant, owner, vault, optional existing record identity, synthetic active session/revocation/membership flags, policy freshness and an alleged grant role.
-- A synthetic `owner` candidate must match the owner ID. A nonowner `viewer` or `editor` candidate must carry an alleged verified grant; `none` is always denied.
+- A supplied **context sketch** includes principal, tenant, owner, vault, optional existing record identity, synthetic active session/revocation/membership flags, policy freshness, an independent alleged vault-tenant identity and an alleged grant role.
+- A synthetic `owner` candidate must match the owner ID. **All** candidate roles require an alleged verified grant, including owner; a nonowner `viewer` or `editor` candidate must also match its role constraints; `none` is always denied.
 - A `viewer` candidate can read, an `editor` can read/create/replace, and an `owner` can read/create/replace/delete. These choices are proposed *screening scenarios*, **not authoritative GoreeCloud Policy defaults**.
-- Existing-record operations require exact tenant, vault and item scope. Creating a new record requires no existing resource identity. Unknown operations, extra fields, stale synthetic policy versions, unexpected types, cross-boundary IDs or missing context all fail closed.
+- Existing-record operations require exact tenant, vault and item scope. Creating a new record requires no existing resource identity but **still** requires matching synthetic principal-tenant and vault-tenant IDs. Unknown operations, extra fields, stale synthetic policy versions, unexpected types, cross-boundary IDs or missing context all fail closed.
 
 The only results are frozen `{ candidate, reason }` objects. `candidate: true` does **not** mean permitted, authenticated, authorized or safe.
 
