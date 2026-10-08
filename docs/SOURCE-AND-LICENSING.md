@@ -20,3 +20,7 @@ Never automatically pull upstream into a production branch. For each upstream up
 **Excluded sources:** Bitwarden Android and iOS native repositories, directory connector, SDK and integrations have not yet been imported. Evaluate their respective licenses and platform requirements before inclusion. Missing product capabilities are **planned**, not implemented.
 
 This document is engineering guidance, not legal advice.
+
+## Recorded source-tree integrity
+
+`source-lock.json` also pins Git tree SHA-1 object IDs for the exact imported server and client source subtrees. The foundation check reads committed subtree object IDs through `git rev-parse HEAD:<path>` and fails if either differs from its pinned import record. This detects unexpected changes to committed imported trees, but it is not a replacement for independent upstream signature, license, dependency or security verification.

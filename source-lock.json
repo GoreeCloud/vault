@@ -6,6 +6,7 @@
     {
       "name": "server",
       "repo": "bitwarden/server",
+      "gitTreeSha": "ebd9f6c4a548b4ee8c9602f5fbed95e51ae31d80",
       "commit": "ea4b0474f0702c270ccef029ce9c491f0d351e09",
       "path": "upstream/bitwarden/server",
       "license": "AGPL-3.0-or-commercial-by-directory",
@@ -18,6 +19,7 @@
     {
       "name": "clients",
       "repo": "bitwarden/clients",
+      "gitTreeSha": "9014209b7ad05b18c5621279223dfa6f0ffa4867",
       "commit": "0e7970ed405e99b18fe9fb776283253301ee7dc1",
       "path": "upstream/bitwarden/clients",
       "license": "GPL-3.0-or-commercial-by-directory",

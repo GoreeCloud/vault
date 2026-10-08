@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 
 const root = process.cwd();
 const lock = JSON.parse(fs.readFileSync(path.join(root, "source-lock.json"), "utf8"));
@@ -9,6 +10,9 @@ assert.equal(lock.classification, "source-reference-only");
 assert.ok(Array.isArray(lock.upstream) && lock.upstream.length === 2);
 for (const item of lock.upstream) {
   assert.match(item.commit, /^[a-f0-9]{40}$/);
+  assert.match(item.gitTreeSha, /^[a-f0-9]{40}$/);
+  const committedTree = execFileSync("git", ["rev-parse", "HEAD:" + item.path], { cwd: root, encoding: "utf8" }).trim();
+  assert.equal(committedTree, item.gitTreeSha, item.name + ": imported source tree changed without provenance acceptance");
   assert.equal(item.runAsGoreeCloud, false);
   assert.match(item.path, /^upstream\/bitwarden\/(server|clients)$/);
   const p = path.join(root, item.path);
@@ -28,7 +32,7 @@ for (const item of lock.upstream) {
     }
   }
 }
-for (const file of ["docs/ARCHITECTURE.md", "docs/SECURITY-GATES.md", "docs/THREAT-MODEL.md", "docs/SECURE-GENERATION.md", "docs/PLATFORM-CONFORMANCE.md", "docs/GLAZE-EXPERIENCE.md", "docs/SOURCE-AND-LICENSING.md", "docs/ROADMAP.md"]) {
+for (const file of ["docs/ARCHITECTURE.md", "docs/SECURITY-GATES.md", "docs/THREAT-MODEL.md", "docs/SECURE-GENERATION.md", "docs/AUTOFILL-SAFETY.md", "docs/PLATFORM-CONFORMANCE.md", "docs/GLAZE-EXPERIENCE.md", "docs/SOURCE-AND-LICENSING.md", "docs/ROADMAP.md"]) {
   assert.ok(fs.existsSync(path.join(root, file)), "required governance document missing: " + file);
 }
 console.log("PASS: imported source notice, commercial-module exclusion, and governance baseline checks");

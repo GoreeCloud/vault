@@ -12,7 +12,7 @@
 
 **Exit definition:** GoreeCloud Vault's product-defining implementation, UX, policy, encryption trust model, authorization, service control, storage contracts, and first-party integrations no longer depend on an inherited Bitwarden application shell. Protocol and library compatibility may remain when narrowly justified and license-compliant. This cannot be claimed until evidenced by source audits and production-like testing.
 
-**Open:** User-facing server and clients, mobile native repositories, full passkey lifecycle, encrypted file attachments, org sharing, disaster recovery, tenant isolation, strong auth, build automation and full application testing. Each must be tracked in the existing active GoreeCloud Vault task record; no old PR, issue or CI result may be mistaken for a current one.
+**Open:** User-facing server and clients, mobile native repositories, full passkey lifecycle, encrypted file attachments, org sharing, disaster recovery, tenant isolation, strong auth, build automation and full application testing. Active work is tracked in current repository issue #3 and blocking security issue #1; a replacement DOCX task record in GoreeCloud/Tasks Management is still pending. No old PR, issue or CI result may be mistaken for a current one.
 
 ## Recommendations
 
