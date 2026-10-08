@@ -21,18 +21,22 @@ const B64URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 const MAX_PAYLOAD_BYTES = 32 * 1024;
 const MIN_PAYLOAD_BYTES = 32;
 
-function ownPlainRecord(value, permittedKeys) {
-  if (value === null || typeof value !== "object") return false;
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  if (Object.getOwnPropertySymbols(value).length) return false;
-  const names = Object.getOwnPropertyNames(value);
-  if (names.length !== permittedKeys.length) return false;
-  return names.every(name =>
-    permittedKeys.includes(name) &&
-    Object.getOwnPropertyDescriptor(value, name)?.get === undefined &&
-    Object.getOwnPropertyDescriptor(value, name)?.set === undefined
-  );
+// Copy the allowed own data properties once before screening. Proxy
+// descriptors are forgeable, so this is NOT authorization or attestation.
+function snapshotRecord(input, names) {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) return null;
+  const proto = Object.getPrototypeOf(input);
+  if (proto !== Object.prototype && proto !== null) return null;
+  const keys = Reflect.ownKeys(input);
+  if (keys.length !== names.length) return null;
+  const safe = Object.create(null);
+  for (const key of keys) {
+    if (typeof key !== "string" || !names.includes(key)) return null;
+    const field = Object.getOwnPropertyDescriptor(input, key);
+    if (!field || !Object.hasOwn(field, "value")) return null;
+    safe[key] = field.value;
+  }
+  return safe;
 }
 function isId(x) { return typeof x === "string" && ID_RE.test(x); }
 function isRevision(x) { return Number.isSafeInteger(x) && x >= 0; }
@@ -63,28 +67,29 @@ export function isCanonicalOpaquePayload(value) {
  */
 export function preflightOpaqueSyncMutation(frame, trustedContext) {
   try {
-    if (!ownPlainRecord(frame, FIELDS) ||
-        !ownPlainRecord(trustedContext, CONTEXT_FIELDS)) return reject("invalid-shape");
-    if (trustedContext.authorized !== true) return reject("not-authorized");
-    if (!isId(trustedContext.expectedVaultId) ||
-        !isRevision(trustedContext.expectedPreviousRevision) ||
-        !isId(frame.vaultId) || !isId(frame.itemId)) return reject("invalid-identity");
-    if (frame.vaultId !== trustedContext.expectedVaultId) return reject("vault-mismatch");
-    if (frame.schemaVersion !== 0 ||
-        (frame.operation !== "create" && frame.operation !== "replace")) {
+    const frameInput = snapshotRecord(frame, FIELDS);
+    const contextInput = snapshotRecord(trustedContext, CONTEXT_FIELDS);
+    if (!frameInput || !contextInput) return reject("invalid-shape");
+    if (contextInput.authorized !== true) return reject("not-authorized");
+    if (!isId(contextInput.expectedVaultId) ||
+        !isRevision(contextInput.expectedPreviousRevision) ||
+        !isId(frameInput.vaultId) || !isId(frameInput.itemId)) return reject("invalid-identity");
+    if (frameInput.vaultId !== contextInput.expectedVaultId) return reject("vault-mismatch");
+    if (frameInput.schemaVersion !== 0 ||
+        (frameInput.operation !== "create" && frameInput.operation !== "replace")) {
       return reject("unsupported-development-format");
     }
-    if (!isRevision(frame.previousRevision) ||
-        !isRevision(frame.nextRevision) ||
-        frame.nextRevision !== frame.previousRevision + 1 ||
-        frame.previousRevision !== trustedContext.expectedPreviousRevision) {
+    if (!isRevision(frameInput.previousRevision) ||
+        !isRevision(frameInput.nextRevision) ||
+        frameInput.nextRevision !== frameInput.previousRevision + 1 ||
+        frameInput.previousRevision !== contextInput.expectedPreviousRevision) {
       return reject("revision-conflict");
     }
-    if ((frame.operation === "create" && frame.previousRevision !== 0) ||
-        (frame.operation === "replace" && frame.previousRevision < 1)) {
+    if ((frameInput.operation === "create" && frameInput.previousRevision !== 0) ||
+        (frameInput.operation === "replace" && frameInput.previousRevision < 1)) {
       return reject("operation-conflict");
     }
-    if (!isCanonicalOpaquePayload(frame.sealedPayload)) return reject("invalid-payload-shape");
+    if (!isCanonicalOpaquePayload(frameInput.sealedPayload)) return reject("invalid-payload-shape");
     return Object.freeze({ candidate: true, reason: "preflight-only-no-crypto" });
   } catch {
     // Throwing getters/proxies/etc. must not escape into callers.
