@@ -1,0 +1,388 @@
+﻿using System.Security.Claims;
+using Bit.Api.AdminConsole.Controllers;
+using Bit.Api.AdminConsole.Models.Request.Organizations;
+using Bit.Api.Auth.Models.Request.Accounts;
+using Bit.Core.AdminConsole.Entities;
+using Bit.Core.AdminConsole.Enums;
+using Bit.Core.AdminConsole.Enums.Provider;
+using Bit.Core.AdminConsole.Models.Business;
+using Bit.Core.AdminConsole.Models.Business.Tokenables;
+using Bit.Core.AdminConsole.Models.Data.Organizations.Policies;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationApiKeys.Interfaces;
+using Bit.Core.AdminConsole.OrganizationFeatures.Organizations.Interfaces;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.Interfaces;
+using Bit.Core.AdminConsole.OrganizationFeatures.Policies;
+using Bit.Core.AdminConsole.Repositories;
+using Bit.Core.Auth.Entities;
+using Bit.Core.Auth.Enums;
+using Bit.Core.Auth.Models.Data;
+using Bit.Core.Auth.Repositories;
+using Bit.Core.Billing.Enums;
+using Bit.Core.Billing.Pricing;
+using Bit.Core.Billing.Providers.Services;
+using Bit.Core.Context;
+using Bit.Core.Entities;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.Core.Test.AdminConsole.AutoFixture;
+using Bit.Core.Test.Billing.Mocks;
+using Bit.Core.Tokens;
+using Bit.Infrastructure.EntityFramework.AdminConsole.Models.Provider;
+using Bit.Test.Common.AutoFixture;
+using Bit.Test.Common.AutoFixture.Attributes;
+using NSubstitute;
+using NSubstitute.ReturnsExtensions;
+using Xunit;
+
+namespace Bit.Api.Test.AdminConsole.Controllers;
+
+[ControllerCustomize(typeof(OrganizationsController))]
+[SutProviderCustomize]
+public class OrganizationsControllerTests
+{
+    [Theory, BitAutoData]
+    public async Task OrganizationsController_UserCannotLeaveOrganizationThatProvidesKeyConnector(
+        SutProvider<OrganizationsController> sutProvider,
+        Guid orgId,
+        User user)
+    {
+        var ssoConfig = new SsoConfig
+        {
+            Id = default,
+            Data = new SsoConfigurationData
+            {
+                MemberDecryptionType = MemberDecryptionType.KeyConnector
+            }.Serialize(),
+            Enabled = true,
+            OrganizationId = orgId,
+        };
+
+        user.UsesKeyConnector = true;
+
+        sutProvider.GetDependency<ICurrentContext>().OrganizationUser(orgId).Returns(true);
+        sutProvider.GetDependency<ISsoConfigRepository>().GetByOrganizationIdAsync(orgId).Returns(ssoConfig);
+        sutProvider.GetDependency<IUserService>().GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        sutProvider.GetDependency<IUserService>().GetOrganizationsClaimingUserAsync(user.Id).Returns(new List<Organization> { null });
+
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() => sutProvider.Sut.Leave(orgId));
+
+        Assert.Contains(new LeaveOrgSsoBlockedError().Message, exception.Message);
+
+        await sutProvider.GetDependency<IRemoveOrganizationUserCommand>().DidNotReceiveWithAnyArgs().UserLeaveAsync(default, default);
+    }
+
+    [Theory, BitAutoData]
+    public async Task OrganizationsController_UserCannotLeaveOrganizationThatManagesUser(
+        SutProvider<OrganizationsController> sutProvider,
+        Guid orgId,
+        User user)
+    {
+        var ssoConfig = new SsoConfig
+        {
+            Id = default,
+            Data = new SsoConfigurationData
+            {
+                MemberDecryptionType = MemberDecryptionType.KeyConnector
+            }.Serialize(),
+            Enabled = true,
+            OrganizationId = orgId,
+        };
+        var foundOrg = new Organization
+        {
+            Id = orgId
+        };
+
+        sutProvider.GetDependency<ICurrentContext>().OrganizationUser(orgId).Returns(true);
+        sutProvider.GetDependency<ISsoConfigRepository>().GetByOrganizationIdAsync(orgId).Returns(ssoConfig);
+        sutProvider.GetDependency<IUserService>().GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        sutProvider.GetDependency<IUserService>().GetOrganizationsClaimingUserAsync(user.Id).Returns(new List<Organization> { foundOrg });
+
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() => sutProvider.Sut.Leave(orgId));
+
+        Assert.Contains(new LeaveOrgClaimedAccountError().Message, exception.Message);
+
+        await sutProvider.GetDependency<IRemoveOrganizationUserCommand>().DidNotReceiveWithAnyArgs().RemoveUserAsync(default, default);
+    }
+
+    [Theory]
+    [BitAutoData(true, false)]
+    [BitAutoData(false, true)]
+    [BitAutoData(false, false)]
+    public async Task OrganizationsController_UserCanLeaveOrganizationThatDoesntProvideKeyConnector(
+        bool keyConnectorEnabled,
+        bool userUsesKeyConnector,
+        SutProvider<OrganizationsController> sutProvider,
+        Guid orgId,
+        User user)
+    {
+        var ssoConfig = new SsoConfig
+        {
+            Id = default,
+            Data = new SsoConfigurationData
+            {
+                MemberDecryptionType = keyConnectorEnabled
+                    ? MemberDecryptionType.KeyConnector
+                    : MemberDecryptionType.MasterPassword
+            }.Serialize(),
+            Enabled = true,
+            OrganizationId = orgId,
+        };
+
+        user.UsesKeyConnector = userUsesKeyConnector;
+
+        sutProvider.GetDependency<ICurrentContext>().OrganizationUser(orgId).Returns(true);
+        sutProvider.GetDependency<ISsoConfigRepository>().GetByOrganizationIdAsync(orgId).Returns(ssoConfig);
+        sutProvider.GetDependency<IUserService>().GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        sutProvider.GetDependency<IUserService>().GetOrganizationsClaimingUserAsync(user.Id).Returns(new List<Organization>());
+
+        await sutProvider.Sut.Leave(orgId);
+
+        await sutProvider.GetDependency<IRemoveOrganizationUserCommand>().Received(1).UserLeaveAsync(orgId, user.Id);
+    }
+
+    [Theory, BitAutoData]
+    public async Task Delete_OrganizationIsConsolidatedBillingClient_ScalesProvidersSeats(
+        SutProvider<OrganizationsController> sutProvider,
+        Provider provider,
+        Organization organization,
+        User user,
+        Guid organizationId,
+        SecretVerificationRequestModel requestModel)
+    {
+        organization.Status = OrganizationStatusType.Managed;
+        organization.PlanType = PlanType.TeamsMonthly;
+        organization.Seats = 10;
+
+        provider.Type = ProviderType.Msp;
+        provider.Status = ProviderStatusType.Billable;
+
+        sutProvider.GetDependency<ICurrentContext>().OrganizationOwner(organizationId).Returns(true);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organizationId).Returns(organization);
+        sutProvider.GetDependency<IUserService>().GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        sutProvider.GetDependency<IUserService>().VerifySecretAsync(user, requestModel.Secret).Returns(true);
+        sutProvider.GetDependency<IProviderRepository>().GetByOrganizationIdAsync(organization.Id).Returns(provider);
+
+        await sutProvider.Sut.Delete(organizationId.ToString(), requestModel);
+
+        await sutProvider.GetDependency<IProviderBillingService>().Received(1)
+            .ScaleSeats(provider, organization.PlanType, -organization.Seats.Value);
+
+        await sutProvider.GetDependency<IOrganizationDeleteCommand>().Received(1).DeleteAsync(organization);
+    }
+
+    [Theory, BitAutoData]
+    public async Task GetAutoEnrollStatus_ReturnsOrganizationAutoEnrollStatus_WithResetPasswordEnabledTrue(
+        SutProvider<OrganizationsController> sutProvider,
+        User user,
+        Organization organization,
+        OrganizationUser organizationUser,
+        [Policy(PolicyType.ResetPassword, data: "{\"AutoEnrollEnabled\": true}")] PolicyStatus policy)
+    {
+        sutProvider.GetDependency<IUserService>().GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdentifierAsync(organization.Id.ToString()).Returns(organization);
+        sutProvider.GetDependency<IOrganizationUserRepository>().GetByOrganizationAsync(organization.Id, user.Id).Returns(organizationUser);
+        sutProvider.GetDependency<IPolicyQuery>().RunAsync(organization.Id, PolicyType.ResetPassword).Returns(policy);
+
+        var result = await sutProvider.Sut.GetAutoEnrollStatus(organization.Id.ToString());
+
+        await sutProvider.GetDependency<IUserService>().Received(1).GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>());
+        await sutProvider.GetDependency<IOrganizationRepository>().Received(1).GetByIdentifierAsync(organization.Id.ToString());
+        await sutProvider.GetDependency<IPolicyQuery>().Received(1).RunAsync(organization.Id, PolicyType.ResetPassword);
+
+        Assert.True(result.ResetPasswordEnabled);
+    }
+
+    [Theory, BitAutoData]
+    public async Task PutCollectionManagement_ValidRequest_Success(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization,
+        OrganizationCollectionManagementUpdateRequestModel model)
+    {
+        // Arrange
+        sutProvider.GetDependency<ICurrentContext>().OrganizationOwner(organization.Id).Returns(true);
+
+        var plan = MockPlans.Get(PlanType.EnterpriseAnnually);
+        sutProvider.GetDependency<IPricingClient>().GetPlan(Arg.Any<PlanType>()).Returns(plan);
+
+        sutProvider.GetDependency<IOrganizationUpdateCollectionManagementCommand>()
+            .UpdateAsync(
+                organization.Id,
+                Arg.Is<OrganizationCollectionManagementSettings>(s =>
+                    s.LimitCollectionCreation == model.LimitCollectionCreation &&
+                    s.LimitCollectionDeletion == model.LimitCollectionDeletion &&
+                    s.LimitItemDeletion == model.LimitItemDeletion &&
+                    s.AllowAdminAccessToAllCollectionItems == model.AllowAdminAccessToAllCollectionItems))
+            .Returns(organization);
+
+        // Act
+        await sutProvider.Sut.PutCollectionManagement(organization.Id, model);
+
+        // Assert
+        await sutProvider.GetDependency<IOrganizationUpdateCollectionManagementCommand>()
+            .Received(1)
+            .UpdateAsync(
+                organization.Id,
+                Arg.Is<OrganizationCollectionManagementSettings>(s =>
+                    s.LimitCollectionCreation == model.LimitCollectionCreation &&
+                    s.LimitCollectionDeletion == model.LimitCollectionDeletion &&
+                    s.LimitItemDeletion == model.LimitItemDeletion &&
+                    s.AllowAdminAccessToAllCollectionItems == model.AllowAdminAccessToAllCollectionItems));
+    }
+
+    [Theory, BitAutoData]
+    public async Task ApiKey_ScimType_InvalidSecret_ThrowsBadRequest(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization,
+        OrganizationApiKey organizationApiKey,
+        User user)
+    {
+        organization.PlanType = PlanType.EnterpriseAnnually;
+        var model = new OrganizationApiKeyRequestModel
+        {
+            Type = OrganizationApiKeyType.Scim,
+            MasterPasswordHash = "invalid-hash"
+        };
+
+        sutProvider.GetDependency<ICurrentContext>().ManageScim(organization.Id).Returns(true);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+        sutProvider.GetDependency<IGetOrganizationApiKeyQuery>()
+            .GetOrganizationApiKeyAsync(organization.Id, OrganizationApiKeyType.Scim)
+            .Returns(organizationApiKey);
+
+        var userService = sutProvider.GetDependency<IUserService>();
+        userService.GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        userService.VerifySecretAsync(user, model.Secret).Returns(false);
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.ApiKey(organization.Id.ToString(), model));
+    }
+
+    [Theory, BitAutoData]
+    public async Task ApiKey_ScimType_ValidSecret_ReturnsApiKey(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization,
+        OrganizationApiKey organizationApiKey,
+        User user)
+    {
+        organization.PlanType = PlanType.EnterpriseAnnually;
+        var model = new OrganizationApiKeyRequestModel
+        {
+            Type = OrganizationApiKeyType.Scim,
+            MasterPasswordHash = "valid-hash"
+        };
+
+        sutProvider.GetDependency<ICurrentContext>().ManageScim(organization.Id).Returns(true);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+        sutProvider.GetDependency<IGetOrganizationApiKeyQuery>()
+            .GetOrganizationApiKeyAsync(organization.Id, OrganizationApiKeyType.Scim)
+            .Returns(organizationApiKey);
+        var userService = sutProvider.GetDependency<IUserService>();
+        userService.GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        userService.VerifySecretAsync(user, model.Secret).Returns(true);
+
+        var result = await sutProvider.Sut.ApiKey(organization.Id.ToString(), model);
+
+        Assert.Equal(organizationApiKey.ApiKey, result.ApiKey);
+    }
+
+    [Theory, BitAutoData]
+    public async Task RotateApiKey_ScimType_InvalidSecret_ThrowsBadRequest(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization,
+        OrganizationApiKey organizationApiKey,
+        User user)
+    {
+        var model = new OrganizationApiKeyRequestModel
+        {
+            Type = OrganizationApiKeyType.Scim,
+            MasterPasswordHash = "invalid-hash"
+        };
+
+        sutProvider.GetDependency<ICurrentContext>().ManageScim(organization.Id).Returns(true);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+        sutProvider.GetDependency<IGetOrganizationApiKeyQuery>()
+            .GetOrganizationApiKeyAsync(organization.Id, OrganizationApiKeyType.Scim)
+            .Returns(organizationApiKey);
+        var userService = sutProvider.GetDependency<IUserService>();
+        userService.GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        userService.VerifySecretAsync(user, model.Secret).Returns(false);
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.RotateApiKey(organization.Id.ToString(), model));
+    }
+
+    [Theory, BitAutoData]
+    public async Task RotateApiKey_ScimType_ValidSecret_ReturnsApiKey(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization,
+        OrganizationApiKey organizationApiKey,
+        User user)
+    {
+        var model = new OrganizationApiKeyRequestModel
+        {
+            Type = OrganizationApiKeyType.Scim,
+            MasterPasswordHash = "valid-hash"
+        };
+
+        sutProvider.GetDependency<ICurrentContext>().ManageScim(organization.Id).Returns(true);
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+        sutProvider.GetDependency<IGetOrganizationApiKeyQuery>()
+            .GetOrganizationApiKeyAsync(organization.Id, OrganizationApiKeyType.Scim)
+            .Returns(organizationApiKey);
+        var userService = sutProvider.GetDependency<IUserService>();
+        userService.GetUserByPrincipalAsync(Arg.Any<ClaimsPrincipal>()).Returns(user);
+        userService.VerifySecretAsync(user, model.Secret).Returns(true);
+
+        var result = await sutProvider.Sut.RotateApiKey(organization.Id.ToString(), model);
+
+        Assert.Equal(organizationApiKey.ApiKey, result.ApiKey);
+    }
+
+    [Theory, BitAutoData]
+    public async Task PostDeleteRecoverToken_ThrowsBadRequestException_WhenTokenExpired(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization)
+    {
+        // Arrange
+        var model = new OrganizationVerifyDeleteRecoverRequestModel { Token = "expired-token" };
+
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+
+        // Token has a matching organization Id but an expiration date two hours in the past.
+        var expiredTokenData = new OrgDeleteTokenable(organization, -2);
+        sutProvider.GetDependency<IDataProtectorTokenFactory<OrgDeleteTokenable>>()
+            .TryUnprotect(model.Token, out expiredTokenData).Returns(true);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.PostDeleteRecoverToken(organization.Id, model));
+
+        await sutProvider.GetDependency<IOrganizationDeleteCommand>()
+            .DidNotReceiveWithAnyArgs().DeleteAsync(default);
+    }
+
+    [Theory, BitAutoData]
+    public async Task GetPrivateKey_WhenOrganizationExists_ReturnsPrivateKey(
+        SutProvider<OrganizationsController> sutProvider,
+        Organization organization)
+    {
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(organization.Id).Returns(organization);
+
+        var result = await sutProvider.Sut.GetPrivateKey(organization.Id);
+
+        Assert.Equal(organization.PrivateKey, result.PrivateKey);
+    }
+
+    [Theory, BitAutoData]
+    public async Task GetPrivateKey_WhenOrganizationNotFound_ThrowsNotFoundException(
+        SutProvider<OrganizationsController> sutProvider,
+        Guid orgId)
+    {
+        sutProvider.GetDependency<IOrganizationRepository>().GetByIdAsync(orgId).ReturnsNull();
+
+        await Assert.ThrowsAsync<NotFoundException>(() => sutProvider.Sut.GetPrivateKey(orgId));
+    }
+}

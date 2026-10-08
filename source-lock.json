@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-10-07",
+  "classification": "source-reference-only",
+  "upstream": [
+    {
+      "name": "server",
+      "repo": "bitwarden/server",
+      "commit": "ea4b0474f0702c270ccef029ce9c491f0d351e09",
+      "path": "upstream/bitwarden/server",
+      "license": "AGPL-3.0-or-commercial-by-directory",
+      "excludedDirectories": [
+        "bitwarden_license",
+        ".git"
+      ],
+      "runAsGoreeCloud": false
+    },
+    {
+      "name": "clients",
+      "repo": "bitwarden/clients",
+      "commit": "0e7970ed405e99b18fe9fb776283253301ee7dc1",
+      "path": "upstream/bitwarden/clients",
+      "license": "GPL-3.0-or-commercial-by-directory",
+      "excludedDirectories": [
+        "bitwarden_license",
+        ".git"
+      ],
+      "runAsGoreeCloud": false
+    }
+  ]
+}

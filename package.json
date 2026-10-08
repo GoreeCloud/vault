@@ -1,0 +1,13 @@
+{
+  "name": "goreecloud-vault-foundation",
+  "version": "0.1.0-dev",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs && node tools/check-foundation.mjs",
+    "check": "node tools/check-foundation.mjs"
+  }
+}

@@ -1,0 +1,87 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Core.AdminConsole.Interfaces;
+using Bit.Core.Auth.Enums;
+using Bit.Core.Auth.Models;
+using Bit.Core.Enums;
+using Bit.Core.Utilities;
+
+namespace Bit.Core.Models.Data.Organizations.OrganizationUsers;
+
+public class OrganizationUserUserDetails : IExternal, ITwoFactorProvidersUser, IOrganizationUser
+{
+    private Dictionary<TwoFactorProviderType, TwoFactorProvider> _twoFactorProviders;
+
+    public Guid Id { get; set; }
+    public Guid OrganizationId { get; set; }
+    public Guid? UserId { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+    public string AvatarColor { get; set; }
+    public string TwoFactorProviders { get; set; }
+    /// <summary>
+    /// Indicates whether the user has a personal premium subscription.
+    /// Does not include premium access from organizations -
+    /// do not use this to check whether the user can access premium features.
+    /// Null when the organization user is in Invited status (UserId is null).
+    /// </summary>
+    public bool? Premium { get; set; }
+    public OrganizationUserStatusType Status { get; set; }
+    public OrganizationUserType Type { get; set; }
+    public bool AccessSecretsManager { get; set; }
+    public bool AccessPam { get; set; }
+    public string ExternalId { get; set; }
+    public string SsoExternalId { get; set; }
+    public string Permissions { get; set; }
+    public string ResetPasswordKey { get; set; }
+    public bool UsesKeyConnector { get; set; }
+    public bool HasMasterPassword { get; set; }
+    /// <summary>
+    /// The reason a user is revoked. Null if the user is not revoked, or was revoked before
+    /// revocation reasons were tracked.
+    /// </summary>
+    public RevocationReason? RevocationReason { get; set; }
+    /// <summary>
+    /// The date the OrganizationUser was created, i.e. when the User was first invited to the Organization.
+    /// </summary>
+    public DateTime CreationDate { get; set; }
+
+    public ICollection<Guid> Groups { get; set; } = new List<Guid>();
+    public ICollection<CollectionAccessSelection> Collections { get; set; } = new List<CollectionAccessSelection>();
+
+    public Dictionary<TwoFactorProviderType, TwoFactorProvider> GetTwoFactorProviders()
+    {
+        if (string.IsNullOrWhiteSpace(TwoFactorProviders))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (_twoFactorProviders == null)
+            {
+                _twoFactorProviders =
+                    JsonHelpers.LegacyDeserialize<Dictionary<TwoFactorProviderType, TwoFactorProvider>>(
+                        TwoFactorProviders);
+            }
+
+            return _twoFactorProviders;
+        }
+        catch (Newtonsoft.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    public Guid? GetUserId()
+    {
+        return UserId;
+    }
+
+    public Permissions GetPermissions()
+    {
+        return string.IsNullOrWhiteSpace(Permissions) ? null
+            : CoreHelpers.LoadClassFromJsonData<Permissions>(Permissions);
+    }
+}

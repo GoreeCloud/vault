@@ -1,0 +1,51 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using System.ComponentModel.DataAnnotations;
+using Bit.Core.AdminConsole.Entities;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.InviteUsers.Models;
+using Bit.Core.Enums;
+using Bit.Core.Models.Data;
+using Bit.Core.Utilities;
+
+namespace Bit.Api.AdminConsole.Public.Models.Request;
+
+public class MemberCreateRequestModel : MemberUpdateRequestModel
+{
+    /// <summary>
+    /// The member's email address.
+    /// </summary>
+    /// <example>jsmith@example.com</example>
+    [Required]
+    [StringLength(256)]
+    [StrictEmailAddress]
+    public new string Email { get; set; }
+
+    public InviteOrganizationUsersRequest ToInviteRequest(
+        Organization organization,
+        bool accessSecretsManager,
+        Guid performedBy,
+        DateTimeOffset performedAt)
+    {
+        // Permissions property is optional for backwards compatibility with existing usage
+        var permissions = (Type is OrganizationUserType.Custom && Permissions is not null)
+            ? Permissions.ToData()
+            : new Permissions();
+
+        return new InviteOrganizationUsersRequest(
+            invites:
+            [
+                new OrganizationUserInviteCommandModel(
+                    email: Email,
+                    assignedCollections: Collections?.Select(c => c.ToCollectionAccessSelection()) ?? [],
+                    groups: Groups ?? [],
+                    type: Type!.Value,
+                    permissions: permissions,
+                    externalId: ExternalId,
+                    accessSecretsManager: accessSecretsManager)
+            ],
+            organization: organization,
+            performedBy: performedBy,
+            performedAt: performedAt);
+    }
+}

@@ -1,0 +1,121 @@
+﻿using System.Globalization;
+using Bit.Core.AdminConsole.AbilitiesCache;
+using Bit.Core.Auth.IdentityServer;
+using Bit.Core.Context;
+using Bit.Core.Services;
+using Bit.Core.Settings;
+using Bit.Core.Utilities;
+using Bit.SharedWeb.Utilities;
+using Duende.IdentityModel;
+
+namespace Bit.Events;
+
+public class Startup
+{
+    public Startup(IWebHostEnvironment env, IConfiguration configuration)
+    {
+        CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+        Configuration = configuration;
+        Environment = env;
+    }
+
+    public IConfiguration Configuration { get; }
+    public IWebHostEnvironment Environment { get; set; }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Options
+        services.AddOptions();
+
+        // Settings
+        var globalSettings = services.AddGlobalSettingsServices(Configuration, Environment);
+
+        // Data Protection
+        services.AddCustomDataProtectionServices(Environment, globalSettings);
+
+        // Repositories
+        services.AddDatabaseRepositories(globalSettings);
+        services.AddTestPlayIdTracking(globalSettings);
+
+        // Context
+        services.AddScoped<ICurrentContext, CurrentContext>();
+
+        // Identity
+        services.AddIdentityAuthenticationServices(globalSettings, Environment, config =>
+        {
+            config.AddPolicy("Application", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application", "external");
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.Api);
+            });
+        });
+
+        // Services
+        services.AddOrganizationAbilityCache(globalSettings);
+        services.AddProviderAbilityCache(globalSettings);
+
+        services.AddEventWriteServices(globalSettings);
+        services.AddScoped<IEventService, EventService>();
+
+        services.ApplyServerCompatibilityLayer();
+
+        // Mvc
+        services.AddMvc(config =>
+        {
+            config.Filters.Add(new LoggingExceptionHandlerFilterAttribute());
+        });
+
+        // Add event integration services
+        services.AddDistributedCache(globalSettings);
+        services.AddRabbitMqListeners(globalSettings);
+    }
+
+    public void Configure(
+        IApplicationBuilder app,
+        IWebHostEnvironment env,
+        GlobalSettings globalSettings)
+    {
+        // Add general security headers
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+
+        // Forwarding Headers
+        if (globalSettings.SelfHosted)
+        {
+            app.UseForwardedHeaders(globalSettings);
+        }
+
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+
+        // Default Middleware
+        app.UseDefaultMiddleware(env, globalSettings);
+
+        // Add routing
+        app.UseRouting();
+
+        // Add Cors
+        app.UseCors(policy => policy.SetIsOriginAllowed(o => CoreHelpers.IsCorsOriginAllowed(o, globalSettings))
+            .AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+
+        // Add authentication and authorization to the request pipeline.
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Add current context
+        app.UseMiddleware<CurrentContextMiddleware>();
+
+        // Gates endpoints carrying IFeatureMetadata; required in any app that
+        // routes requests through endpoints tagged with [RequireFeature].
+        app.UseFeatureFlagChecks();
+
+        // Add MVC to the request pipeline.
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapDefaultControllerRoute();
+            endpoints.MapVersionEndpoint();
+        });
+    }
+}

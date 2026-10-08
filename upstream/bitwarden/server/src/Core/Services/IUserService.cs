@@ -1,0 +1,148 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using System.Security.Claims;
+using Bit.Core.AdminConsole.Entities;
+using Bit.Core.Auth.Enums;
+using Bit.Core.Billing.Models.Business;
+using Bit.Core.Entities;
+using Bit.Core.Enums;
+using Bit.Core.KeyManagement.Models.Data;
+using Bit.Core.Models.Business;
+using Microsoft.AspNetCore.Identity;
+
+namespace Bit.Core.Services;
+
+public interface IUserService
+{
+    Guid? GetProperUserId(ClaimsPrincipal principal);
+    Task<User> GetUserByIdAsync(string userId);
+    Task<User> GetUserByIdAsync(Guid userId);
+    Task<User> GetUserByPrincipalAsync(ClaimsPrincipal principal);
+    Task<DateTime> GetAccountRevisionDateByIdAsync(Guid userId);
+    Task SaveUserAsync(User user, bool push = false);
+    Task<IdentityResult> CreateUserAsync(User user);
+    Task<IdentityResult> CreateUserAsync(User user, RegisterFinishData registerFinishData);
+    Task SendMasterPasswordHintAsync(string email);
+    Task SendEmailVerificationAsync(User user);
+    Task<IdentityResult> ConfirmEmailAsync(User user, string token);
+    Task InitiateEmailChangeAsync(User user, string newEmail);
+    Task<IdentityResult> ChangeEmailAsync(User user, string masterPassword, string newEmail, string newMasterPassword,
+        string token, string key);
+    [Obsolete("Use ISelfServicePasswordChangeCommand instead. To be removed in PM-33141.")]
+    Task<IdentityResult> ChangePasswordAsync(User user, string masterPassword, string newMasterPassword, string passwordHint, string key);
+    // TODO removed with https://bitwarden.atlassian.net/browse/PM-27328
+    [Obsolete("Use ISetKeyConnectorKeyCommand instead. This method will be removed in a future version.")]
+    Task<IdentityResult> SetKeyConnectorKeyAsync(User user, string key, string orgIdentifier);
+    Task<IdentityResult> AdminResetPasswordAsync(OrganizationUserType type, Guid orgId, Guid id, string newMasterPassword, string key);
+    [Obsolete("Use IReplaceAdminSetTemporaryPasswordCommand instead. To be removed in PM-33141.")]
+    Task<IdentityResult> UpdateTempPasswordAsync(User user, string newMasterPassword, string key, string hint);
+    Task<IdentityResult> RefreshSecurityStampAsync(User user, string masterPasswordHash);
+    Task UpdateTwoFactorProviderAsync(User user, TwoFactorProviderType type, bool setEnabled = true, bool logEvent = true);
+    /// <summary>
+    /// Removes the entry for <paramref name="type"/> from the user's <c>TwoFactorProviders</c> JSON column.
+    /// The provider's <c>MetaData</c> (TOTP shared secret, Duo client secret, YubiKey IDs, WebAuthn credentials, etc.)
+    /// is destroyed in the process; the name is historical — this is a hard delete of the provider configuration,
+    /// not a reversible disable. No-op if <paramref name="type"/> is not currently configured. Emits
+    /// <see cref="Bit.Core.Enums.EventType.User_Disabled2fa"/> and re-evaluates 2FA-removal policies if no
+    /// providers remain.
+    /// </summary>
+    Task DisableTwoFactorProviderAsync(User user, TwoFactorProviderType type);
+    Task<IdentityResult> DeleteAsync(User user);
+    Task<IdentityResult> DeleteAsync(User user, string token);
+    Task SendDeleteConfirmationAsync(string email);
+    Task UpdateLicenseAsync(User user, UserLicense license);
+    Task EnablePremiumAsync(Guid userId, DateTime? expirationDate);
+    Task DisablePremiumAsync(Guid userId, DateTime? expirationDate);
+    Task UpdatePremiumExpirationAsync(Guid userId, DateTime? expirationDate);
+    Task<UserLicense> GenerateLicenseAsync(User user, SubscriptionInfo subscriptionInfo = null,
+        int? version = null);
+    Task<bool> CheckPasswordAsync(User user, string password);
+    /// <summary>
+    /// Checks if the user has access to premium features, either through a personal subscription or through an organization.
+    ///
+    /// This is the preferred way to definitively know if a user has access to premium features when you already have the User object.
+    /// </summary>
+    /// <param name="user">user being acted on</param>
+    /// <returns>true if they can access premium; false otherwise.</returns>
+    Task<bool> CanAccessPremium(User user);
+
+    /// <summary>
+    /// Checks if the user has inherited access to premium features through an organization.
+    ///
+    /// This primarily serves as a means to communicate to the client when a user has inherited their premium status
+    /// through an organization. Feature gating logic probably should not be behind this check.
+    /// </summary>
+    /// <param name="user">user being acted on</param>
+    /// <returns>true if they can access premium because of organization membership; false otherwise.</returns>
+    [Obsolete("Use IHasPremiumAccessQuery.HasPremiumFromOrganizationAsync instead. This method will be removed in a future version.")]
+    Task<bool> HasPremiumFromOrganization(User user);
+    Task<string> GenerateSignInTokenAsync(User user, string purpose);
+
+    Task<IdentityResult> UpdatePasswordHash(User user, string newPassword,
+        bool validatePassword = true, bool refreshStamp = true);
+    // TODO: Remove this method when the PM37165_RotateUserApiKeyCommand feature flag is cleaned up.
+    [Obsolete("Use IRotateUserApiKeyCommand instead. This method will be removed once the PM37165_RotateUserApiKeyCommand feature flag is removed.")]
+    Task RotateApiKeyAsync(User user);
+    string GetUserName(ClaimsPrincipal principal);
+    Task SendOTPAsync(User user);
+    Task<bool> VerifyOTPAsync(User user, string token);
+    Task<bool> VerifySecretAsync(User user, string secret);
+    /// <summary>
+    /// We use this method to check if the user has an active new device verification bypass
+    /// </summary>
+    /// <param name="userId">self</param>
+    /// <returns>returns true if the value is found in the cache</returns>
+    Task<bool> ActiveNewDeviceVerificationException(Guid userId);
+    /// <summary>
+    /// We use this method to toggle the new device verification bypass
+    /// </summary>
+    /// <param name="userId">Id of user bypassing new device verification</param>
+    Task ToggleNewDeviceVerificationException(Guid userId);
+
+    void SetTwoFactorProvider(User user, TwoFactorProviderType type, bool setEnabled = true);
+
+    /// <summary>
+    /// This method is used by the TwoFactorAuthenticationValidator to recover two
+    /// factor for a user. This allows users to be logged in after a successful recovery
+    /// attempt.
+    ///
+    /// This method logs the event, sends an email to the user, and removes two factor
+    /// providers on the user account. This means that a user will have to accomplish
+    /// new device verification on their account on new logins, if it is enabled for their user.
+    /// </summary>
+    /// <param name="recoveryCode">recovery code associated with the user logging in</param>
+    /// <param name="user">The user to refresh the 2FA and Recovery Code on.</param>
+    /// <returns>true if the recovery code is valid; false otherwise</returns>
+    Task<bool> RecoverTwoFactorAsync(User user, string recoveryCode);
+
+    /// <summary>
+    /// Returns true if the user is a legacy user. Legacy users use their master key as their
+    /// encryption key. We force these users to the web to migrate their encryption scheme.
+    /// </summary>
+    Task<bool> IsLegacyUser(string userId);
+
+    /// <summary>
+    /// Indicates if the user is managed by any organization.
+    /// </summary>
+    /// <remarks>
+    /// A user is considered managed by an organization if their email domain matches one of the
+    /// verified domains of that organization, and the user is a member of it.
+    /// The organization must be enabled and able to have verified domains.
+    /// </remarks>
+    Task<bool> IsClaimedByAnyOrganizationAsync(Guid userId);
+
+    /// <summary>
+    /// Verify whether the new email domain meets the requirements for managed users.
+    /// </summary>
+    /// <returns>
+    /// IdentityResult
+    /// </returns>
+    Task<IdentityResult> ValidateClaimedUserDomainAsync(User user, string newEmail);
+
+    /// <summary>
+    /// Gets the organizations that manage the user.
+    /// </summary>
+    /// <inheritdoc cref="IsClaimedByAnyOrganizationAsync"/>
+    Task<IEnumerable<Organization>> GetOrganizationsClaimingUserAsync(Guid userId);
+}

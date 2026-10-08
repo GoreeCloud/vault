@@ -1,0 +1,259 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Api.AdminConsole.Authorization;
+using Bit.Api.AdminConsole.Authorization.Collections;
+using Bit.Api.AdminConsole.Authorization.Requirements;
+using Bit.Api.AdminConsole.Models.Request;
+using Bit.Api.AdminConsole.Models.Response;
+using Bit.Api.Models.Response;
+using Bit.Core.AdminConsole.AbilitiesCache;
+using Bit.Core.AdminConsole.OrganizationFeatures.Groups.Interfaces;
+using Bit.Core.AdminConsole.Repositories;
+using Bit.Core.AdminConsole.Services;
+using Bit.Core.Exceptions;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.OrganizationAuthorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Bit.Api.AdminConsole.Controllers;
+
+[Route("organizations/{orgId}/groups")]
+[Authorize("Application")]
+public class GroupsController : Controller
+{
+    private readonly IGroupRepository _groupRepository;
+    private readonly IGroupService _groupService;
+    private readonly IDeleteGroupCommand _deleteGroupCommand;
+    private readonly IOrganizationRepository _organizationRepository;
+    private readonly ICreateGroupCommand _createGroupCommand;
+    private readonly IUpdateGroupCommand _updateGroupCommand;
+    private readonly IAuthorizationService _authorizationService;
+    private readonly IOrganizationAbilityCacheService _organizationAbilityCacheService;
+    private readonly IUserService _userService;
+    private readonly IOrganizationUserRepository _organizationUserRepository;
+    private readonly ICollectionRepository _collectionRepository;
+
+    public GroupsController(
+        IGroupRepository groupRepository,
+        IGroupService groupService,
+        IOrganizationRepository organizationRepository,
+        ICreateGroupCommand createGroupCommand,
+        IUpdateGroupCommand updateGroupCommand,
+        IDeleteGroupCommand deleteGroupCommand,
+        IAuthorizationService authorizationService,
+        IOrganizationAbilityCacheService organizationAbilityCacheService,
+        IUserService userService,
+        IOrganizationUserRepository organizationUserRepository,
+        ICollectionRepository collectionRepository)
+    {
+        _groupRepository = groupRepository;
+        _groupService = groupService;
+        _organizationRepository = organizationRepository;
+        _createGroupCommand = createGroupCommand;
+        _updateGroupCommand = updateGroupCommand;
+        _deleteGroupCommand = deleteGroupCommand;
+        _authorizationService = authorizationService;
+        _organizationAbilityCacheService = organizationAbilityCacheService;
+        _userService = userService;
+        _organizationUserRepository = organizationUserRepository;
+        _collectionRepository = collectionRepository;
+    }
+
+    [HttpGet("{id}")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task<GroupResponseModel> Get([FromRoute] Guid orgId, Guid id)
+    {
+        var group = await _groupRepository.GetByIdAsync(id);
+        if (group == null || group.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        return new GroupResponseModel(group);
+    }
+
+    [HttpGet("{id}/details")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task<GroupDetailsResponseModel> GetDetails([FromRoute] Guid orgId, Guid id)
+    {
+        var groupDetails = await _groupRepository.GetByIdWithCollectionsAsync(id);
+        if (groupDetails?.Item1 == null || groupDetails.Item1.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        return new GroupDetailsResponseModel(groupDetails.Item1, groupDetails.Item2);
+    }
+
+    [HttpGet("")]
+    [Authorize<OrganizationCollectionManagementAccessRequirement>]
+    public async Task<ListResponseModel<GroupResponseModel>> GetOrganizationGroups([FromRoute] Guid orgId)
+    {
+        var groups = await _groupRepository.GetManyByOrganizationIdAsync(orgId);
+        var responses = groups.Select(g => new GroupResponseModel(g));
+        return new ListResponseModel<GroupResponseModel>(responses);
+    }
+
+    [HttpGet("details")]
+    [Authorize<ManageUsersOrGroupsRequirement>]
+    public async Task<ListResponseModel<GroupDetailsResponseModel>> GetOrganizationGroupDetails([FromRoute] Guid orgId)
+    {
+        var groups = await _groupRepository.GetManyWithCollectionsByOrganizationIdAsync(orgId);
+        var responses = groups.Select(g => new GroupDetailsResponseModel(g.Item1, g.Item2));
+        return new ListResponseModel<GroupDetailsResponseModel>(responses);
+    }
+
+    [HttpGet("{id}/users")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task<IEnumerable<Guid>> GetUsers([FromRoute] Guid orgId, Guid id)
+    {
+        var group = await _groupRepository.GetByIdAsync(id);
+        if (group == null || group.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        var groupIds = await _groupRepository.GetManyUserIdsByIdAsync(id);
+        return groupIds;
+    }
+
+    [HttpPost("")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task<GroupResponseModel> Post([FromRoute] Guid orgId, [FromBody] GroupRequestModel model)
+    {
+        // Check the user has permission to grant access to the collections for the new group
+        if (model.Collections?.Any() == true)
+        {
+            var collections = await _collectionRepository.GetManyByManyIdsAsync(model.Collections.Select(a => a.Id));
+            var authorized =
+                (await _authorizationService.AuthorizeAsync(User, collections, BulkCollectionOperations.ModifyGroupAccess))
+                .Succeeded;
+            if (!authorized)
+            {
+                throw new NotFoundException();
+            }
+        }
+
+        var organization = await _organizationRepository.GetByIdAsync(orgId);
+        var group = model.ToGroup(orgId);
+        await _createGroupCommand.CreateGroupAsync(group, organization, model.Collections?.Select(c => c.ToSelectionReadOnly()).ToList(), model.Users);
+
+        return new GroupResponseModel(group);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task<GroupResponseModel> Put([FromRoute] Guid orgId, Guid id, [FromBody] GroupRequestModel model)
+    {
+        var (group, currentAccess) = await _groupRepository.GetByIdWithCollectionsAsync(id);
+        if (group == null || group.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        // Authorization check:
+        // If admins are not allowed access to all collections, you cannot add yourself to a group.
+        // No error is thrown for this, we just don't update groups.
+        var orgAbility = await _organizationAbilityCacheService.GetOrganizationAbilityAsync(orgId);
+        if (!orgAbility.AllowAdminAccessToAllCollectionItems)
+        {
+            var userId = _userService.GetProperUserId(User).Value;
+            var organizationUser = await _organizationUserRepository.GetByOrganizationAsync(orgId, userId);
+            var currentGroupUsers = await _groupRepository.GetManyUserIdsByIdAsync(id);
+            // OrganizationUser may be null if the current user is a provider
+            if (organizationUser != null && !currentGroupUsers.Contains(organizationUser.Id) && model.Users.Contains(organizationUser.Id))
+            {
+                throw new BadRequestException("You cannot add yourself to groups.");
+            }
+        }
+
+        // Authorization check:
+        // You must have authorization to ModifyUserAccess for all collections being saved
+        var postedCollections = await _collectionRepository
+            .GetManyByManyIdsAsync(model.Collections.Select(c => c.Id));
+        foreach (var collection in postedCollections)
+        {
+            if (!(await _authorizationService.AuthorizeAsync(User, collection,
+                    BulkCollectionOperations.ModifyGroupAccess))
+                .Succeeded)
+            {
+                throw new NotFoundException();
+            }
+        }
+
+        // The client only sends collections that the saving user has permissions to edit.
+        // We need to combine these with collections that the user doesn't have permissions for, so that we don't
+        // accidentally overwrite those
+        var currentCollections = await _collectionRepository
+            .GetManyByManyIdsAsync(currentAccess.Select(cas => cas.Id));
+
+        var readonlyCollectionIds = new HashSet<Guid>();
+        foreach (var collection in currentCollections)
+        {
+            if (!(await _authorizationService.AuthorizeAsync(User, collection, BulkCollectionOperations.ModifyGroupAccess))
+                .Succeeded)
+            {
+                readonlyCollectionIds.Add(collection.Id);
+            }
+        }
+
+        var editedCollectionAccess = model.Collections
+            .Select(c => c.ToSelectionReadOnly());
+        var readonlyCollectionAccess = currentAccess
+            .Where(ca => readonlyCollectionIds.Contains(ca.Id));
+        var collectionsToSave = editedCollectionAccess
+            .Concat(readonlyCollectionAccess)
+            .ToList();
+
+        var organization = await _organizationRepository.GetByIdAsync(orgId);
+
+        await _updateGroupCommand.UpdateGroupAsync(model.ToGroup(group), organization, collectionsToSave, model.Users);
+        return new GroupResponseModel(group);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task Delete([FromRoute] Guid orgId, Guid id)
+    {
+        var group = await _groupRepository.GetByIdAsync(id);
+        if (group == null || group.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        await _deleteGroupCommand.DeleteAsync(group);
+    }
+
+    [HttpDelete("")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task BulkDelete([FromRoute] Guid orgId, [FromBody] GroupBulkRequestModel model)
+    {
+        var groups = await _groupRepository.GetManyByManyIds(model.Ids);
+
+        foreach (var group in groups)
+        {
+            if (group.OrganizationId != orgId)
+            {
+                throw new NotFoundException();
+            }
+        }
+
+        await _deleteGroupCommand.DeleteManyAsync(groups);
+    }
+
+    [HttpDelete("{id}/user/{orgUserId}")]
+    [Authorize<ManageGroupsRequirement>]
+    public async Task DeleteUser([FromRoute] Guid orgId, Guid id, Guid orgUserId)
+    {
+        var group = await _groupRepository.GetByIdAsync(id);
+        if (group == null || group.OrganizationId != orgId)
+        {
+            throw new NotFoundException();
+        }
+
+        await _groupService.DeleteUserAsync(group, orgUserId);
+    }
+}

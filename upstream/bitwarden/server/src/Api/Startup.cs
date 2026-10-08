@@ -1,0 +1,418 @@
+﻿using Bit.Api.Utilities;
+using Bit.Core;
+using Bit.Core.Context;
+using Bit.Core.Settings;
+using AspNetCoreRateLimit;
+using Stripe;
+using Bit.Core.Utilities;
+using Duende.IdentityModel;
+using System.Globalization;
+using Bit.Api.Auth.Models.Request;
+using Bit.Api.KeyManagement.Models.Requests;
+using Bit.Api.KeyManagement.Validators;
+using Bit.Api.Tools.Models.Request;
+using Bit.Api.Vault.Models.Request;
+using Bit.Core.Auth.Entities;
+using Bit.SharedWeb.Health;
+using Microsoft.OpenApi;
+using Bit.SharedWeb.Utilities;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Bit.Core.Auth.UserFeatures;
+using Bit.Core.Entities;
+using Bit.Core.Billing.Extensions;
+using Bit.Core.OrganizationFeatures.OrganizationSubscriptions;
+using Bit.Core.Tools.Entities;
+using Bit.Core.Vault.Entities;
+using Bit.Api.Auth.Models.Request.WebAuthn;
+using Bit.Core.Auth.Models.Data;
+using Bit.Core.Auth.Identity.TokenProviders;
+using Bit.Core.Tools.ImportFeatures;
+using Bit.Core.Auth.Models.Api.Request;
+using Bit.Core.Dirt.Reports.ReportFeatures;
+using Bit.Core.Tools.SendFeatures;
+using Bit.Core.Auth.IdentityServer;
+using Bit.Core.Auth.Identity;
+using Bit.Core.Enums;
+using Bit.HttpExtensions;
+using Bit.Subscriptions.Organization;
+using Bit.Subscriptions.User;
+
+
+#if !OSS
+using Bit.Commercial.Core.SecretsManager;
+using Bit.Commercial.Core.Utilities;
+using Bit.Commercial.Infrastructure.EntityFramework.SecretsManager;
+using Bit.Services.Pam.Api.Endpoints;
+using Bit.Services.Pam.Utilities;
+#endif
+
+namespace Bit.Api;
+
+public class Startup
+{
+    public Startup(IWebHostEnvironment env, IConfiguration configuration)
+    {
+        CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+        Configuration = configuration;
+        Environment = env;
+    }
+
+    public IConfiguration Configuration { get; private set; }
+    public IWebHostEnvironment Environment { get; set; }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Options
+        services.AddOptions();
+
+        // Settings
+        var globalSettings = services.AddGlobalSettingsServices(Configuration, Environment);
+        if (!globalSettings.SelfHosted)
+        {
+            services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimitOptions"));
+            services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
+        }
+
+        // Data Protection
+        services.AddCustomDataProtectionServices(Environment, globalSettings);
+
+        // Event Grid
+        if (!string.IsNullOrWhiteSpace(globalSettings.EventGridKey))
+        {
+            ApiHelpers.EventGridKey = globalSettings.EventGridKey;
+        }
+
+        // Stripe Billing
+        StripeConfiguration.ApiKey = globalSettings.Stripe.ApiKey;
+        StripeConfiguration.MaxNetworkRetries = globalSettings.Stripe.MaxNetworkRetries;
+
+        // Repositories
+        services.AddDatabaseRepositories(globalSettings);
+        services.AddTestPlayIdTracking(globalSettings);
+
+        // Context
+        services.AddScoped<ICurrentContext, CurrentContext>();
+        services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+        // Caching
+        services.AddMemoryCache();
+        services.AddDistributedCache(globalSettings);
+
+        if (!globalSettings.SelfHosted)
+        {
+            services.AddIpRateLimiting(globalSettings);
+        }
+
+        // Identity
+        services.AddCustomIdentityServices(globalSettings);
+        services.AddIdentityAuthenticationServices(globalSettings, Environment, config =>
+        {
+            config.AddPolicy(Policies.Application, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application", "external");
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.Api);
+            });
+            config.AddPolicy(Policies.Web, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application", "external");
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.Api);
+                policy.RequireClaim(JwtClaimTypes.ClientId, BitwardenClient.Web);
+            });
+            config.AddPolicy(Policies.Push, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.ApiPush);
+            });
+            config.AddPolicy(Policies.Licensing, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.ApiLicensing);
+            });
+            config.AddPolicy(Policies.Organization, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.ApiOrganization);
+            });
+            config.AddPolicy(Policies.Installation, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.ApiInstallation);
+            });
+            config.AddPolicy(Policies.Secrets, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireAssertion(ctx => ctx.User.HasClaim(c =>
+                    c.Type == JwtClaimTypes.Scope &&
+                    (c.Value.Contains(ApiScopes.Api) || c.Value.Contains(ApiScopes.ApiSecrets))
+                ));
+            });
+            config.AddPolicy(Policies.Send, configurePolicy: policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(JwtClaimTypes.Scope, ApiScopes.ApiSendAccess);
+                policy.RequireClaim(Claims.SendAccessClaims.SendId);
+            });
+        });
+
+        services.AddScoped<AuthenticatorTokenProvider>();
+
+        // Key Rotation
+        services.AddUserKeyCommands(globalSettings);
+        services
+            .AddScoped<IRotationValidator<IEnumerable<CipherWithIdRequestModel>, IEnumerable<Cipher>>,
+                CipherRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<IEnumerable<FolderWithIdRequestModel>, IEnumerable<Folder>>,
+                FolderRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<IEnumerable<SendWithIdRequestModel>, IReadOnlyList<Send>>,
+                SendRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<IEnumerable<EmergencyAccessWithIdRequestModel>, IEnumerable<EmergencyAccess>>,
+                EmergencyAccessRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<OrganizationAccountRecoveryRotationData,
+                    IReadOnlyList<OrganizationUser>>
+                , OrganizationUserRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<IEnumerable<WebAuthnLoginRotateKeyRequestModel>, IEnumerable<WebAuthnLoginRotateKeyData>>,
+                WebAuthnLoginKeyRotationValidator>();
+        services
+            .AddScoped<IRotationValidator<IEnumerable<OtherDeviceKeysUpdateRequestModel>, IEnumerable<Device>>,
+                DeviceRotationValidator>();
+
+        // Services
+        services.AddBaseServices(globalSettings);
+        services.AddDefaultServices(globalSettings);
+        services.AddOrganizationSubscriptionServices();
+        services.AddCoreLocalizationServices();
+        services.AddBillingOperations();
+        services.AddReportingServices(globalSettings);
+        services.AddImportServices();
+
+        services.AddSendServices();
+
+        // Authorization Handlers
+        services.AddAuthorizationHandlers();
+
+        //health check
+        if (!globalSettings.SelfHosted)
+        {
+            services.AddHealthChecks(globalSettings);
+        }
+
+#if OSS
+        services.AddOosServices();
+#else
+        services.AddCommercialCoreServices();
+        services.AddCommercialSecretsManagerServices();
+        services.AddSecretsManagerEfRepositories();
+        services.AddPamServices();
+        Jobs.JobsHostedService.AddCommercialSecretsManagerJobServices(services);
+#endif
+
+        // Billing subscriptions minimal API libraries
+        services.AddUserSubscriptions();
+        services.AddOrganizationSubscriptions();
+        if (!globalSettings.SelfHosted)
+        {
+            services.AddOpenApiEndpointDataSource(MapSubscriptionEndpoints);
+        }
+
+        // MVC
+        services.AddMvc(config =>
+        {
+            config.Conventions.Add(new ApiExplorerGroupConvention());
+            config.Conventions.Add(new PublicApiControllersModelConvention());
+        });
+
+        // Required for ApiExplorer to enumerate Minimal API endpoints (e.g. PAM) so they appear in the OpenAPI spec.
+        services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen(globalSettings, Environment);
+        Jobs.JobsHostedService.AddJobsServices(services, globalSettings.SelfHosted);
+        services.AddHostedService<Jobs.JobsHostedService>();
+
+        // Add Event Integrations services
+        services.AddEventIntegrationsCommandsQueries(globalSettings);
+        services.AddSlackService(globalSettings);
+    }
+
+    public void Configure(
+        IApplicationBuilder app,
+        IWebHostEnvironment env,
+        GlobalSettings globalSettings,
+        ILogger<Startup> logger)
+    {
+        // Add general security headers
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+
+        // Default Middleware
+        app.UseDefaultMiddleware(env, globalSettings);
+
+        if (!globalSettings.SelfHosted)
+        {
+            // Rate limiting
+            app.UseMiddleware<CustomIpRateLimitMiddleware>();
+        }
+        else
+        {
+            app.UseForwardedHeaders(globalSettings);
+        }
+
+        // Add localization
+        app.UseCoreLocalization();
+
+        // Add static files to the request pipeline.
+        app.UseStaticFiles();
+
+        // Add routing
+        app.UseRouting();
+
+        // Add Cors
+        app.UseCors(policy => policy.SetIsOriginAllowed(o => CoreHelpers.IsCorsOriginAllowed(o, globalSettings))
+            .AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+
+        // Add authentication and authorization to the request pipeline.
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Add current context
+        app.UseMiddleware<CurrentContextMiddleware>();
+
+        // Gates endpoints carrying IFeatureMetadata; required in any app that
+        // routes requests through endpoints tagged with [RequireFeature].
+        app.UseFeatureFlagChecks();
+
+        // Add endpoints to the request pipeline.
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapDefaultControllerRoute();
+            endpoints.MapVersionEndpoint();
+
+#if !OSS
+            // PAM is a commercial feature; its Minimal API endpoints are only mapped in non-OSS builds.
+            endpoints.MapPamEndpoints();
+#endif
+
+            if (!globalSettings.SelfHosted)
+            {
+                endpoints.MapHealthChecks("/healthz");
+
+                endpoints.MapHealthChecks("/healthz/extended", new HealthCheckOptions
+                {
+                    ResponseWriter = HealthCheckServiceExtensions.WriteResponse
+                });
+            }
+
+            // Billing subscriptions minimal API endpoints
+            if (!globalSettings.SelfHosted)
+            {
+                MapSubscriptionEndpoints(endpoints);
+            }
+        });
+
+        // Add Swagger
+        // Note that the swagger.json generation is configured in the call to AddSwaggerGen above.
+        if (Environment.IsDevelopment() || globalSettings.SelfHosted)
+        {
+            // adds the middleware to serve the swagger.json while the server is running
+            app.UseSwagger(config =>
+            {
+                config.RouteTemplate = "specs/{documentName}/swagger.json";
+
+                // Remove all Bitwarden cloud servers and only register the local server
+                config.PreSerializeFilters.Add((swaggerDoc, httpReq) =>
+                {
+                    swaggerDoc.Servers =
+                    [
+                        new()
+                        {
+                            Url = globalSettings.BaseServiceUri.Api,
+                        }
+                    ];
+
+                    swaggerDoc.Components ??= new OpenApiComponents();
+                    swaggerDoc.Components.SecuritySchemes = new Dictionary<string, IOpenApiSecurityScheme>
+                    {
+                        {
+                            "oauth2-client-credentials",
+                            new OpenApiSecurityScheme
+                            {
+                                Type = SecuritySchemeType.OAuth2,
+                                Flows = new OpenApiOAuthFlows
+                                {
+                                    ClientCredentials = new OpenApiOAuthFlow
+                                    {
+                                        TokenUrl = new Uri($"{globalSettings.BaseServiceUri.Identity}/connect/token"),
+                                        Scopes = new Dictionary<string, string>
+                                {
+                                    { ApiScopes.ApiOrganization, "Organization APIs" }
+                                }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "send-access-bearer",
+                            new OpenApiSecurityScheme
+                            {
+                                Type = SecuritySchemeType.Http,
+                                Scheme = "bearer",
+                                BearerFormat = "JWT",
+                                Description = "Send access token obtained from /connect/token using the send_access grant.",
+                                Extensions = new Dictionary<string, IOpenApiExtension>
+                                {
+                                    { "x-explicit-bearer-token", new JsonNodeExtension(true) }
+                                }
+                            }
+                        }
+                    };
+
+                    swaggerDoc.Security =
+                    [
+                        new OpenApiSecurityRequirement
+                        {
+                            [new OpenApiSecuritySchemeReference("oauth2-client-credentials", swaggerDoc)] = [ApiScopes.ApiOrganization]
+                        },
+                    ];
+
+                    swaggerDoc.Workspace = new OpenApiWorkspace();
+                    swaggerDoc.RegisterComponents();
+                });
+            });
+
+            // adds the middleware to display the web UI
+            app.UseSwaggerUI(config =>
+            {
+                config.DocumentTitle = "Bitwarden API Documentation";
+                config.RoutePrefix = "docs";
+                config.SwaggerEndpoint($"{globalSettings.BaseServiceUri.Api}/specs/public/swagger.json",
+                    "Bitwarden Public API");
+                config.OAuthClientId("accountType.id");
+                config.OAuthClientSecret("secretKey");
+
+                // Persist authorization on page refresh - for development use only
+                if (Environment.IsDevelopment())
+                {
+                    config.EnablePersistAuthorization();
+                }
+            });
+        }
+
+        // Log startup
+        logger.LogInformation(Constants.BypassFiltersEventId, "{Project} started.", globalSettings.ProjectName);
+    }
+
+    private static void MapSubscriptionEndpoints(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGroup("/account/billing/subscription")
+            .MapUserSubscriptionEndpoints();
+        endpoints.MapGroup("/organizations/{organizationId:guid}/billing/subscription")
+            .MapOrganizationSubscriptionEndpoints();
+        endpoints.MapGroup("/organizations/billing/subscription")
+            .MapOrganizationSubscriptionPurchaseEndpoints();
+    }
+}

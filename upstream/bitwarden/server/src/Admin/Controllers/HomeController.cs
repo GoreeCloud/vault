@@ -1,0 +1,122 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using System.Diagnostics;
+using System.Text.Json;
+using Bit.Admin.Models;
+using Bit.Core.Settings;
+using Bitwarden.Server.Sdk.Environment;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+
+namespace Bit.Admin.Controllers;
+
+public class HomeController : Controller
+{
+    public const string ExternalHttpClientName = "HomeControllerExternal";
+
+    private readonly GlobalSettings _globalSettings;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<HomeController> _logger;
+    private readonly IBitwardenEnvironment _bitwardenEnvironment;
+
+    public HomeController(GlobalSettings globalSettings, IHttpClientFactory httpClientFactory, ILogger<HomeController> logger, IBitwardenEnvironment bitwardenEnvironment)
+    {
+        _globalSettings = globalSettings;
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+        _bitwardenEnvironment = bitwardenEnvironment;
+    }
+
+    [Authorize]
+    public IActionResult Index()
+    {
+        return View(new HomeModel
+        {
+            GlobalSettings = _globalSettings,
+            CurrentVersion = _bitwardenEnvironment.Version
+        });
+    }
+
+    public IActionResult Error()
+    {
+        return View(new ErrorViewModel
+        {
+            RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
+        });
+    }
+
+
+    public async Task<IActionResult> GetLatestVersion(ProjectType project, CancellationToken cancellationToken)
+    {
+        var requestUri = $"https://selfhost.bitwarden.com/version.json";
+        try
+        {
+            var response = await _httpClientFactory.CreateClient(ExternalHttpClientName).GetAsync(requestUri, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var latestVersions = JsonConvert.DeserializeObject<LatestVersions>(await response.Content.ReadAsStringAsync());
+                return project switch
+                {
+                    ProjectType.Core => new JsonResult(latestVersions.Versions.CoreVersion),
+                    ProjectType.Web => new JsonResult(latestVersions.Versions.WebVersion),
+                    _ => throw new System.NotImplementedException(),
+                };
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            _logger.LogError(e, "Error encountered while sending GET request to {RequestUri}", requestUri);
+            return new JsonResult("Unable to fetch latest version") { StatusCode = StatusCodes.Status500InternalServerError };
+        }
+
+        return new JsonResult("-");
+    }
+
+    public async Task<IActionResult> GetInstalledWebVersion(CancellationToken cancellationToken)
+    {
+        var requestUri = $"{_globalSettings.BaseServiceUri.InternalVault}/version.json";
+        try
+        {
+            var response = await _httpClientFactory.CreateClient().GetAsync(requestUri, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                using var jsonDocument = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+                var root = jsonDocument.RootElement;
+                return new JsonResult(root.GetProperty("version").GetString());
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            _logger.LogError(e, "Error encountered while sending GET request to {RequestUri}", requestUri);
+            return new JsonResult("Unable to fetch installed version") { StatusCode = StatusCodes.Status500InternalServerError };
+        }
+
+        return new JsonResult("-");
+    }
+
+    private class LatestVersions
+    {
+        [JsonProperty("versions")]
+        public Versions Versions { get; set; }
+    }
+
+    private class Versions
+    {
+        [JsonProperty("coreVersion")]
+        public string CoreVersion { get; set; }
+
+        [JsonProperty("webVersion")]
+        public string WebVersion { get; set; }
+
+        [JsonProperty("keyConnectorVersion")]
+        public string KeyConnectorVersion { get; set; }
+    }
+}
+
+public enum ProjectType
+{
+    Core,
+    Web,
+}

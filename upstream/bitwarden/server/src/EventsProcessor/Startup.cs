@@ -1,0 +1,59 @@
+﻿using System.Globalization;
+using Bit.Core.Utilities;
+using Bit.SharedWeb.Utilities;
+
+namespace Bit.EventsProcessor;
+
+public class Startup
+{
+    public Startup(IWebHostEnvironment env, IConfiguration configuration)
+    {
+        CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+        Configuration = configuration;
+        Environment = env;
+    }
+
+    public IConfiguration Configuration { get; }
+    public IWebHostEnvironment Environment { get; set; }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        // Options
+        services.AddOptions();
+
+        // Settings
+        var globalSettings = services.AddGlobalSettingsServices(Configuration, Environment);
+
+        // Data Protection
+        services.AddCustomDataProtectionServices(Environment, globalSettings);
+
+        // Repositories
+        services.AddDatabaseRepositories(globalSettings);
+        services.AddTestPlayIdTracking(globalSettings);
+
+        // Add event integration services
+        services.AddDistributedCache(globalSettings);
+        services.AddAzureServiceBusListeners(globalSettings);
+        services.AddHostedService<AzureQueueHostedService>();
+
+        if (EventIntegrationsServiceCollectionExtensions.IsAzureServiceBusEnabled(globalSettings))
+        {
+            services.AddHostedService<DeadLetterCleanupHostedService>();
+        }
+    }
+
+    public void Configure(IApplicationBuilder app)
+    {
+        // Add general security headers
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+        app.UseRouting();
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapGet("/alive",
+                async context => await context.Response.WriteAsJsonAsync(System.DateTime.UtcNow));
+            endpoints.MapGet("/now",
+                async context => await context.Response.WriteAsJsonAsync(System.DateTime.UtcNow));
+            endpoints.MapVersionEndpoint();
+        });
+    }
+}

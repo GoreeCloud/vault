@@ -1,0 +1,957 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Api.AdminConsole.Models.Response;
+using Bit.Api.Auth.Models.Request.Accounts;
+using Bit.Api.Models.Request.Accounts;
+using Bit.Api.Models.Response;
+using Bit.Core;
+using Bit.Core.AdminConsole.Enums.Provider;
+using Bit.Core.AdminConsole.OrganizationFeatures.Policies;
+using Bit.Core.AdminConsole.OrganizationFeatures.Policies.PolicyRequirements;
+using Bit.Core.AdminConsole.Repositories;
+using Bit.Core.Auth.Identity;
+using Bit.Core.Auth.Models.Api.Request.Accounts;
+using Bit.Core.Auth.Services;
+using Bit.Core.Auth.UserFeatures.TdeOffboardingPassword.Interfaces;
+using Bit.Core.Auth.UserFeatures.TempPassword.Interfaces;
+using Bit.Core.Auth.UserFeatures.TwoFactorAuth.Interfaces;
+using Bit.Core.Auth.UserFeatures.UserApiKey.Interfaces;
+using Bit.Core.Auth.UserFeatures.UserEmail;
+using Bit.Core.Auth.UserFeatures.UserMasterPassword.Interfaces;
+using Bit.Core.Context;
+using Bit.Core.Entities;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.KeyManagement.Kdf;
+using Bit.Core.KeyManagement.Models.Data;
+using Bit.Core.KeyManagement.Queries.Interfaces;
+using Bit.Core.Models.Api.Response;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.Core.Utilities;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Bit.Api.Auth.Controllers;
+
+[Route("accounts")]
+[Authorize(Policies.Application)]
+public class AccountsController : Controller
+{
+    private readonly IOrganizationService _organizationService;
+    private readonly IOrganizationUserRepository _organizationUserRepository;
+    private readonly IProviderUserRepository _providerUserRepository;
+    private readonly IUserService _userService;
+    private readonly ISelfServicePasswordChangeCommand _selfServicePasswordChangeCommand;
+    private readonly IPolicyRequirementQuery _policyRequirementQuery;
+    private readonly ISetInitialMasterPasswordCommandV1 _setInitialMasterPasswordCommandV1;
+    private readonly IFinishSsoJitProvisionMasterPasswordCommand _finishSsoJitProvisionMasterPasswordCommand;
+    private readonly ITdeSetPasswordCommand _tdeSetPasswordCommand;
+    private readonly ITdeOffboardingPasswordCommand _tdeOffboardingPasswordCommand;
+    private readonly IReplaceAdminSetTemporaryPasswordCommand _replaceAdminSetTemporaryPasswordCommand;
+    private readonly ITwoFactorIsEnabledQuery _twoFactorIsEnabledQuery;
+    private readonly IFeatureService _featureService;
+    private readonly IUserAccountKeysQuery _userAccountKeysQuery;
+    private readonly ITwoFactorEmailService _twoFactorEmailService;
+    private readonly IChangeKdfCommand _changeKdfCommand;
+    private readonly IUserRepository _userRepository;
+    private readonly IRotateUserApiKeyCommand _rotateUserApiKeyCommand;
+    private readonly ISelfServiceChangeEmailCommand _selfServiceChangeEmailCommand;
+    private readonly ICurrentContext _currentContext;
+    private readonly ILogger<AccountsController> _logger;
+
+    public AccountsController(
+        IOrganizationService organizationService,
+        IOrganizationUserRepository organizationUserRepository,
+        IProviderUserRepository providerUserRepository,
+        IUserService userService,
+        ISelfServicePasswordChangeCommand selfServicePasswordChangeCommand,
+        IPolicyRequirementQuery policyRequirementQuery,
+        IFinishSsoJitProvisionMasterPasswordCommand finishSsoJitProvisionMasterPasswordCommand,
+        ISetInitialMasterPasswordCommandV1 setInitialMasterPasswordCommandV1,
+        ITdeSetPasswordCommand tdeSetPasswordCommand,
+        ITdeOffboardingPasswordCommand tdeOffboardingPasswordCommand,
+        IReplaceAdminSetTemporaryPasswordCommand replaceAdminSetTemporaryPasswordCommand,
+        ITwoFactorIsEnabledQuery twoFactorIsEnabledQuery,
+        IFeatureService featureService,
+        IUserAccountKeysQuery userAccountKeysQuery,
+        ITwoFactorEmailService twoFactorEmailService,
+        IChangeKdfCommand changeKdfCommand,
+        IUserRepository userRepository,
+        IRotateUserApiKeyCommand rotateUserApiKeyCommand,
+        ISelfServiceChangeEmailCommand selfServiceChangeEmailCommand,
+        ICurrentContext currentContext,
+        ILogger<AccountsController> logger
+        )
+    {
+        _organizationService = organizationService;
+        _organizationUserRepository = organizationUserRepository;
+        _providerUserRepository = providerUserRepository;
+        _userService = userService;
+        _selfServicePasswordChangeCommand = selfServicePasswordChangeCommand;
+        _policyRequirementQuery = policyRequirementQuery;
+        _finishSsoJitProvisionMasterPasswordCommand = finishSsoJitProvisionMasterPasswordCommand;
+        _setInitialMasterPasswordCommandV1 = setInitialMasterPasswordCommandV1;
+        _tdeSetPasswordCommand = tdeSetPasswordCommand;
+        _tdeOffboardingPasswordCommand = tdeOffboardingPasswordCommand;
+        _replaceAdminSetTemporaryPasswordCommand = replaceAdminSetTemporaryPasswordCommand;
+        _twoFactorIsEnabledQuery = twoFactorIsEnabledQuery;
+        _featureService = featureService;
+        _userAccountKeysQuery = userAccountKeysQuery;
+        _twoFactorEmailService = twoFactorEmailService;
+        _changeKdfCommand = changeKdfCommand;
+        _userRepository = userRepository;
+        _rotateUserApiKeyCommand = rotateUserApiKeyCommand;
+        _selfServiceChangeEmailCommand = selfServiceChangeEmailCommand;
+        _currentContext = currentContext;
+        _logger = logger;
+    }
+
+
+    [HttpPost("password-hint")]
+    [AllowAnonymous]
+    public async Task PostPasswordHint([FromBody] PasswordHintRequestModel model)
+    {
+        await _userService.SendMasterPasswordHintAsync(model.Email);
+    }
+
+    [HttpPost("email-token")]
+    public async Task PostEmailToken([FromBody] EmailTokenRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        // TODO: PM-39120 - PM30806_SelfServiceChangeEmailCommand flag cleanup, remove the flag
+        // check and keep only the SelfServiceChangeEmailCommand call.
+        if (_featureService.IsEnabled(FeatureFlagKeys.PM30806_SelfServiceChangeEmailCommand))
+        {
+            await _selfServiceChangeEmailCommand.InitiateChangeEmailAsync(
+                user, model.MasterPasswordHash, model.NewEmail);
+
+            return;
+        }
+
+        if (user.UsesKeyConnector)
+        {
+            throw new BadRequestException("You cannot change your email when using Key Connector.");
+        }
+
+        if (!await _userService.CheckPasswordAsync(user, model.MasterPasswordHash))
+        {
+            await Task.Delay(2000);
+            throw new BadRequestException("MasterPasswordHash", "Invalid password.");
+        }
+
+        var claimedUserValidationResult = await _userService.ValidateClaimedUserDomainAsync(user, model.NewEmail);
+
+        if (!claimedUserValidationResult.Succeeded)
+        {
+            throw new BadRequestException(claimedUserValidationResult.Errors);
+        }
+
+        await _userService.InitiateEmailChangeAsync(user, model.NewEmail);
+    }
+
+    [HttpPost("email")]
+    public async Task PostEmail([FromBody] EmailRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        // TODO: PM-39120 - PM30806_SelfServiceChangeEmailCommand flag cleanup, remove the flag
+        // check and keep only the SelfServiceChangeEmailCommand call.
+        if (_featureService.IsEnabled(FeatureFlagKeys.PM30806_SelfServiceChangeEmailCommand))
+        {
+            await _selfServiceChangeEmailCommand.ChangeEmailAsync(
+                user, model.MasterPasswordHash, model.NewEmail, model.Token);
+            return;
+        }
+
+        if (user.UsesKeyConnector)
+        {
+            throw new BadRequestException("You cannot change your email when using Key Connector.");
+        }
+
+        // Legacy path still rotates the master password and wrapped user key alongside the
+        // email change; those fields are optional on the model so we have to enforce them here.
+        if (string.IsNullOrEmpty(model.NewMasterPasswordHash) || string.IsNullOrEmpty(model.Key))
+        {
+            ModelState.AddModelError(string.Empty, "NewMasterPasswordHash and Key are required.");
+            throw new BadRequestException(ModelState);
+        }
+
+        var result = await _userService.ChangeEmailAsync(user, model.MasterPasswordHash, model.NewEmail,
+            model.NewMasterPasswordHash, model.Token, model.Key);
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+
+    [HttpPost("verify-email")]
+    public async Task PostVerifyEmail()
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        await _userService.SendEmailVerificationAsync(user);
+    }
+
+    [HttpPost("verify-email-token")]
+    [AllowAnonymous]
+    public async Task PostVerifyEmailToken([FromBody] VerifyEmailRequestModel model)
+    {
+        var user = await _userService.GetUserByIdAsync(new Guid(model.UserId));
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+        var result = await _userService.ConfirmEmailAsync(user, model.Token);
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("password")]
+    public async Task PostPassword([FromBody] PasswordRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        IdentityResult result;
+        if (model.RequestHasNewDataTypes())
+        {
+            result = await _selfServicePasswordChangeCommand.ChangePasswordAsync(
+                user,
+                model.MasterPasswordHash,
+                model.UnlockData!.ToData(),
+                model.AuthenticationData!.ToData(),
+                model.MasterPasswordHint);
+        }
+        else
+        {
+            result = await _userService.ChangePasswordAsync(user, model.MasterPasswordHash,
+                model.NewMasterPasswordHash, model.MasterPasswordHint, model.Key);
+        }
+
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("set-password")]
+    public async Task PostSetPasswordAsync([FromBody] SetInitialPasswordRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        // Modern-shape request (MPAD + MPUD set). Try the specialized branches below — TDE
+        // set-password (no keypair) and V2 MP JIT (AccountKeys + flag on). If neither matches,
+        // fall through to SetInitialPasswordV1Async, which uses the V1 command to handle modern
+        // V1 MP JIT requests and all legacy-shape requests (TDE and MP JIT). See its doc comment
+        // for the full list of scenarios.
+        if (model.HasAuthAndUnlockData())
+        {
+            // TDE set-password (for TDE users who obtain the "manage account recovery" permission).
+            // _tdeSetPasswordCommand handles both V1 and V2 TDE users (it sets the master password
+            // without touching cryptographic state).
+            // 
+            // Note: Why not check the V2RegistrationTDEJIT flag?
+            // The V2RegistrationTDEJIT flag governs SSO+TDE account creation, not set-password, so
+            // don't reference it here (no feature-flag gate), because it isn't relevant. A TDE user
+            // reaching this endpoint already has keys that were set up at registration time, regardless
+            // of the flag.
+            if (model.IsTdeSetPasswordRequest())
+            {
+                await _tdeSetPasswordCommand.SetMasterPasswordAsync(user, model.ToData());
+                return;
+            }
+
+            // V2 encryption - MP JIT.
+            // We require AccountKeys (the new key shape) here, not legacy Keys — otherwise
+            // a modern V1 MP JIT request (MPAD + MPUD + legacy Keys) would be incorrectly routed here
+            // when the flag is on, and `model.ToData().AccountKeys` would be null, breaking the V2 MP
+            // JIT command (which requires AccountKeys per FinishSsoJitProvisionMasterPasswordCommand).
+            if (model.AccountKeys != null &&
+                _featureService.IsEnabled(FeatureFlagKeys.EnableAccountEncryptionV2JitPasswordRegistration))
+            {
+                await _finishSsoJitProvisionMasterPasswordCommand.FinishProvisionAsync(user, model.ToData());
+                return;
+            }
+        }
+
+        await SetInitialPasswordV1Async(user, model);
+    }
+
+    /// <summary>
+    /// Handles setting an initial password for V1 users in the following scenarios:
+    /// 1. TDE user where request contains legacy fields (MasterPasswordHash + Key)
+    /// 2. MP JIT user where request contains legacy fields (MasterPasswordHash + Key + Keys)
+    /// 3. MP JIT user where request contains MPAD + MPUD + legacy Keys (not AccountKeys)
+    /// </summary>
+    /// <remarks>
+    /// TODO: In order to remove this method, all 3 of those scenarios need to become unused. This means
+    /// removal can only happen when BOTH of the following are true:
+    /// 
+    /// 1. Client-side changes in https://bitwarden.atlassian.net/browse/PM-35599 have been merged
+    ///    and have aged out according to the Bitwarden release support policy. This covers scenarios
+    ///    #1-2 above (legacy TDE and legacy MP JIT).
+    /// 
+    /// 2. The EnableAccountEncryptionV2JitPasswordRegistration feature flag has been unwound in
+    ///    https://bitwarden.atlassian.net/browse/PM-27327 and the client-side portion of the flag removal has
+    ///    aged out according to the Bitwarden release support policy. This covers scenarios #2-3 above (legacy
+    ///    and modern MP JIT).
+    /// </remarks>
+    private async Task SetInitialPasswordV1Async(User user, SetInitialPasswordRequestModel model)
+    {
+        // Defensive: V1 cannot consume AccountKeys (the new key shape). If a request carries
+        // AccountKeys we'd silently drop the keypair, so fail loudly. This can only happen if
+        // the V2 MP JIT flag is off (otherwise the V2 branch above would have handled it) — i.e.,
+        // a client/server flag-state mismatch or a non-Angular caller.
+        if (model.AccountKeys != null)
+        {
+            throw new BadRequestException(
+                "Request includes V2 AccountKeys but V2 encryption is not enabled.");
+        }
+
+        try
+        {
+            // Stage 1 (PM-27044) compatibility: the client MUST send salt == email.lower.trim
+            // on initial SET. Clients currently derive the master key from the email as salt at
+            // login time, so a divergent salt persisted here would make the account un-loginable.
+            // Mirrors the check in SetInitialPasswordData.ValidateDataForUser; removable in
+            // Stage 3 when PM-28143 clears and clients consume the explicit salt from prelogin.
+            model.MasterPasswordUnlock?.ToData().ValidateSaltUnchangedForUser(user);
+            model.MasterPasswordAuthentication?.ToData().ValidateSaltUnchangedForUser(user);
+
+            // ToUser() handles fallbacks if MPAD + MPUD are not present (i.e. legacy shape)
+            user = model.ToUser(user);
+        }
+        catch (Exception e)
+        {
+            ModelState.AddModelError(string.Empty, e.Message);
+            throw new BadRequestException(ModelState);
+        }
+
+        var result = await _setInitialMasterPasswordCommandV1.SetInitialMasterPasswordAsync(
+            user,
+            model.MasterPasswordAuthentication?.MasterPasswordAuthenticationHash ?? model.MasterPasswordHash,
+            model.MasterPasswordUnlock?.MasterKeyWrappedUserKey ?? model.Key,
+            model.OrgIdentifier);
+
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("verify-password")]
+    public async Task<MasterPasswordPolicyResponseModel> PostVerifyPassword([FromBody] SecretVerificationRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        if (await _userService.CheckPasswordAsync(user, model.MasterPasswordHash))
+        {
+            var masterPasswordPolicy = await _policyRequirementQuery.GetAsyncVNext<MasterPasswordPolicyRequirement>(user.Id);
+
+            return new MasterPasswordPolicyResponseModel(masterPasswordPolicy.EnforcedOptions);
+        }
+
+        ModelState.AddModelError(nameof(model.MasterPasswordHash), "Invalid password.");
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("kdf")]
+    public async Task PostKdf([FromBody] ChangeKdfRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var result = await _changeKdfCommand.ChangeKdfAsync(user, model.MasterPasswordHash, model.AuthenticationData.ToData(), model.UnlockData.ToData());
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("security-stamp")]
+    public async Task PostSecurityStamp([FromBody] SecretVerificationRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var result = await _userService.RefreshSecurityStampAsync(user, model.Secret);
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpGet("profile")]
+    public async Task<ProfileResponseModel> GetProfile()
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var organizationUserDetails = await _organizationUserRepository.GetManyDetailsByUserAsync(user.Id,
+            OrganizationUserStatusType.Confirmed);
+        var providerUserDetails = await _providerUserRepository.GetManyDetailsByUserAsync(user.Id,
+            ProviderUserStatusType.Confirmed);
+        var providerUserOrganizationDetails =
+            await _providerUserRepository.GetManyOrganizationDetailsByUserAsync(user.Id,
+                ProviderUserStatusType.Confirmed);
+
+        var twoFactorEnabled = await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(user);
+        var hasPremiumFromOrg = await _userService.HasPremiumFromOrganization(user);
+        var organizationIdsClaimingActiveUser = await GetOrganizationIdsClaimingUserAsync(user.Id);
+
+        var accountKeys = await _userAccountKeysQuery.Run(user);
+
+        var organizationUserDetailsNew = await _organizationUserRepository.GetManyConfirmedAcceptedDetailsByUserAsync(user.Id);
+
+        var response = new ProfileResponseModel(user, accountKeys, organizationUserDetails, providerUserDetails,
+            providerUserOrganizationDetails, twoFactorEnabled,
+            hasPremiumFromOrg, organizationIdsClaimingActiveUser, organizationUserDetailsNew);
+        return response;
+    }
+
+    [HttpGet("organizations")]
+    public async Task<ListResponseModel<ProfileOrganizationResponseModel>> GetOrganizations()
+    {
+        var userId = _userService.GetProperUserId(User);
+        var organizationUserDetails = await _organizationUserRepository.GetManyDetailsByUserAsync(userId.Value,
+            OrganizationUserStatusType.Confirmed);
+        var organizationIdsClaimingUser = await GetOrganizationIdsClaimingUserAsync(userId.Value);
+
+        var responseData = organizationUserDetails.Select(o => new ProfileOrganizationResponseModel(o, organizationIdsClaimingUser));
+        return new ListResponseModel<ProfileOrganizationResponseModel>(responseData);
+    }
+
+    [HttpPut("profile")]
+    public async Task<ProfileResponseModel> PutProfile([FromBody] UpdateProfileRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        await _userService.SaveUserAsync(model.ToUser(user));
+
+        var twoFactorEnabled = await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(user);
+        var hasPremiumFromOrg = await _userService.HasPremiumFromOrganization(user);
+        var organizationIdsClaimingActiveUser = await GetOrganizationIdsClaimingUserAsync(user.Id);
+        var userAccountKeys = await _userAccountKeysQuery.Run(user);
+
+        var response = new ProfileResponseModel(user, userAccountKeys, null, null, null, twoFactorEnabled, hasPremiumFromOrg, organizationIdsClaimingActiveUser);
+        return response;
+    }
+
+    [HttpPost("profile")]
+    [Obsolete("This endpoint is deprecated. Use PUT /profile instead.")]
+    public async Task<ProfileResponseModel> PostProfile([FromBody] UpdateProfileRequestModel model)
+    {
+        return await PutProfile(model);
+    }
+
+    [HttpPut("avatar")]
+    public async Task<ProfileResponseModel> PutAvatar([FromBody] UpdateAvatarRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+        await _userService.SaveUserAsync(model.ToUser(user), true);
+
+        var userTwoFactorEnabled = await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(user);
+        var userHasPremiumFromOrganization = await _userService.HasPremiumFromOrganization(user);
+        var organizationIdsClaimingActiveUser = await GetOrganizationIdsClaimingUserAsync(user.Id);
+        var accountKeys = await _userAccountKeysQuery.Run(user);
+
+        var response = new ProfileResponseModel(user, accountKeys, null, null, null, userTwoFactorEnabled, userHasPremiumFromOrganization, organizationIdsClaimingActiveUser);
+        return response;
+    }
+
+    [HttpPost("avatar")]
+    [Obsolete("This endpoint is deprecated. Use PUT /avatar instead.")]
+    public async Task<ProfileResponseModel> PostAvatar([FromBody] UpdateAvatarRequestModel model)
+    {
+        return await PutAvatar(model);
+    }
+
+    [HttpGet("revision-date")]
+    public async Task<long?> GetAccountRevisionDate()
+    {
+        var userId = _userService.GetProperUserId(User);
+        long? revisionDate = null;
+        if (userId.HasValue)
+        {
+            var date = await _userService.GetAccountRevisionDateByIdAsync(userId.Value);
+            revisionDate = CoreHelpers.ToEpocMilliseconds(date);
+        }
+
+        return revisionDate;
+    }
+
+    [HttpPost("keys")]
+    public async Task<KeysResponseModel> PostKeys([FromBody] KeysRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.PrivateKey) || !string.IsNullOrWhiteSpace(user.PublicKey))
+        {
+            throw new BadRequestException("User has existing keypair");
+        }
+
+        if (model.AccountKeys != null)
+        {
+            var accountKeysData = model.AccountKeys.ToAccountKeysData();
+            if (!accountKeysData.IsV2Encryption())
+            {
+                throw new BadRequestException("AccountKeys are only supported for V2 encryption.");
+            }
+            // A client that predates the key id field sends none. The account then picks one up from
+            // the backfill endpoint on a later sync rather than here.
+            var userKeyId = KeyId.FromHexEncodedString(model.UserKeyId);
+            var updateUserDataTasks = userKeyId == null
+                ? null
+                : new UpdateUserData[] { _userRepository.SetUserKeyId(user.Id, userKeyId) };
+
+            await _userRepository.SetV2AccountCryptographicStateAsync(user.Id, accountKeysData,
+                updateUserDataTasks);
+            return new KeysResponseModel(accountKeysData, user.Key);
+        }
+        else
+        {
+            // Todo: Drop this after a transition period. This will drop no-account-keys requests.
+            // The V1 check in the other branch should persist
+            // https://bitwarden.atlassian.net/browse/PM-27329
+            await _userService.SaveUserAsync(model.ToUser(user));
+            return new KeysResponseModel(new UserAccountKeysData
+            {
+                PublicKeyEncryptionKeyPairData = new PublicKeyEncryptionKeyPairData(
+                    user.PrivateKey,
+                    user.PublicKey
+                )
+            }, user.Key);
+        }
+
+    }
+
+    [HttpGet("keys")]
+    public async Task<KeysResponseModel> GetKeys()
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var accountKeys = await _userAccountKeysQuery.Run(user);
+        return new KeysResponseModel(accountKeys, user.Key);
+    }
+
+    [HttpDelete]
+    public async Task Delete([FromBody] SecretVerificationRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        if (!await _userService.VerifySecretAsync(user, model.Secret))
+        {
+            ModelState.AddModelError(string.Empty, "User verification failed.");
+            await Task.Delay(2000);
+        }
+        else
+        {
+            var result = await _userService.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                return;
+            }
+
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+        }
+
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("delete")]
+    [Obsolete("This endpoint is deprecated. Use DELETE / instead.")]
+    public async Task PostDelete([FromBody] SecretVerificationRequestModel model)
+    {
+        await Delete(model);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("delete-recover")]
+    public async Task PostDeleteRecover([FromBody] DeleteRecoverRequestModel model)
+    {
+        await _userService.SendDeleteConfirmationAsync(model.Email);
+    }
+
+    [HttpPost("delete-recover-token")]
+    [AllowAnonymous]
+    public async Task PostDeleteRecoverToken([FromBody] VerifyDeleteRecoverRequestModel model)
+    {
+        var user = await _userService.GetUserByIdAsync(new Guid(model.UserId));
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var result = await _userService.DeleteAsync(user, model.Token);
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        await Task.Delay(2000);
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpDelete("sso/{organizationId}")]
+    public async Task DeleteSsoUser(string organizationId)
+    {
+        var userId = _userService.GetProperUserId(User);
+        if (!userId.HasValue)
+        {
+            throw new NotFoundException();
+        }
+
+        await _organizationService.DeleteSsoUserAsync(userId.Value, new Guid(organizationId));
+    }
+
+    [HttpGet("sso/user-identifier")]
+    public async Task<string> GetSsoUserIdentifier()
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        var token = await _userService.GenerateSignInTokenAsync(user, TokenPurposes.LinkSso);
+        var userIdentifier = $"{user.Id},{token}";
+        return userIdentifier;
+    }
+
+    [HttpPost("api-key")]
+    public async Task<ApiKeyResponseModel> ApiKey([FromBody] SecretVerificationRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        if (!await _userService.VerifySecretAsync(user, model.Secret))
+        {
+            await Task.Delay(2000);
+            throw new BadRequestException(string.Empty, "User verification failed.");
+        }
+
+        return new ApiKeyResponseModel(user);
+    }
+
+    [HttpPost("rotate-api-key")]
+    public async Task<ApiKeyResponseModel> RotateApiKey([FromBody] SecretVerificationRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        if (!await _userService.VerifySecretAsync(user, model.Secret))
+        {
+            await Task.Delay(2000);
+            throw new BadRequestException(string.Empty, "User verification failed.");
+        }
+
+        if (_featureService.IsEnabled(FeatureFlagKeys.PM37165_RotateUserApiKeyCommand))
+        {
+            await _rotateUserApiKeyCommand.RotateApiKeyAsync(user);
+        }
+        else
+        {
+            // legacy path while PM37165_RotateUserApiKeyCommand rolls out
+            // so temporarily disable the obsolete warning for RotateApiKeyAsync
+#pragma warning disable CS0618
+            await _userService.RotateApiKeyAsync(user);
+#pragma warning restore CS0618
+        }
+        var response = new ApiKeyResponseModel(user);
+        return response;
+    }
+
+    [HttpPut("update-temp-password")]
+    public async Task PutUpdateTempPasswordAsync([FromBody] UpdateTempPasswordRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        IdentityResult result;
+        if (model.RequestHasNewDataTypes())
+        {
+            result = await _replaceAdminSetTemporaryPasswordCommand.ReplaceTemporaryPasswordAsync(
+                user,
+                model.UnlockData!.ToData(),
+                model.AuthenticationData!.ToData(),
+                model.MasterPasswordHint);
+        }
+        else
+        {
+            result = await _userService.UpdateTempPasswordAsync(
+                user,
+                model.NewMasterPasswordHash,
+                model.Key,
+                model.MasterPasswordHint);
+        }
+
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPut("update-tde-offboarding-password")]
+    public async Task PutUpdateTdePasswordAsync([FromBody] UpdateTdeOffboardingPasswordRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+        if (user == null)
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        IdentityResult result;
+        if (model.RequestHasNewDataTypes())
+        {
+            result = await _tdeOffboardingPasswordCommand.UpdateTdeOffboardingPasswordAsync(
+                user,
+                model.UnlockData!.ToData(),
+                model.AuthenticationData!.ToData(),
+                model.MasterPasswordHint);
+        }
+        else
+        {
+            result = await _tdeOffboardingPasswordCommand.UpdateTdeOffboardingPasswordAsync(
+                user,
+                model.NewMasterPasswordHash,
+                model.Key,
+                model.MasterPasswordHint);
+        }
+
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+
+        throw new BadRequestException(ModelState);
+    }
+
+    [HttpPost("request-otp")]
+    public async Task PostRequestOTP()
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+
+        await _userService.SendOTPAsync(user);
+    }
+
+    [HttpPost("verify-otp")]
+    public async Task VerifyOTP([FromBody] VerifyOTPRequestModel model)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User);
+
+        if (!await _userService.VerifyOTPAsync(user, model.OTP))
+        {
+            await Task.Delay(2000);
+            throw new BadRequestException("Token", "Invalid token");
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("resend-new-device-otp")]
+    public async Task ResendNewDeviceOtpAsync([FromBody] UnauthenticatedSecretVerificationRequestModel request)
+    {
+        // The code is scoped to a device, so prefer the device making this request.
+        var deviceIdentifier = _currentContext.DeviceIdentifier;
+
+        // Login rejects an over-long identifier, so a code scoped to one would be unusable. The check
+        // precedes the secret check, so a 400 never signals whether the secret was correct.
+        if (deviceIdentifier?.Length > Device.MaxIdentifierLength)
+        {
+            throw new BadRequestException("Device-Identifier", "Invalid device identifier.");
+        }
+
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+        if (user == null || !await _userService.VerifySecretAsync(user, request.Secret))
+        {
+            // If the user is not found, or the secret is not valid, we still return
+            // a success response, to avoid account enumeration via response shape.
+            return;
+        }
+
+        // TODO: PM-43465 - Delete this fallback block once every supported client version sends the
+        // Device-Identifier header on this request. It covers clients that do not identify themselves by
+        // reusing the device the pending code was originally issued to (mobile clients don't send it yet).
+        if (string.IsNullOrWhiteSpace(deviceIdentifier))
+        {
+            deviceIdentifier = await _twoFactorEmailService
+                .GetPendingNewDeviceVerificationDeviceIdentifierAsync(user);
+        }
+
+        // No device to scope to means no code can be issued. The secret is already verified here, so a
+        // distinguishable response would confirm a correct secret to an anonymous caller — hence the
+        // unchanged success shape, with the log as the only signal.
+        if (string.IsNullOrWhiteSpace(deviceIdentifier))
+        {
+            _logger.LogWarning(
+                "Could not resend a new device verification code: the request identified no device and no "
+                + "pending device was recorded.");
+            return;
+        }
+
+        // TODO PM-43468: a user can send up a different device identifier than the one they started with, but this is fine
+        // because this basically creates a new new device verification session and the new device will only be saved
+        // to the user's devices table upon successful verification of the OTP + MP login re-submission. 
+        // We should eventually mitigate this by leveraging a similar approach to the SsoEmail2faSessionTokenable
+        // which enshrines the session data (e.g., like device identifier) in the server token itself. 
+        await _twoFactorEmailService.SendNewDeviceVerificationEmailAsync(user, deviceIdentifier);
+    }
+
+    [HttpPut("verify-devices")]
+    public async Task SetUserVerifyDevicesAsync([FromBody] SetVerifyDevicesRequestModel request)
+    {
+        var user = await _userService.GetUserByPrincipalAsync(User) ?? throw new UnauthorizedAccessException();
+
+        if (!await _userService.VerifySecretAsync(user, request.Secret))
+        {
+            await Task.Delay(2000);
+            throw new BadRequestException(string.Empty, "User verification failed.");
+        }
+        user.VerifyDevices = request.VerifyDevices;
+
+        await _userService.SaveUserAsync(user);
+    }
+
+    [HttpPost("verify-devices")]
+    [Obsolete("This endpoint is deprecated. Use PUT /verify-devices instead.")]
+    public async Task PostSetUserVerifyDevicesAsync([FromBody] SetVerifyDevicesRequestModel request)
+    {
+        await SetUserVerifyDevicesAsync(request);
+    }
+
+    private async Task<IEnumerable<Guid>> GetOrganizationIdsClaimingUserAsync(Guid userId)
+    {
+        var organizationsClaimingUser = await _userService.GetOrganizationsClaimingUserAsync(userId);
+        return organizationsClaimingUser.Select(o => o.Id);
+    }
+}
