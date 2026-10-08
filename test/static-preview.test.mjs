@@ -52,3 +52,25 @@ test("visual stylesheet has focus, responsive reflow and accessibility adaptatio
   }
   assert.ok(css.length > 2500, "Prevent return to unstyled single-rule placeholder");
 });
+
+test("light and dark nav hover and focus colors meet minimum text contrast", () => {
+  assert.ok(css.includes(".rail nav a:hover,.rail nav a:focus-visible{background:var(--nav-hover)}"));
+  const dark = css.match(/:root\{([\s\S]*?)\}/)?.[1];
+  const light = css.match(/@media\(prefers-color-scheme:light\)\{\s*:root\{([^}]+)\}/)?.[1];
+  assert.ok(dark && light, "both theme variable sets must exist");
+  const get = (text, key) => {
+    const value = text.match(new RegExp("--" + key + ":(#[0-9a-f]{6})"))?.[1];
+    assert.ok(value, "missing theme variable " + key);
+    return [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16) / 255);
+  };
+  const luminance = rgb => rgb.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const ratio = (a, b) => {
+    const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (values[0] + 0.05) / (values[1] + 0.05);
+  };
+  for (const theme of [dark, light]) {
+    assert.ok(ratio(get(theme, "text"), get(theme, "nav-hover")) >= 4.5,
+      "navigation hover and keyboard focus text contrast must be at least 4.5:1");
+  }
+});
