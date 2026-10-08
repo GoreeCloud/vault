@@ -74,3 +74,63 @@ test("rejects malformed input and unexpected keys without throwing", () => {
     assert.equal(preflightAutofillCandidate(input).candidate, false);
   }
 });
+
+test("missing fields, symbols and accessor properties fail closed", () => {
+  const missing = eligible();
+  delete missing.hostRiskVerdict;
+  const withSymbol = eligible();
+  withSymbol[Symbol("risk")] = "fixture";
+  const getter = eligible();
+  Object.defineProperty(getter, "documentUrl", {
+    get() { throw Error("untrusted getter must not run"); }
+  });
+  const riskGetter = eligible();
+  Object.defineProperty(riskGetter.hostRiskVerdict, "decision", {
+    get() { throw Error("host-risk accessor must not run"); }
+  });
+  const inherited = Object.create({ savedUrl: "https://login.example.test" });
+  for (const x of [missing, withSymbol, getter, riskGetter, inherited]) {
+    assert.deepEqual(Object.keys(preflightAutofillCandidate(x)), ["candidate", "reason"]);
+    assert.equal(preflightAutofillCandidate(x).candidate, false);
+  }
+});
+
+test("malicious proxies cannot crash autofill screening", () => {
+  const badRequest = new Proxy(eligible(), { ownKeys() { throw Error("keys blocked"); } });
+  const badRisk = new Proxy(eligible().hostRiskVerdict, {
+    getOwnPropertyDescriptor() { throw Error("descriptor blocked"); }
+  });
+  const badProto = new Proxy(eligible(), {
+    getPrototypeOf() { throw Error("prototype blocked"); }
+  });
+  for (const x of [badRequest, badProto, { ...eligible(), hostRiskVerdict: badRisk }]) {
+    assert.doesNotThrow(() => preflightAutofillCandidate(x));
+    const output = preflightAutofillCandidate(x);
+    assert.equal(output.candidate, false);
+    assert.equal(Object.isFrozen(output), true);
+  }
+});
+
+test("deterministic malformed-input sweep always denies without data echo", () => {
+  let seed = 0x51F10A;
+  function next() {
+    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+    return seed >>> 0;
+  }
+  for (let i = 0; i < 384; i++) {
+    const sample = eligible();
+    switch (next() % 8) {
+      case 0: sample.frameDepth = -1 - (next() % 99); break;
+      case 1: sample.savedUrl = "http://login.example.test/" + next(); break;
+      case 2: sample.documentUrl = "https://untrusted.invalid/" + next(); break;
+      case 3: sample.topLevelUrl = "https://different.invalid/" + next(); break;
+      case 4: sample.userInitiated = false; break;
+      case 5: sample.explicitUserConsent = undefined; break;
+      case 6: sample.hostRiskVerdict = { ...sample.hostRiskVerdict, isCurrent: false }; break;
+      case 7: sample["secret_" + next()] = "sensitive-fixture"; break;
+    }
+    const out = preflightAutofillCandidate(sample);
+    assert.equal(out.candidate, false, "mutation " + i);
+    assert.equal(JSON.stringify(out).includes("sensitive-fixture"), false);
+  }
+});

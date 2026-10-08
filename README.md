@@ -32,7 +32,7 @@ Requires Node.js 20+ (no npm dependencies):
 npm test
 ```
 
-This tests repository import boundaries, isolated origin matching, an unapproved password-generation prototype, autofill candidate screening, opaque-sync envelope shape checks, synthetic access-boundary tests, and client-private item template shape screening. None is a working browser extension, cryptographic vault, or server. It **does not** test the upstream server/clients, deployed cryptography, password storage, browser autofill integration, or production readiness.
+This tests repository import boundaries, isolated origin matching, an unapproved password-generation prototype, hardened autofill candidate screening and hostile-input checks, opaque-sync envelope shape checks, synthetic access-boundary tests, and client-private item template shape screening. None is a working browser extension, cryptographic vault, or server. It **does not** test the upstream server/clients, deployed cryptography, password storage, browser autofill integration, or production readiness.
 
 ## Security default
 

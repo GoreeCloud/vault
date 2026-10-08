@@ -2,11 +2,11 @@
 
 **Status:** Native Development prototype; **not enabled in any browser, service, extension or client**.
 
-`src/autofill-preflight.mjs` screens possible autofill events without reading or returning passwords. It rejects insecure origins, cross-origin navigation, subdomains, all subframes, private contexts, implicit fills, locked sessions, missing user consent and stale or mismatched host-reported risk evidence.
+`src/autofill-preflight.mjs` screens possible autofill events without reading or returning passwords. It rejects insecure origins, cross-origin navigation, subdomains, all subframes, private contexts, implicit fills, locked sessions, missing user consent and stale or mismatched host-reported risk evidence. The input shape now requires exactly the expected own data properties, rejects accessors, symbols, missing or extra keys, and fails closed on throwing proxies; the origin helper rejects raw controls, whitespace and backslashes instead of relying on URL-parser normalization.
 
 ## Trust model
 
-**Calling code is security-critical.** JavaScript executing in a web page can forge flags such as `userInitiated`, `vaultUnlocked` and `hostRiskVerdict`. The presence of these fields is **not** cryptographic proof or a genuine Wardveil integration. Never call this function with values authored by the page. Do not connect its `candidate: true` output directly to a password store or form-fill API. It is *not* an authorization decision.
+**Calling code is security-critical.** JavaScript executing in a web page can forge flags such as `userInitiated`, `vaultUnlocked` and `hostRiskVerdict`. The presence of these fields is **not** cryptographic proof or a genuine Wardveil integration. Proxy objects may fake descriptors, and passing the strict shape screening is not a trusted browser/host attestation. Never call this function with values authored by the page. Do not connect its `candidate: true` output directly to a password store or form-fill API. It is *not* an authorization decision.
 
 Before any browser integration, an independently trusted native extension/browser background component must:
 

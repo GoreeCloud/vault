@@ -19,3 +19,17 @@ test("strict matching prevents subdomain and deceptive-origin autofill", () => {
 test("canonicalizes default HTTPS port without wildcard expansion", () => {
   assert.equal(isExactOriginMatch("https://example.org:443/login", "https://example.org"), true);
 });
+
+test("rejects origin-ambiguous backslashes and URL-parser-normalized controls", () => {
+  for (const value of [
+    "https://example.org\\@other.invalid/",
+    " https://example.org",
+    "https://example.org\\login",
+    "https://example.org\n",
+    "https://example.org\t",
+    "https://example.org\u007f"
+  ]) {
+    assert.equal(canonicalSecureOrigin(value), null);
+  }
+  assert.equal(canonicalSecureOrigin("https://example.org/path%20with%20spaces"), "https://example.org");
+});

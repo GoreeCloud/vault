@@ -5,7 +5,8 @@
  * user interaction, isolation, unlock lifetime, and site-specific tests.
  */
 export function canonicalSecureOrigin(value) {
-  if (typeof value !== "string" || value.length === 0 || value.length > 2048) return null;
+  if (typeof value !== "string" || value.length === 0 || value.length > 2048 ||
+      /[\u0000-\u0020\u007f\\]/.test(value)) return null;
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password || !url.hostname) return null;
