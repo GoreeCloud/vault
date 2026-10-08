@@ -74,3 +74,32 @@ test("light and dark nav hover and focus colors meet minimum text contrast", () 
       "navigation hover and keyboard focus text contrast must be at least 4.5:1");
   }
 });
+
+test("feature icon foreground and background meet minimum contrast in both themes", () => {
+  assert.ok(css.includes("background:var(--tile-bg);color:var(--tile-ink)"));
+  const themes = [
+    css.match(/:root\{([\s\S]*?)\}/)?.[1],
+    css.match(/@media\(prefers-color-scheme:light\)\{\s*:root\{([^}]+)\}/)?.[1]
+  ];
+  const color = (theme, key) => {
+    const hex = theme?.match(new RegExp("--" + key + ":(#[0-9a-f]{6})"))?.[1];
+    assert.ok(hex, "Missing " + key);
+    return [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16) / 255);
+  };
+  const luminance = rgb => rgb.map(v => v <= 0.04045 ?
+    v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, v, index) => sum + v * [0.2126, 0.7152, 0.0722][index], 0);
+  for (const theme of themes) {
+    const lightness = [color(theme, "tile-bg"), color(theme, "tile-ink")]
+      .map(luminance).sort((a, b) => b - a);
+    const contrast = (lightness[0] + 0.05) / (lightness[1] + 0.05);
+    assert.ok(contrast >= 4.5, "Icon contrast below 4.5:1: " + contrast);
+  }
+});
+
+test("preview small labels remain legible without changing safety constraints", () => {
+  for (const token of ["font-size:12px", "font-size:13px", "font-size:14px"]) {
+    assert.ok(css.includes(token), "Missing readable preview type scale " + token);
+  }
+  assert.doesNotMatch(html, /<\s*(form|input|textarea|script)\b/i);
+});
