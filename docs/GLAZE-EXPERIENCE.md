@@ -1,9 +1,9 @@
 # Glaze integration (design contract, unimplemented)
 
-Use the current **Glaze — GoreeCloud Design & Experience System** from the authoritative `GoreeCloud/glaze` repository and Glaze-Index. Do not copy arbitrary Bitwarden screenshots, colors, controls, or branding as a substitute for integration.
+Use the current **Glaze — GoreeCloud Design & Experience System** from the authoritative `GoreeCloud/glaze` repository and Glaze-Index. As verified from the current canonical Glaze repository, the required Stable consumer target is **Glaze V1.7 / `1.7.0`**, with runtime entrypoint `js/glaze-v1.7.0.mjs`. This is a bounded Stable identity/runtime inherited from V1.6.0; the V1.7.1 richer capabilities are still in Development. **Vault has not adopted that runtime, supplied consumer evidence, or reached Glaze conformance.** Do not copy arbitrary Bitwarden screenshots, colors, controls, or branding as a substitute for integration.
 
 Required experiences: accessible lock/unlock and reauthentication, searchable credential library, safe editing, passkey management, recovery/backup, cross-device sync state, multi-profile switching, migration wizard, breach and risk warnings, privacy/consent controls, secure onboarding, and understandable offline behavior.
 
 Design characteristics: calm, premium, compact hierarchy; strong readability; keyboard and screen-reader support; adaptive window/mobile layout; reduced motion; appropriate contrast; quality iconography; predictable empty/loading/error states; no decorative or misleading security badges. Show meaningful encryption/backup *status* only from authoritative evidence.
 
-Glaze must not be allowed to weaken cryptographic boundaries or entice users into unsafe credential disclosure. No in-product visual implementation is claimed in the current imported foundation.
+Glaze must not be allowed to weaken cryptographic boundaries or entice users into unsafe credential disclosure. Before claiming adoption, pin and vendor/use the approved exact Stable source, perform Vault-local rendered and accessible experience tests, keyboard/touch/reduced-motion, representative platform/security/privacy acceptance, and rollback. Do not import 1.7.1 Development as Stable behavior. No in-product visual implementation is claimed in the current imported foundation.
