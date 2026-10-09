@@ -39,6 +39,8 @@ def transition(snapshot: LockSnapshot, event: Event) -> LockSnapshot:
         return LockSnapshot()
     if not isinstance(snapshot.state, LockState) or not isinstance(snapshot.pending_attempt, bool):
         return LockSnapshot()
+    if snapshot.state == LockState.UNLOCK_REQUESTED and not snapshot.pending_attempt:
+        return LockSnapshot()
     if event == Event.REQUEST_UNLOCK and snapshot.state == LockState.LOCKED:
         return LockSnapshot(LockState.UNLOCK_REQUESTED, True)
     if event == Event.REQUEST_UNLOCK and snapshot.state == LockState.UNLOCK_REQUESTED:
