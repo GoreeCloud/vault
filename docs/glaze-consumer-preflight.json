@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "consumer": "GoreeCloud/vault",
+  "status": "adoption-required",
+  "target": {
+    "repository": "GoreeCloud/glaze",
+    "stableVersion": "1.7.0",
+    "stableRuntime": "js/glaze-v1.7.0.mjs",
+    "stableScope": "contracts/v1.7/stable-scope.json",
+    "scopeBlobAtInspection": "187be631e91d1f0640eb144fc258fced3d94828d",
+    "consumerRegistry": "consumers/registry.json"
+  },
+  "acceptance": {
+    "runtimeImported": false,
+    "exactRevisionPinned": false,
+    "renderedReviewed": false,
+    "assistiveTechnologyReviewed": false,
+    "supportedFormFactorsReviewed": false,
+    "privacySecurityReviewed": false,
+    "rollbackReviewed": false,
+    "registeredConsumerAccepted": false,
+    "productionAuthorized": false
+  },
+  "evidence": {
+    "runtimeRevision": null,
+    "renderedReview": null,
+    "assistiveTechnologyReview": null,
+    "formFactorReview": null,
+    "privacySecurityReview": null,
+    "rollbackReview": null,
+    "registryAcceptance": null,
+    "productionApproval": null
+  },
+  "scopeNote": "Local read-only preview is unqualified. Glaze consumer acceptance cannot be inferred from upstream Stable status or screenshots."
+}
