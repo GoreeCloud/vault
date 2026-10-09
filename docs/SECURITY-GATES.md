@@ -30,3 +30,5 @@ The first-party origin-matching sample in `src/` rejects unsafe URLs and cross-o
 ## Human acceptance
 
 Cryptographic designs, production service exposure, key custody, recovery, and Stable release must be reviewed against the exact candidate code and current evidence. Historic issue numbers and CI runs associated with deleted GoreeCloud Vault repositories are **not reusable** as acceptance evidence.
+
+The synthetic device/session revocation planner screens forged metadata only. It does not revoke real sessions, validate an initiator, attest devices, rotate encryption keys, or enforce an atomic revision. Any production integration needs separate exact-revision human security review and server/client runtime testing.

@@ -20,6 +20,7 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 - `src/synthetic-offline-queue.mjs` — bounded metadata-only sequencing of fabricated offline edits; no storage or retries
 - `src/synthetic-access-boundary.mjs` — non-operational single-owner role/scope screening for synthetic fixtures only
 - `src/synthetic-client-item-schema.mjs` — client-private field-name templates only, with no credential values, persistence or encryption
+- `src/synthetic-device-revocation.mjs` — bounded fabricated device/session revocation proposals, not real session invalidation or authorization
 - `src/synthetic-lock-lifecycle.mjs` — forged-state lock/reauth transition proposals only; never authenticates or unlocks a real vault
 - `src/synthetic-backup-manifest.mjs` — metadata-only backup/restore preflight; never reads, writes, encrypts or restores backup bytes
 - `src/synthetic-observability-signal.mjs` — identifier-free coarse operational-signal screening; never collects or transmits telemetry
@@ -38,6 +39,8 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 Open [the local static preview](preview/index.html) from your checkout. It has no forms, accounts, encryption or credential entry and is **not a password manager**. The design target is Glaze 1.7.0, but the runtime and consumer acceptance are not implemented. See [preview limitations](docs/STATIC-PREVIEW.md).
 
 For optional loopback-only HTTP/header QA, run `npm run preview` and open `http://127.0.0.1:8765/` on that machine. Stop it with Ctrl+C. This server is for local development, not deployment; never tunnel it or provide credentials. The QA server's tests are included in `npm test`.
+
+The static preview includes CSS viewport safe-area handling for notches and gesture navigation. This is not evidence of native mobile inset behavior; see `test/preview-safe-area.test.mjs`.
 
 ## Check the foundation
 
