@@ -4,6 +4,7 @@ on:
     paths:
       - 'tools/lock_lifecycle_reference.py'
       - 'tests/test_lock_lifecycle_reference.py'
+      - 'tests/test_lock_lifecycle_subclass_guard.py'
       - '.github/workflows/lock-lifecycle-reference.yml'
   workflow_dispatch:
 permissions:
@@ -18,4 +19,4 @@ jobs:
         with:
           python-version: '3.12'
       - name: Run isolated metadata lifecycle tests
-        run: python -m unittest discover -s tests -p 'test_lock_lifecycle_reference.py' -v
+        run: python -m unittest discover -s tests -p 'test_lock_lifecycle*.py' -v
