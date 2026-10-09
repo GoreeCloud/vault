@@ -23,6 +23,8 @@ The synthetic item-schema and access-boundary checks use caller-supplied metadat
 
 The synthetic lock-lifecycle module accepts only forged Development fixture facts and cannot authenticate a session, verify a biometric/device assertion, access keys, persist a timer, or unlock a real vault. The synthetic backup-manifest module operates on metadata only: encryption, integrity and rollback fields are untrusted claims and no backup bytes or Everkeep operation exist. The synthetic observability module merely rejects non-minimized signal shapes; it does not collect or authorize telemetry, and any future collection requires separate Privacy Shield and Observability acceptance.
 
+The synthetic passkey RP preflight applies an intentionally stricter exact-host/top-level HTTPS Development rule and accepts no WebAuthn ceremony material; caller origin, unlock and risk facts remain forgeable. It is not permission to invoke a credential provider. The synthetic migration preflight permits only a metadata-only no-write dry-run proposal; recovery, integrity, consent and destination state are untrusted caller claims. The synthetic clipboard lifecycle never accepts content or authorizes copying; its clear/schedule result does not prove the operating system clipboard or history was cleared.
+
 The first-party origin-matching sample in `src/` rejects unsafe URLs and cross-origin matches, but is **not** an end-to-end phishing or autofill security boundary and must not be integrated before review. The `opaque-sync-preflight` module is a **non-operational synthetic shape check only**: candidate schema v0 does not establish ciphertext authentication, server authorization, key custody, or any right to store or synchronize secrets.
 
 ## Human acceptance
