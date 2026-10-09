@@ -26,13 +26,18 @@ function copyExactDataRecord(value, keys) {
   return safe;
 }
 function copyDevices(value) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype ||
-      !Number.isSafeInteger(value.length) || value.length < 1 || value.length > 16) return null;
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+  // Array length must come from an own data descriptor, not a hostile Proxy
+  // get trap that may change between shape-check and iteration.
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+  const length = lengthDescriptor?.value;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value") ||
+      !Number.isSafeInteger(length) || length < 1 || length > 16) return null;
   const own = Reflect.ownKeys(value);
-  if (own.length !== value.length + 1 || !own.includes("length")) return null;
+  if (own.length !== length + 1 || !own.includes("length")) return null;
   const copy = [];
   let previous = 0;
-  for (let i = 0; i < value.length; i++) {
+  for (let i = 0; i < length; i++) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
     if (!descriptor || !Object.hasOwn(descriptor, "value")) return null;
     const device = copyExactDataRecord(descriptor.value, DEVICE_KEYS);
