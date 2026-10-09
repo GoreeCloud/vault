@@ -25,3 +25,7 @@ A future real service must perform independently authenticated session validatio
 Human-approved security design and exact-revision tests; multi-tenant and organization isolation; collection sharing and grant revocation; expiration and clock trust; concurrent modification and stale-session tests; fuzz/property tests; rate limiting, enumeration and anti-abuse protections; redacted audit; accessible error UX; recovery and restore; and operational monitoring without protected data.
 
 See [security gate #1](https://github.com/GoreeCloud/vault/issues/1), [implementation backlog #3](https://github.com/GoreeCloud/vault/issues/3), `docs/NATIVE-SYNC-CONTRACT.md`, `docs/CRYPTOGRAPHY-CANDIDATE.md` and `docs/SECURITY-GATES.md`.
+
+## Descriptor-snapshot regression candidate
+
+This Development branch copies exact own data descriptors into frozen null-prototype request and context sketches before the synthetic comparison. It does not invoke caller-controlled ordinary property getters after checking shape. Getter accessors, hostile descriptor traps and unexpected fields are rejected. A Proxy may still forge its descriptors: this change is only a hostile-input hardening experiment, not authentic identity/session evidence or operational access enforcement. Regression coverage lives in `test/synthetic-access-snapshot.test.mjs`. Exact-head independent security review and real server authorization testing remain open.
