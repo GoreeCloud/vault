@@ -44,7 +44,7 @@ test("rejects configs whose old alphabet-size upper bound overstated strength", 
   assert.match(eligible, /[a-z]/);
   assert.match(eligible, /[A-Z]/);
   assert.match(eligible, /[0-9]/);
-  assert.match(eligible, /[!@#$%^&*()\\-_=+\\[\\]{}:,.?]/);
+  assert.match(eligible, /[^A-Za-z0-9]/);
 });
 
 test("boundary estimates always use enabled class sizes, including ambiguous-exclusion", () => {
