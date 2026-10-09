@@ -81,3 +81,10 @@ footer{border-top:1px solid var(--line);border-bottom:0}
   .notice p{color:#654927}
   .status,.gate>span{color:#6d491c}
 }
+
+/* Development preview only: viewport system-bar and gesture-area containment.
+   Real Android/iOS clients must consume their native window insets separately. */
+body{min-width:0;padding-block-start:env(safe-area-inset-top,0px);padding-block-end:env(safe-area-inset-bottom,0px);padding-inline-start:env(safe-area-inset-left,0px);padding-inline-end:env(safe-area-inset-right,0px)}
+.shell{min-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+.skip:focus{top:calc(env(safe-area-inset-top,0px) + 8px)}
+@media(max-width:540px){.toolbar,footer,.gate,.section-head{overflow-wrap:anywhere}.brand,.notice,.gate{min-width:0}}

@@ -22,3 +22,8 @@ The restore preflight additionally requires a matching target vault, an empty ta
 Before real Vault backup/restore exists, the exact implementation must have human-approved cryptographic framing and key custody; authenticated client-side backup format and versioning; rollback/replay protection; authorization and ownership checks; least-privilege Everkeep integration; retention and deletion semantics; corruption/truncation/wrong-key/old-backup tests; safe non-empty-target conflict handling; transactional restore or equivalent recovery guarantees; destructive-operation safeguards; representative restore drills; and verified rollback from failed recovery.
 
 This preflight is useful for designing those contracts without crossing the current secret-handling security gate. It is not Everkeep conformance or disaster-recovery acceptance.
+
+
+## Hostile-input snapshot hardening
+
+Both manifest and restore context fields are copied from exact own data descriptors into immutable null-prototype snapshots before validation. No caller property getters are invoked while interpreting encryption, operator-access or restore-safety claims. Malicious Proxy descriptors can still lie; this robustness check **never verifies encryption or authorization**.

@@ -17,3 +17,8 @@ Write mode is deliberately unsupported. Non-empty-target migration is deliberate
 Real migration requires format-specific parsers with hostile-input limits; protected local handling; explicit consent; dry-run and diff UX; field and attachment fidelity; versioned normalization; verified integrity evidence; duplicate/conflict policy; transactional or safely recoverable writes; backup and rollback; cleanup of temporary material; compatibility testing; malformed-input tests; representative round trips; and exact-revision security/privacy review.
 
 This module is a planning guard only and does not authorize real data ingestion or satisfy migration/recovery release gates.
+
+
+## Hostile-input snapshot hardening
+
+The Development parser now copies only exact, own, descriptor-backed data fields into an immutable null-prototype snapshot **before** it reads any policy claims. This prevents a caller's JavaScript property-get trap from reporting safe values that contradict its own property descriptors. Accessors are refused without invocation. Proxy descriptors can still be forged, and all recovery/consent metadata remains untrusted; this is input robustness, not trust attestation.

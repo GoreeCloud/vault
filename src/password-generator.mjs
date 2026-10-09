@@ -61,9 +61,14 @@ export function generatePassword(options = {}) {
   if (groups.length === 0) throw new RangeError("At least one character class must be enabled");
 
   const alphabet = groups.join("");
-  // A conservative configuration gate, NOT a claim of formal min-entropy:
-  // forced per-class characters and shuffling alter the output distribution.
-  if (length * Math.log2(alphabet.length) < MIN_TARGET_BITS) {
+  // Each forced class draw is uniform in its own group; remaining draws
+  // are uniform in the union alphabet. For any final output, a permutation
+  // averages pre-shuffle probabilities, so it cannot increase the largest
+  // probability beyond 1 / (product(group sizes) * alphabetSize^(length-k)).
+  // This is a conservative lower bound, not independently audited entropy.
+  const conservativeBits = groups.reduce((sum, group) => sum + Math.log2(group.length), 0)
+    + (length - groups.length) * Math.log2(alphabet.length);
+  if (conservativeBits < MIN_TARGET_BITS) {
     throw new RangeError("Configuration does not meet the minimum strength target");
   }
 
