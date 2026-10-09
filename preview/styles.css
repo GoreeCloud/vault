@@ -76,6 +76,7 @@ footer{border-top:1px solid var(--line);border-bottom:0}
   .action{background:#305999;color:#fff}
   .action:hover{background:#183e7a}
   .notice{background:#fff1df;border-color:#b58a55}
+  .notice-icon{color:#744a13}
   .notice h2{color:#744a13}
   .notice p{color:#654927}
   .status,.gate>span{color:#6d491c}
