@@ -35,3 +35,20 @@ test("generates independent outputs without caching or writing credentials", () 
   const passwords = new Set(Array.from({length: 100}, () => generatePassword()));
   assert.equal(passwords.size, 100);
 });
+
+test("rejects configs whose old alphabet-size upper bound overstated strength", () => {
+  assert.throws(() => generatePassword({length: 21}), RangeError);
+  assert.throws(() => generatePassword({length: 22, symbols: false}), RangeError);
+  const eligible = generatePassword({length: 22});
+  assert.equal(eligible.length, 22);
+  assert.match(eligible, /[a-z]/);
+  assert.match(eligible, /[A-Z]/);
+  assert.match(eligible, /[0-9]/);
+  assert.match(eligible, /[!@#$%^&*()\\-_=+\\[\\]{}:,.?]/);
+});
+
+test("boundary estimates always use enabled class sizes, including ambiguous-exclusion", () => {
+  assert.throws(() => generatePassword({length: 22, excludeAmbiguous: true, symbols: false}), RangeError);
+  const safe = generatePassword({length: 28, excludeAmbiguous: true});
+  assert.doesNotMatch(safe, /[0O1lI]/);
+});
