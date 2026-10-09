@@ -21,6 +21,8 @@ No public listener, deployment secrets, account creation, API migration, browser
 
 The synthetic item-schema and access-boundary checks use caller-supplied metadata and fixtures; neither validates actual cryptographic encryption, session authority, tenant ownership, grant verification or secret handling. Client item type and field names must not be exposed to the sync server.
 
+The synthetic lock-lifecycle module accepts only forged Development fixture facts and cannot authenticate a session, verify a biometric/device assertion, access keys, persist a timer, or unlock a real vault. The synthetic backup-manifest module operates on metadata only: encryption, integrity and rollback fields are untrusted claims and no backup bytes or Everkeep operation exist. The synthetic observability module merely rejects non-minimized signal shapes; it does not collect or authorize telemetry, and any future collection requires separate Privacy Shield and Observability acceptance.
+
 The first-party origin-matching sample in `src/` rejects unsafe URLs and cross-origin matches, but is **not** an end-to-end phishing or autofill security boundary and must not be integrated before review. The `opaque-sync-preflight` module is a **non-operational synthetic shape check only**: candidate schema v0 does not establish ciphertext authentication, server authorization, key custody, or any right to store or synchronize secrets.
 
 ## Human acceptance
