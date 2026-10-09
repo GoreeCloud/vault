@@ -35,7 +35,9 @@ def transition(snapshot: LockSnapshot, event: Event) -> LockSnapshot:
     Events are strictly typed, unrecognized inputs or invalid snapshots fail
     closed. No transition can produce an authenticated/unlocked state.
     """
-    if not isinstance(snapshot, LockSnapshot) or not isinstance(event, Event):
+    # Reject subclasses: overridden getters can fabricate transient states and
+    # returning an untrusted subclass breaks the immutable-snapshot contract.
+    if type(snapshot) is not LockSnapshot or type(event) is not Event:
         return LockSnapshot()
     if not isinstance(snapshot.state, LockState) or not isinstance(snapshot.pending_attempt, bool):
         return LockSnapshot()
