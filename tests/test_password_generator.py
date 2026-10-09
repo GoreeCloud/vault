@@ -3,7 +3,7 @@
 import string
 import unittest
 
-from tools.password_generator import SYMBOLS, generate_password
+from tools.password_generator import SYMBOLS, generate_password, generate_numeric_pin
 
 
 class PasswordGeneratorTests(unittest.TestCase):
@@ -57,6 +57,21 @@ class PasswordGeneratorTests(unittest.TestCase):
         for value in (None, True, 3, ["a"]):
             with self.subTest(value=value), self.assertRaises(TypeError):
                 generate_password(exclude_characters=value)
+
+    def test_numeric_pin_defaults_and_lengths(self):
+        for length in (6, 8, 16, 32):
+            for _ in range(20):
+                pin = generate_numeric_pin(length)
+                self.assertEqual(len(pin), length)
+                self.assertTrue(pin.isascii() and pin.isdecimal())
+
+    def test_numeric_pin_invalid_inputs(self):
+        for value in (0, 5, 33, True, False, 8.0, "8", None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                generate_numeric_pin(value)
+
+    def test_numeric_pin_is_not_constant(self):
+        self.assertGreater(len({generate_numeric_pin() for _ in range(40)}), 1)
 
     def test_nonconstant_output(self):
         self.assertGreater(len({generate_password() for _ in range(50)}), 1)
