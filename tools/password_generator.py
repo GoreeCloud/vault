@@ -56,3 +56,14 @@ def generate_password(
         target = secrets.randbelow(index + 1)
         result[index], result[target] = result[target], result[index]
     return "".join(result)
+
+
+def generate_numeric_pin(length: int = 8) -> str:
+    """Generate an unbiased numeric PIN without storage, logging, or network I/O.
+
+    Intended for standalone generation only; does not implement authentication,
+    PIN verification, rate limiting, or device unlock.
+    """
+    if isinstance(length, bool) or not isinstance(length, int) or not 6 <= length <= 32:
+        raise ValueError("PIN length must be an integer from 6 to 32")
+    return "".join(secrets.choice(DIGITS) for _ in range(length))
