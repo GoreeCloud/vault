@@ -21,6 +21,7 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 - `src/synthetic-access-boundary.mjs` — non-operational single-owner role/scope screening for synthetic fixtures only
 - `src/synthetic-client-item-schema.mjs` — client-private field-name templates only, with no credential values, persistence or encryption
 - `src/synthetic-device-revocation.mjs` — bounded fabricated device/session revocation proposals, not real session invalidation or authorization
+- `src/synthetic-profile-switch.mjs` — anonymous, no-action, metadata-only multi-profile switch screening; no authorization or real profile isolation
 - `src/synthetic-lock-lifecycle.mjs` — forged-state lock/reauth transition proposals only; never authenticates or unlocks a real vault
 - `src/synthetic-backup-manifest.mjs` — metadata-only backup/restore preflight; never reads, writes, encrypts or restores backup bytes
 - `src/synthetic-observability-signal.mjs` — identifier-free coarse operational-signal screening; never collects or transmits telemetry
