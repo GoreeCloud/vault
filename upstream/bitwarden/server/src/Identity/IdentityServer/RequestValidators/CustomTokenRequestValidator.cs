@@ -1,0 +1,279 @@
+﻿using System.Diagnostics;
+using System.Security.Claims;
+using Bit.Core;
+using Bit.Core.AdminConsole.OrganizationFeatures.Policies;
+using Bit.Core.Auth.Identity;
+using Bit.Core.Auth.IdentityServer;
+using Bit.Core.Auth.Repositories;
+using Bit.Core.Auth.UserFeatures.Devices.Interfaces;
+using Bit.Core.Context;
+using Bit.Core.Entities;
+using Bit.Core.KeyManagement.Queries.Interfaces;
+using Bit.Core.Platform.Installations;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.Core.Settings;
+using Duende.IdentityModel;
+using Duende.IdentityServer.Extensions;
+using Duende.IdentityServer.Validation;
+using Microsoft.AspNetCore.Identity;
+
+namespace Bit.Identity.IdentityServer.RequestValidators;
+
+public class CustomTokenRequestValidator : BaseRequestValidator<CustomTokenRequestValidationContext>,
+    ICustomTokenRequestValidator
+{
+    private readonly UserManager<User> _userManager;
+    private readonly IUpdateInstallationCommand _updateInstallationCommand;
+    private readonly Version _denyLegacyUserMinimumVersion = new(Constants.DenyLegacyUserMinimumVersion);
+
+    public CustomTokenRequestValidator(
+        UserManager<User> userManager,
+        IUserService userService,
+        IEventService eventService,
+        IDeviceValidator deviceValidator,
+        ITwoFactorAuthenticationValidator twoFactorAuthenticationValidator,
+        ISsoRequestValidator ssoRequestValidator,
+        ILogger<CustomTokenRequestValidator> logger,
+        ICurrentContext currentContext,
+        GlobalSettings globalSettings,
+        IUserRepository userRepository,
+        IFeatureService featureService,
+        ISsoConfigRepository ssoConfigRepository,
+        IUserDecryptionOptionsBuilder userDecryptionOptionsBuilder,
+        IUpdateInstallationCommand updateInstallationCommand,
+        IPolicyRequirementQuery policyRequirementQuery,
+        IAuthRequestRepository authRequestRepository,
+        IMailService mailService,
+        IUserAccountKeysQuery userAccountKeysQuery,
+        IClientVersionValidator clientVersionValidator,
+        IUpdateDeviceLastActivityCommand updateDeviceLastActivityCommand)
+        : base(
+            userManager,
+            userService,
+            eventService,
+            deviceValidator,
+            twoFactorAuthenticationValidator,
+            ssoRequestValidator,
+            logger,
+            currentContext,
+            globalSettings,
+            userRepository,
+            featureService,
+            ssoConfigRepository,
+            userDecryptionOptionsBuilder,
+            policyRequirementQuery,
+            authRequestRepository,
+            mailService,
+            userAccountKeysQuery,
+            clientVersionValidator,
+            updateDeviceLastActivityCommand)
+    {
+        _userManager = userManager;
+        _updateInstallationCommand = updateInstallationCommand;
+    }
+
+    // NOTE: Feature flags with progressive rollout (device-keyed or user-keyed) cannot be
+    // evaluated from inside this validator without first populating CurrentContext.UserId /
+    // CurrentContext.DeviceIdentifier. CurrentContextMiddleware only sees /connect/token
+    // headers, which do not carry either value. For refresh, populate CurrentContext inline
+    // immediately before the flag check from the server-signed Subject claims (see
+    // TryUpdateDeviceLastActivityForRefreshAsync below). Do not populate CurrentContext
+    // from raw form-body input before validation — pre-validation client values would become
+    // visible to any downstream reader in the same request.
+    public async Task ValidateAsync(CustomTokenRequestValidationContext context)
+    {
+        Debug.Assert(context.Result is not null);
+
+        if (context.Result.ValidatedRequest.GrantType == "refresh_token")
+        {
+            // Force legacy users to the web for migration
+            if (await _userService.IsLegacyUser(GetSubject(context)?.GetSubjectId()) &&
+                (context.Result.ValidatedRequest.ClientId != "web" || CurrentContext.ClientVersion >= _denyLegacyUserMinimumVersion))
+            {
+                await FailAuthForLegacyUserAsync(null, context);
+                return;
+            }
+
+            await TryUpdateDeviceLastActivityForRefreshAsync(context);
+        }
+
+        string[] allowedGrantTypes = ["authorization_code", "client_credentials"];
+        string clientId = context.Result.ValidatedRequest.ClientId;
+        if (!allowedGrantTypes.Contains(context.Result.ValidatedRequest.GrantType)
+            || clientId.StartsWith("organization")
+            || clientId.StartsWith("installation")
+            || clientId.StartsWith("internal")
+            || context.Result.ValidatedRequest.Client.AllowedScopes.Contains(ApiScopes.ApiSecrets))
+        {
+            if (context.Result.ValidatedRequest.Client.Properties.TryGetValue("encryptedPayload", out var payload) &&
+                !string.IsNullOrWhiteSpace(payload))
+            {
+                context.Result.CustomResponse = new Dictionary<string, object> { { "encrypted_payload", payload } };
+
+            }
+            if (context.Result.ValidatedRequest.ClientId.StartsWith("installation"))
+            {
+                await RecordActivityForInstallation(clientId.Split(".")[1]);
+            }
+            return;
+        }
+        await ValidateAsync(context, context.Result.ValidatedRequest, new CustomValidatorRequestContext { });
+    }
+
+    protected async override Task<bool> ValidateContextAsync(CustomTokenRequestValidationContext context,
+        CustomValidatorRequestContext validatorContext)
+    {
+        Debug.Assert(context.Result is not null);
+        var email = context.Result.ValidatedRequest.Subject?.GetDisplayName()
+                    ?? context.Result.ValidatedRequest.ClientClaims
+                        ?.FirstOrDefault(claim => claim.Type == JwtClaimTypes.Email)?.Value;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            validatorContext.User = await _userManager.FindByEmailAsync(email);
+        }
+        return validatorContext.User != null;
+    }
+
+    protected override Task SetSuccessResult(CustomTokenRequestValidationContext context, User user,
+        List<Claim> claims, Dictionary<string, object> customResponse)
+    {
+        Debug.Assert(context.Result is not null);
+        context.Result.CustomResponse = customResponse;
+        if (claims?.Any() ?? false)
+        {
+            context.Result.ValidatedRequest.Client.AlwaysSendClientClaims = true;
+            context.Result.ValidatedRequest.Client.ClientClaimsPrefix = string.Empty;
+            foreach (var claim in claims)
+            {
+                context.Result.ValidatedRequest.ClientClaims.Add(claim);
+            }
+        }
+        if (context.Result.CustomResponse == null || user.MasterPassword != null)
+        {
+            return Task.CompletedTask;
+        }
+
+        // KeyConnector responses below
+
+        // Apikey login
+        if (context.Result.ValidatedRequest.GrantType == "client_credentials")
+        {
+            if (user.UsesKeyConnector)
+            {
+                // KeyConnectorUrl is configured in the CLI client, we just need to tell the client to use it
+                context.Result.CustomResponse["ApiUseKeyConnector"] = true;
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override ClaimsPrincipal? GetSubject(CustomTokenRequestValidationContext context)
+    {
+        Debug.Assert(context.Result is not null);
+        return context.Result.ValidatedRequest.Subject;
+    }
+
+    [Obsolete("Consider using SetGrantValidationErrorResult instead.")]
+    protected override void SetTwoFactorResult(CustomTokenRequestValidationContext context,
+        Dictionary<string, object> customResponse)
+    {
+        Debug.Assert(context.Result is not null);
+        context.Result.Error = "invalid_grant";
+        context.Result.ErrorDescription = "Two factor required.";
+        context.Result.IsError = true;
+        context.Result.CustomResponse = customResponse;
+    }
+
+    [Obsolete("Consider using SetGrantValidationErrorResult instead.")]
+    protected override void SetErrorResult(CustomTokenRequestValidationContext context,
+        Dictionary<string, object> customResponse)
+    {
+        Debug.Assert(context.Result is not null);
+        context.Result.Error = "invalid_grant";
+        context.Result.IsError = true;
+        context.Result.CustomResponse = customResponse;
+    }
+
+    protected override void SetValidationErrorResult(
+        CustomTokenRequestValidationContext context, CustomValidatorRequestContext requestContext)
+    {
+        Debug.Assert(context.Result is not null);
+        context.Result.Error = requestContext.ValidationErrorResult.Error;
+        context.Result.IsError = requestContext.ValidationErrorResult.IsError;
+        context.Result.ErrorDescription = requestContext.ValidationErrorResult.ErrorDescription;
+        context.Result.CustomResponse = requestContext.CustomResponse;
+    }
+
+    private async Task TryUpdateDeviceLastActivityForRefreshAsync(CustomTokenRequestValidationContext context)
+    {
+        Debug.Assert(context.Result is not null);
+        try
+        {
+            var subject = context.Result.ValidatedRequest.Subject;
+            var rawIdentifier = subject?.FindFirstValue(Claims.Device);
+            // Defensive: the `device` claim is always populated from a non-empty server-known
+            // string at issuance (see BaseRequestValidator.BuildSubjectClaims). The normalizer
+            // guards an invariant rather than a known failure mode.
+            var identifier = string.IsNullOrWhiteSpace(rawIdentifier) ? null : rawIdentifier;
+            var userIdString = subject?.FindFirstValue(JwtClaimTypes.Subject);
+            Guid.TryParse(userIdString, out var userId);
+
+            // Populate CurrentContext for the LD bucketing decision below. Both values come
+            // from the server-signed refresh-token Subject claims.
+            // TODO: PM-34091 - delete when cleaning up the feature flag; the bump call reads
+            // userId / identifier directly.
+            if (userId != Guid.Empty)
+            {
+                CurrentContext.UserId ??= userId;
+            }
+            if (identifier is not null)
+            {
+                CurrentContext.DeviceIdentifier ??= identifier;
+            }
+
+            // TODO: PM-34091 - remove feature flag check when cleaning up
+            if (!_featureService.IsEnabled(FeatureFlagKeys.DevicesLastActivityDate))
+            {
+                return;
+            }
+
+            if (identifier is null || userId == Guid.Empty)
+            {
+                return;
+            }
+
+            var clientVersion = CurrentContext.ClientVersion?.ToString();
+            await _updateDeviceLastActivityCommand.UpdateByIdentifierAndUserIdAsync(identifier, userId, clientVersion);
+        }
+        catch (Exception e)
+        {
+            // Log and swallow exceptions from this non-critical update, as we don't want to fail logins
+            // due to issues updating the device's last-activity state (LastActivityDate / ClientVersion).
+            _logger.LogWarning(e, "Failed to update device last activity for device with identifier {DeviceIdentifier}.",
+                context.Result.ValidatedRequest.Subject?.FindFirstValue(Claims.Device));
+        }
+    }
+
+    /// <summary>
+    /// To help mentally separate organizations that self host from abandoned
+    /// organizations we hook in to the token refresh event for installations
+    /// to write a simple `DateTime.Now` to the database.
+    /// </summary>
+    /// <remarks>
+    /// This works well because installations don't phone home very often.
+    /// Currently self hosted installations only refresh tokens every 24
+    /// hours or so for the sake of hooking in to cloud's push relay service.
+    /// If installations ever start refreshing tokens more frequently we may need to
+    /// adjust this to avoid making a bunch of unnecessary database calls!
+    /// </remarks>
+    private async Task RecordActivityForInstallation(string? installationIdString)
+    {
+        if (!Guid.TryParse(installationIdString, out var installationId))
+        {
+            return;
+        }
+        await _updateInstallationCommand.UpdateLastActivityDateAsync(installationId);
+    }
+}

@@ -1,0 +1,17 @@
+# Never commit credentials, locally decrypted vaults, or host secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.kdbx
+*.sqlite
+*.db
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/coverage/
+.DS_Store

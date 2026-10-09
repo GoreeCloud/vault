@@ -1,0 +1,777 @@
+﻿using Bit.Core.AdminConsole.Entities;
+using Bit.Core.AdminConsole.OrganizationFeatures.InviteLinks;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.AcceptMembership;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.AutoConfirmUser;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.Interfaces;
+using Bit.Core.AdminConsole.OrganizationFeatures.Policies.PolicyRequirements.Errors;
+using Bit.Core.Auth.Models.Business.Tokenables;
+using Bit.Core.Auth.UserFeatures.EmergencyAccess.Interfaces;
+using Bit.Core.Billing.Enums;
+using Bit.Core.Entities;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.Models.Data.Organizations.OrganizationUsers;
+using Bit.Core.OrganizationFeatures.OrganizationUsers;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.Core.Tokens;
+using Bit.Test.Common.AutoFixture;
+using Bit.Test.Common.AutoFixture.Attributes;
+using Bit.Test.Common.Fakes;
+using NSubstitute;
+using Xunit;
+using static Bit.Core.AdminConsole.Utilities.v2.Validation.ValidationResultHelpers;
+
+namespace Bit.Core.Test.OrganizationFeatures.OrganizationUsers;
+
+// Note: test names follow MethodName_StateUnderTest_ExpectedBehavior pattern.
+[SutProviderCustomize]
+public class AcceptOrgUserCommandTests
+{
+    private readonly IUserService _userService = Substitute.For<IUserService>();
+    private readonly IOrgUserInviteTokenableFactory _orgUserInviteTokenableFactory = Substitute.For<IOrgUserInviteTokenableFactory>();
+    private readonly IDataProtectorTokenFactory<OrgUserInviteTokenable> _orgUserInviteTokenDataFactory = new FakeDataProtectorTokenFactory<OrgUserInviteTokenable>();
+
+    // Base AcceptOrgUserAsync method tests ----------------------------------------------------------------------------
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUser_InvitedUserToSingleOrg_AcceptsOrgUser(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Valid(new AcceptOrganizationMembershipValidationResult
+                {
+                    AutoConfirmPolicyEnabled = true
+                })));
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        // Assert
+        // Verify returned org user details
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+
+        // Verify org repository called with updated orgUser
+        await sutProvider.GetDependency<IOrganizationUserRepository>().Received(1).ReplaceAsync(
+            Arg.Is<OrganizationUser>(ou => ou.Id == orgUser.Id && ou.Status == OrganizationUserStatusType.Accepted));
+
+        // Verify emails sent to admin
+        await sutProvider.GetDependency<IMailService>().Received(1).SendOrganizationAcceptedEmailAsync(
+            Arg.Is<Organization>(o => o.Id == org.Id),
+            Arg.Is<string>(e => e == user.Email),
+            Arg.Is<IEnumerable<string>>(a => a.Contains(adminUserDetails.Email))
+        );
+
+        await sutProvider.GetDependency<IPushAutoConfirmNotificationCommand>()
+            .Received(1)
+            .PushAsync(user.Id, orgUser.OrganizationId);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUser_OrgUserStatusIsRevoked_ReturnsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Common setup
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Revoke user status
+        orgUser.Status = OrganizationUserStatusType.Revoked;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new OrganizationAccessRevoked(org.Name).Message, exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData(OrganizationUserStatusType.Accepted)]
+    [BitAutoData(OrganizationUserStatusType.Confirmed)]
+    public async Task AcceptOrgUser_OrgUserStatusIsNotInvited_ThrowsBadRequest(
+        OrganizationUserStatusType orgUserStatus,
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Set status to something other than invited
+        orgUser.Status = orgUserStatus;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal("Already accepted.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_UserWithout2FAJoining2FARequiredOrg_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Invalid(new AcceptOrganizationMembershipValidationResult(),
+                    new TwoFactorRequiredForMembership())));
+
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new TwoFactorRequiredForMembership().Message, exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_UserWith2FAJoining2FARequiredOrg_Succeeds(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Validator passes (2FA is satisfied) — default from SetupCommonAcceptOrgUserMocks
+        await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        await sutProvider.GetDependency<IOrganizationUserRepository>()
+            .Received(1)
+            .ReplaceAsync(Arg.Is<OrganizationUser>(ou => ou.Status == OrganizationUserStatusType.Accepted));
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_UserJoiningOrgWithout2FARequirement_Succeeds(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Validator passes (no 2FA requirement) — default from SetupCommonAcceptOrgUserMocks
+        await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        await sutProvider.GetDependency<IOrganizationUserRepository>()
+            .Received(1)
+            .ReplaceAsync(Arg.Is<OrganizationUser>(ou => ou.Status == OrganizationUserStatusType.Accepted));
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_WithSingleOrgEnabled_UserJoiningOrgWithSingleOrgPolicy_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Invalid(new AcceptOrganizationMembershipValidationResult(),
+                    new UserIsAMemberOfAnotherOrganization())));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new UserCannotAcceptInviteMemberOfAnotherOrg().Message, exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_UserInOrgWithSingleOrgPolicyAlready_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser,
+        OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Invalid(new AcceptOrganizationMembershipValidationResult(),
+                    new UserIsAMemberOfAnOrganizationThatHasSingleOrgPolicy())));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new UserCannotAcceptInviteForbiddenByOtherOrg().Message, exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_NoSingleOrgPolicy_Succeeds(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        // Assert
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+    }
+
+    [Theory]
+    [BitAutoData(OrganizationUserType.Admin)]
+    [BitAutoData(OrganizationUserType.Owner)]
+    public async Task AcceptOrgUser_AdminOfFreePlanTryingToJoinSecondFreeOrg_ThrowsBadRequest(
+        OrganizationUserType userType,
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+        org.PlanType = PlanType.Free;
+        orgUser.Type = userType;
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetCountByFreeOrganizationAdminUserAsync(user.Id)
+            .Returns(1);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new FreeOrgAdminLimitError().Message, exception.Message);
+    }
+
+    // AcceptOrgUserByOrgIdAsync tests --------------------------------------------------------------------------------
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_NewToken_AcceptsUserAndVerifiesEmail(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        // Setup FakeDataProtectorTokenFactory for creating new tokens - this must come first in order
+        // to avoid resetting mocks
+        sutProvider.SetDependency(_orgUserInviteTokenDataFactory, "orgUserInviteTokenDataFactory");
+        sutProvider.Create();
+
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+        SetupCommonAcceptOrgUserByTokenMocks(sutProvider, user, orgUser);
+
+        // Must come after common mocks as they mutate the org user.
+        // Mock tokenable factory to return a token that expires in 5 days
+        _orgUserInviteTokenableFactory.CreateToken(orgUser).Returns(new OrgUserInviteTokenable(orgUser)
+        {
+            ExpirationDate = DateTime.UtcNow.Add(TimeSpan.FromDays(5))
+        });
+
+        var newToken = CreateToken(orgUser);
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, newToken, _userService);
+
+        // Assert
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+
+        // Verify user email verified logic
+        Assert.True(user.EmailVerified);
+        await sutProvider.GetDependency<IUserRepository>().Received(1).ReplaceAsync(
+            Arg.Is<User>(u => u.Id == user.Id && u.Email == user.Email && user.EmailVerified == true));
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_NullOrgUser_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Guid orgUserId)
+    {
+        // Arrange
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUserId).Returns((OrganizationUser)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUserId, user, "token", _userService));
+
+        Assert.Equal("User invalid.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_GenericInvalidToken_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, OrganizationUser orgUser)
+    {
+        // Arrange
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUser.Id)
+            .Returns(Task.FromResult(orgUser));
+
+        var invalidToken = "invalidToken";
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, invalidToken, _userService));
+
+        Assert.Equal("Invalid token.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_ExpiredNewToken_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, OrganizationUser orgUser)
+    {
+        // Arrange
+        // Setup FakeDataProtectorTokenFactory for creating new tokens - this must come first in order
+        // to avoid resetting mocks
+        sutProvider.SetDependency(_orgUserInviteTokenDataFactory, "orgUserInviteTokenDataFactory");
+        sutProvider.Create();
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUser.Id)
+            .Returns(Task.FromResult(orgUser));
+
+        // Must come after common mocks as they mutate the org user.
+        // Mock tokenable factory to return a token that expired yesterday
+        _orgUserInviteTokenableFactory.CreateToken(orgUser).Returns(new OrgUserInviteTokenable(orgUser)
+        {
+            ExpirationDate = DateTime.UtcNow.Add(TimeSpan.FromDays(-1))
+        });
+
+        var newToken = CreateToken(orgUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, newToken, _userService));
+
+        Assert.Equal("Expired token.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_InvalidNewToken_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, OrganizationUser orgUser)
+    {
+        // Arrange
+        // Setup FakeDataProtectorTokenFactory for creating new tokens - this must come first in order
+        // to avoid resetting mocks
+        sutProvider.SetDependency(_orgUserInviteTokenDataFactory, "orgUserInviteTokenDataFactory");
+        sutProvider.Create();
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUser.Id)
+            .Returns(Task.FromResult(orgUser));
+
+        // Must come after common mocks as they mutate the org user.
+        // Send a null org-user to force an invalid token result
+        _orgUserInviteTokenableFactory.CreateToken(orgUser).Returns(new OrgUserInviteTokenable(null!)
+        {
+            ExpirationDate = DateTime.UtcNow.AddDays(1),
+        });
+
+        var newToken = CreateToken(orgUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, newToken, _userService));
+
+        Assert.Equal("Invalid token.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData(OrganizationUserStatusType.Accepted,
+        "Invitation already accepted. You will receive an email when your organization membership is confirmed.")]
+    [BitAutoData(OrganizationUserStatusType.Confirmed,
+        "You are already part of this organization.")]
+    public async Task AcceptOrgUserByToken_UserAlreadyInOrg_ThrowsBadRequest(
+        OrganizationUserStatusType statusType,
+        string expectedErrorMessage,
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, OrganizationUser orgUser)
+    {
+        // Arrange
+        // Setup FakeDataProtectorTokenFactory for creating new tokens - this must come first in order
+        // to avoid resetting mocks
+        sutProvider.SetDependency(_orgUserInviteTokenDataFactory, "orgUserInviteTokenDataFactory");
+        sutProvider.Create();
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUser.Id)
+            .Returns(Task.FromResult(orgUser));
+
+        // Indicate that a user with the given email already exists in the organization
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetCountByOrganizationAsync(orgUser.OrganizationId, user.Email, true)
+            .Returns(1);
+
+        orgUser.Status = statusType;
+
+        // Must come after common mocks as they mutate the org user.
+        // Mock tokenable factory to return valid, new token that expires in 5 days
+        _orgUserInviteTokenableFactory.CreateToken(orgUser).Returns(new OrgUserInviteTokenable(orgUser)
+        {
+            ExpirationDate = DateTime.UtcNow.Add(TimeSpan.FromDays(5))
+        });
+
+        var newToken = CreateToken(orgUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, newToken, _userService));
+
+        Assert.Equal(expectedErrorMessage, exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByToken_EmailMismatch_ThrowsBadRequest(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, OrganizationUser orgUser)
+    {
+        // Arrange
+        // Setup FakeDataProtectorTokenFactory for creating new tokens - this must come first in order
+        // to avoid resetting mocks
+        sutProvider.SetDependency(_orgUserInviteTokenDataFactory, "orgUserInviteTokenDataFactory");
+        sutProvider.Create();
+
+        SetupCommonAcceptOrgUserByTokenMocks(sutProvider, user, orgUser);
+
+        // Modify the orgUser's email to be different from the user's email to simulate the mismatch
+        orgUser.Email = "mismatchedEmail@example.com";
+
+        // Must come after common mocks as they mutate the org user.
+        // Mock tokenable factory to return a token that expires in 5 days
+        _orgUserInviteTokenableFactory.CreateToken(orgUser).Returns(new OrgUserInviteTokenable(orgUser)
+        {
+            ExpirationDate = DateTime.UtcNow.Add(TimeSpan.FromDays(5))
+        });
+
+        var newToken = CreateToken(orgUser);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByEmailTokenAsync(orgUser.Id, user, newToken, _userService));
+
+        Assert.Equal("User email does not match invite.", exception.Message);
+    }
+
+
+    // AcceptOrgUserByOrgSsoIdAsync -----------------------------------------------------------------------------------
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgSsoIdAsync_ValidData_AcceptsOrgUser(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdentifierAsync(org.Identifier)
+            .Returns(org);
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByOrganizationAsync(org.Id, user.Id)
+            .Returns(orgUser);
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserByOrgSsoIdAsync(org.Identifier, user, _userService);
+
+        // Assert
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgSsoIdAsync_InvalidOrg_ThrowsBadRequest(SutProvider<AcceptOrgUserCommand> sutProvider,
+        string orgSsoIdentifier, User user)
+    {
+        // Arrange
+
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdentifierAsync(orgSsoIdentifier)
+            .Returns((Organization)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByOrgSsoIdAsync(orgSsoIdentifier, user, _userService));
+
+        Assert.Equal("Organization invalid.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgSsoIdAsync_UserNotInOrg_ThrowsBadRequest(SutProvider<AcceptOrgUserCommand> sutProvider,
+        Organization org, User user)
+    {
+        // Arrange
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdentifierAsync(org.Identifier)
+            .Returns(org);
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByOrganizationAsync(org.Id, user.Id)
+            .Returns((OrganizationUser)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByOrgSsoIdAsync(org.Identifier, user, _userService));
+
+        Assert.Equal("User not found within organization.", exception.Message);
+    }
+
+    // AcceptOrgUserByOrgIdAsync ---------------------------------------------------------------------------------------
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgId_ValidData_AcceptsOrgUser(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdAsync(org.Id)
+            .Returns(org);
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByOrganizationAsync(org.Id, user.Id)
+            .Returns(orgUser);
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserByOrgIdAsync(org.Id, user, _userService);
+
+        // Assert
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgId_InvalidOrg_ThrowsBadRequest(SutProvider<AcceptOrgUserCommand> sutProvider,
+        Guid orgId, User user)
+    {
+        // Arrange
+
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdAsync(orgId)
+            .Returns((Organization)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByOrgIdAsync(orgId, user, _userService));
+
+        Assert.Equal("Organization invalid.", exception.Message);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserByOrgId_UserNotInOrg_ThrowsBadRequest(SutProvider<AcceptOrgUserCommand> sutProvider,
+        Organization org, User user)
+    {
+        // Arrange
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdAsync(org.Id)
+            .Returns(org);
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByOrganizationAsync(org.Id, user.Id)
+            .Returns((OrganizationUser)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(
+            () => sutProvider.Sut.AcceptOrgUserByOrgIdAsync(org.Id, user, _userService));
+
+        Assert.Equal("User not found within organization.", exception.Message);
+    }
+
+    // Auto-confirm policy validation tests --------------------------------------------------------------------------
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_WhenValidatorReturnsValid_AcceptsUser(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // Act
+        var resultOrgUser = await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        // Assert
+        AssertValidAcceptedOrgUser(resultOrgUser, orgUser, user);
+
+        await sutProvider.GetDependency<IOrganizationUserRepository>().Received(1).ReplaceAsync(
+            Arg.Is<OrganizationUser>(ou => ou.Id == orgUser.Id && ou.Status == OrganizationUserStatusType.Accepted));
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_WhenValidatorReturnsInvalid_ThrowsBadRequestException(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Invalid(new AcceptOrganizationMembershipValidationResult(),
+                    new UserCannotBelongToAnotherOrganization(string.Empty))));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService));
+
+        Assert.Equal(new UserCannotBelongToAnotherOrganization(string.Empty).Message, exception.Message);
+        await sutProvider.GetDependency<IDeleteEmergencyAccessCommand>()
+            .DidNotReceiveWithAnyArgs()
+            .DeleteAllByUserIdAsync(Arg.Any<Guid>());
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_WithEmergencyAccessDeletionRequired_DeletesEmergencyAccess(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Any<AcceptOrganizationMembershipValidationRequest>())
+            .Returns(Task.FromResult(
+                Valid(new AcceptOrganizationMembershipValidationResult
+                {
+                    AutoConfirmPolicyEnabled = true
+                })));
+
+        // Act
+        await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        // Assert
+        await sutProvider.GetDependency<IDeleteEmergencyAccessCommand>()
+            .Received(1)
+            .DeleteAllByUserIdAsync(user.Id);
+    }
+
+    [Theory]
+    [BitAutoData]
+    public async Task AcceptOrgUserAsync_WithNoEmergencyAccessDeletion_DoesNotDeleteEmergencyAccess(
+        SutProvider<AcceptOrgUserCommand> sutProvider,
+        User user, Organization org, OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        SetupCommonAcceptOrgUserMocks(sutProvider, user, org, orgUser, adminUserDetails);
+
+        // AutoConfirmPolicyEnabled defaults to false in SetupCommonAcceptOrgUserMocks
+
+        // Act
+        await sutProvider.Sut.AcceptOrgUserAsync(orgUser, user, _userService);
+
+        // Assert
+        await sutProvider.GetDependency<IDeleteEmergencyAccessCommand>()
+            .DidNotReceiveWithAnyArgs()
+            .DeleteAllByUserIdAsync(Arg.Any<Guid>());
+    }
+
+    // Private helpers -------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///  Asserts that the given org user is in the expected state after a successful AcceptOrgUserAsync call.
+    ///  For use in happy path tests.
+    /// </summary>
+    private void AssertValidAcceptedOrgUser(OrganizationUser resultOrgUser, OrganizationUser expectedOrgUser, User user)
+    {
+        Assert.NotNull(resultOrgUser);
+        Assert.Equal(OrganizationUserStatusType.Accepted, resultOrgUser.Status);
+        Assert.Equal(expectedOrgUser, resultOrgUser);
+        Assert.Equal(expectedOrgUser.Id, resultOrgUser.Id);
+        Assert.Null(resultOrgUser.Email);
+        Assert.Equal(user.Id, resultOrgUser.UserId);
+
+
+    }
+
+
+    private void SetupCommonAcceptOrgUserByTokenMocks(SutProvider<AcceptOrgUserCommand> sutProvider, User user, OrganizationUser orgUser)
+    {
+        user.EmailVerified = false;
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetByIdAsync(orgUser.Id)
+            .Returns(Task.FromResult(orgUser));
+
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetCountByOrganizationAsync(orgUser.OrganizationId, user.Email, true)
+            .Returns(0);
+    }
+
+    /// <summary>
+    /// Sets up common mock behavior for the AcceptOrgUserAsync tests.
+    /// This method initializes:
+    /// - The invited user's email, status, type, and organization ID.
+    /// - Ensures the user is not part of any other organizations.
+    /// - Confirms the target organization doesn't have a single org policy.
+    /// - Ensures the user doesn't belong to an organization with a single org policy.
+    /// - Assumes the user doesn't have 2FA enabled and the organization doesn't require it.
+    /// - Provides mock data for an admin to validate email functionality.
+    /// - Returns the corresponding organization for the given org ID.
+    /// </summary>
+    private static void SetupCommonAcceptOrgUserMocks(SutProvider<AcceptOrgUserCommand> sutProvider, User user,
+        Organization org,
+        OrganizationUser orgUser, OrganizationUserUserDetails adminUserDetails)
+    {
+        // Arrange
+        orgUser.Email = user.Email;
+        orgUser.Status = OrganizationUserStatusType.Invited;
+        orgUser.Type = OrganizationUserType.User;
+        orgUser.OrganizationId = org.Id;
+
+        // User is not part of any other orgs
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetManyByUserAsync(user.Id)
+            .Returns([]);
+
+        // Provide at least 1 admin to test email functionality
+        sutProvider.GetDependency<IOrganizationUserRepository>()
+            .GetManyByMinimumRoleAsync(orgUser.OrganizationId, OrganizationUserType.Admin)
+            .Returns([adminUserDetails]);
+
+        // Return org
+        sutProvider.GetDependency<IOrganizationRepository>()
+            .GetByIdAsync(org.Id)
+            .Returns(org);
+
+        // Membership validator returns valid (no restrictions) by default
+        sutProvider.GetDependency<IAcceptOrganizationMembershipValidator>()
+            .ValidateAsync(Arg.Is<AcceptOrganizationMembershipValidationRequest>(r =>
+                r.OrganizationId == org.Id && r.User == user))
+            .Returns(Task.FromResult(
+                Valid(new AcceptOrganizationMembershipValidationResult())));
+    }
+
+    private string CreateToken(OrganizationUser orgUser)
+    {
+        var orgUserInviteTokenable = _orgUserInviteTokenableFactory.CreateToken(orgUser);
+        var protectedToken = _orgUserInviteTokenDataFactory.Protect(orgUserInviteTokenable);
+
+        return protectedToken;
+    }
+}

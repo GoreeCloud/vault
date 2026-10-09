@@ -1,0 +1,102 @@
+CREATE PROCEDURE [dbo].[OrganizationUser_UpdateMany]
+    @jsonData NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @UserIds [dbo].[GuidIdArray]
+
+    -- Parse the JSON string
+    DECLARE @OrganizationUserInput AS TABLE (
+        [Id] UNIQUEIDENTIFIER,
+        [OrganizationId] UNIQUEIDENTIFIER,
+        [UserId] UNIQUEIDENTIFIER,
+        [Email] NVARCHAR(256),
+        [Key] VARCHAR(MAX),
+        [Status] SMALLINT,
+        [Type] TINYINT,
+        [ExternalId] NVARCHAR(300),
+        [CreationDate] DATETIME2(7),
+        [RevisionDate] DATETIME2(7),
+        [Permissions] NVARCHAR(MAX),
+        [ResetPasswordKey] VARCHAR(MAX),
+        [AccessSecretsManager] BIT,
+        [RevocationReason] TINYINT NULL,
+        [StatusNew] SMALLINT NULL,
+        [AccessPam] BIT,
+        [V2UpgradeToken] VARCHAR(MAX) NULL
+    )
+
+    INSERT INTO @OrganizationUserInput
+    SELECT
+        [Id],
+        [OrganizationId],
+        [UserId],
+        [Email],
+        [Key],
+        [Status],
+        [Type],
+        [ExternalId],
+        [CreationDate],
+        [RevisionDate],
+        [Permissions],
+        [ResetPasswordKey],
+        [AccessSecretsManager],
+        [RevocationReason],
+        [StatusNew],
+        [AccessPam],
+        [V2UpgradeToken]
+    FROM OPENJSON(@jsonData)
+    WITH (
+        [Id] UNIQUEIDENTIFIER '$.Id',
+        [OrganizationId] UNIQUEIDENTIFIER '$.OrganizationId',
+        [UserId] UNIQUEIDENTIFIER '$.UserId',
+        [Email] NVARCHAR(256) '$.Email',
+        [Key] VARCHAR(MAX) '$.Key',
+        [Status] SMALLINT '$.Status',
+        [Type] TINYINT '$.Type',
+        [ExternalId] NVARCHAR(300) '$.ExternalId',
+        [CreationDate] DATETIME2(7) '$.CreationDate',
+        [RevisionDate] DATETIME2(7) '$.RevisionDate',
+        [Permissions] NVARCHAR (MAX) '$.Permissions',
+        [ResetPasswordKey] VARCHAR (MAX) '$.ResetPasswordKey',
+        [AccessSecretsManager] BIT '$.AccessSecretsManager',
+        [RevocationReason] TINYINT '$.RevocationReason',
+        [StatusNew] SMALLINT '$.StatusNew',
+        [AccessPam] BIT '$.AccessPam',
+        [V2UpgradeToken] VARCHAR(MAX) '$.V2UpgradeToken'
+    )
+
+    -- Perform the update
+    UPDATE
+        OU
+    SET
+        [OrganizationId] = OUI.[OrganizationId],
+        [UserId] = OUI.[UserId],
+        [Email] = OUI.[Email],
+        [Key] = OUI.[Key],
+        [Status] = OUI.[Status],
+        [Type] = OUI.[Type],
+        [ExternalId] = OUI.[ExternalId],
+        [CreationDate] = OUI.[CreationDate],
+        [RevisionDate] = OUI.[RevisionDate],
+        [Permissions] = OUI.[Permissions],
+        [ResetPasswordKey] = OUI.[ResetPasswordKey],
+        [AccessSecretsManager] = OUI.[AccessSecretsManager],
+        [RevocationReason] = OUI.[RevocationReason],
+        [StatusNew] = OUI.[StatusNew],
+        [AccessPam] = ISNULL(OUI.[AccessPam], 0),
+        [V2UpgradeToken] = OUI.[V2UpgradeToken]
+    FROM
+        [dbo].[OrganizationUser] OU
+    INNER JOIN
+        @OrganizationUserInput OUI ON OU.Id = OUI.Id
+
+    -- Bump account revision dates
+    INSERT INTO @UserIds
+    SELECT [UserId]
+    FROM @OrganizationUserInput
+    WHERE [UserId] IS NOT NULL
+
+    EXEC [dbo].[User_BumpManyAccountRevisionDates] @UserIds
+END

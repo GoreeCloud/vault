@@ -1,0 +1,63 @@
+﻿CREATE PROCEDURE [dbo].[OrganizationUser_Create]
+    @Id UNIQUEIDENTIFIER OUTPUT,
+    @OrganizationId UNIQUEIDENTIFIER,
+    @UserId UNIQUEIDENTIFIER,
+    @Email NVARCHAR(256),
+    @Key VARCHAR(MAX),
+    @Status SMALLINT,
+    @Type TINYINT,
+    @ExternalId NVARCHAR(300),
+    @CreationDate DATETIME2(7),
+    @RevisionDate DATETIME2(7),
+    @Permissions NVARCHAR(MAX),
+    @ResetPasswordKey VARCHAR(MAX),
+    @AccessSecretsManager BIT = 0,
+    @RevocationReason TINYINT = NULL,
+    @StatusNew SMALLINT = NULL,
+    @AccessPam BIT = 0,
+    @V2UpgradeToken VARCHAR(MAX) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    INSERT INTO [dbo].[OrganizationUser]
+    (
+        [Id],
+        [OrganizationId],
+        [UserId],
+        [Email],
+        [Key],
+        [Status],
+        [Type],
+        [ExternalId],
+        [CreationDate],
+        [RevisionDate],
+        [Permissions],
+        [ResetPasswordKey],
+        [AccessSecretsManager],
+        [RevocationReason],
+        [StatusNew],
+        [AccessPam],
+        [V2UpgradeToken]
+    )
+    VALUES
+    (
+        @Id,
+        @OrganizationId,
+        @UserId,
+        @Email,
+        @Key,
+        @Status,
+        @Type,
+        @ExternalId,
+        @CreationDate,
+        @RevisionDate,
+        @Permissions,
+        @ResetPasswordKey,
+        @AccessSecretsManager,
+        @RevocationReason,
+        @StatusNew,
+        @AccessPam,
+        @V2UpgradeToken
+    )
+END

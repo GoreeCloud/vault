@@ -1,0 +1,36 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+namespace Bit.Setup;
+
+public class AppIdBuilder
+{
+    private readonly Context _context;
+
+    public AppIdBuilder(Context context)
+    {
+        _context = context;
+    }
+
+    public void Build()
+    {
+        var model = new TemplateModel
+        {
+            Url = _context.Config.Url
+        };
+
+        // Needed for backwards compatability with migrated U2F tokens.
+        Helpers.WriteLine(_context, "Building FIDO U2F app id.");
+        Directory.CreateDirectory($"{_context.App.RootDirectory}/web/");
+        var template = Helpers.ReadTemplate("AppId");
+        using (var sw = File.CreateText($"{_context.App.RootDirectory}/web/app-id.json"))
+        {
+            sw.Write(template(model));
+        }
+    }
+
+    public class TemplateModel
+    {
+        public string Url { get; set; }
+    }
+}

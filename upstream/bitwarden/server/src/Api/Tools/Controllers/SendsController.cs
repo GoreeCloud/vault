@@ -1,0 +1,434 @@
+﻿using System.Text.Json;
+using Azure.Messaging.EventGrid;
+using Bit.Api.Tools.Models.Request;
+using Bit.Api.Tools.Models.Response;
+using Bit.Api.Utilities;
+using Bit.Core;
+using Bit.Core.Auth.Identity;
+using Bit.Core.Auth.UserFeatures.SendAccess;
+using Bit.Core.Billing.Premium.Queries;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.Platform.Push;
+using Bit.Core.Services;
+using Bit.Core.Tools.Enums;
+using Bit.Core.Tools.Models.Data;
+using Bit.Core.Tools.Repositories;
+using Bit.Core.Tools.SendFeatures;
+using Bit.Core.Tools.SendFeatures.Commands.Interfaces;
+using Bit.Core.Tools.SendFeatures.Queries.Interfaces;
+using Bit.Core.Tools.SendFeatures.Services.Interfaces;
+using Bit.Core.Tools.Services;
+using Bit.Core.Utilities;
+using Bit.HttpExtensions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Bit.Api.Tools.Controllers;
+
+[Route("sends")]
+public class SendsController : Controller
+{
+    private readonly ISendRepository _sendRepository;
+    private readonly IUserService _userService;
+    private readonly ISendAuthorizationService _sendAuthorizationService;
+    private readonly ISendFileStorageService _sendFileStorageService;
+    private readonly INonAnonymousSendCommand _nonAnonymousSendCommand;
+    private readonly ISendOwnerQuery _sendOwnerQuery;
+    private readonly ILogger<SendsController> _logger;
+    private readonly IPushNotificationService _pushNotificationService;
+    private readonly IHasPremiumAccessQuery _hasPremiumAccessQuery;
+    private readonly IEventService _eventService;
+    private readonly ISendEventClassifier _sendEventClassifier;
+    private readonly Bitwarden.Server.Sdk.Features.IFeatureService _featureService;
+
+    public SendsController(
+        ISendRepository sendRepository,
+        IUserService userService,
+        ISendAuthorizationService sendAuthorizationService,
+        INonAnonymousSendCommand nonAnonymousSendCommand,
+        ISendOwnerQuery sendOwnerQuery,
+        ISendFileStorageService sendFileStorageService,
+        ILogger<SendsController> logger,
+        IPushNotificationService pushNotificationService,
+        IHasPremiumAccessQuery hasPremiumAccessQuery,
+        IEventService eventService,
+        ISendEventClassifier sendEventClassifier,
+        Bitwarden.Server.Sdk.Features.IFeatureService featureService
+    )
+    {
+        _sendRepository = sendRepository;
+        _userService = userService;
+        _sendAuthorizationService = sendAuthorizationService;
+        _nonAnonymousSendCommand = nonAnonymousSendCommand;
+        _sendOwnerQuery = sendOwnerQuery;
+        _sendFileStorageService = sendFileStorageService;
+        _logger = logger;
+        _pushNotificationService = pushNotificationService;
+        _hasPremiumAccessQuery = hasPremiumAccessQuery;
+        _eventService = eventService;
+        _sendEventClassifier = sendEventClassifier;
+        _featureService = featureService;
+    }
+
+    #region Anonymous endpoints
+
+    [AllowAnonymous]
+    [HttpPost("file/validate/azure")]
+    public async Task<ObjectResult> AzureValidateFile()
+    {
+        return await ApiHelpers.HandleAzureEvents(Request, new Dictionary<string, Func<EventGridEvent, Task>>
+        {
+            {
+                "Microsoft.Storage.BlobCreated", async (eventGridEvent) =>
+                {
+                    try
+                    {
+                        var blobName =
+                            eventGridEvent.Subject.Split($"{AzureSendFileStorageService.FilesContainerName}/blobs/")[1];
+                        var sendId = AzureSendFileStorageService.SendIdFromBlobName(blobName);
+                        var send = await _sendRepository.GetByIdAsync(new Guid(sendId));
+                        if (send == null)
+                        {
+                            if (_sendFileStorageService is AzureSendFileStorageService azureSendFileStorageService)
+                            {
+                                await azureSendFileStorageService.DeleteBlobAsync(blobName);
+                            }
+
+                            return;
+                        }
+
+                        // This finalizes the upload begun by PostFile, which already logged Send_Created_*;
+                        // don't log a second, redundant Send_Edited_* for what the user experiences as one creation.
+                        await _nonAnonymousSendCommand.ConfirmFileSize(send, logEvent: false);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Uncaught exception occurred while handling event grid event: {Event}",
+                            JsonSerializer.Serialize(eventGridEvent));
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    #endregion
+
+    #region Non-anonymous endpoints
+
+    [Authorize(Policies.Application)]
+    [HttpGet("{id}")]
+    public async Task<SendResponseModel> Get(string id)
+    {
+        var sendId = new Guid(id);
+        var send = await _sendOwnerQuery.Get(sendId, User);
+        if (send.Type == SendType.Item && !_featureService.IsEnabled(FeatureFlagKeys.TemporaryItemSharing))
+        {
+            throw new NotFoundException();
+        }
+        return new SendResponseModel(send);
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpGet("")]
+    public async Task<ListResponseModel<SendResponseModel>> GetAll()
+    {
+        var sends = (await _sendOwnerQuery.GetOwned(User)).AsEnumerable();
+        if (!_featureService.IsEnabled(FeatureFlagKeys.TemporaryItemSharing))
+        {
+            sends = sends.Where(s => s.Type != SendType.Item);
+        }
+        var responses = sends.Select(s => new SendResponseModel(s));
+        var result = new ListResponseModel<SendResponseModel>(responses);
+        return result;
+    }
+
+    [Authorize(Policy = Policies.Send)]
+    [HttpPost("access/")]
+    [ProducesResponseType<SendAccessResponseModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AccessUsingAuth()
+    {
+        var guid = User.GetSendId();
+        var send = await _sendRepository.GetByIdAsync(guid);
+        if (send == null)
+        {
+            throw new BadRequestException("Could not locate send");
+        }
+
+        if (!INonAnonymousSendCommand.SendCanBeAccessed(send) || (send.Type == SendType.Item && !_featureService.IsEnabled(FeatureFlagKeys.TemporaryItemSharing)))
+        {
+            throw new NotFoundException();
+        }
+
+        var sendResponse = new SendAccessResponseModel(send);
+        if (send.UserId.HasValue && !send.HideEmail.GetValueOrDefault())
+        {
+            var creator = await _userService.GetUserByIdAsync(send.UserId.Value);
+            sendResponse.CreatorIdentifier = creator.Email;
+        }
+
+        /*
+         * AccessCount is incremented differently depending on Send type:
+         * - Text and Item Sends are incremented at every access
+         * - File Sends are incremented only when the file is downloaded
+         *
+         * Note that this endpoint is initially called for all Send types
+         */
+        if (send.Type == SendType.Text || send.Type == SendType.Item)
+        {
+            send.AccessCount++;
+            await _sendRepository.ReplaceAsync(send);
+            await _pushNotificationService.PushSyncSendUpdateAsync(send);
+        }
+
+        if (send.UserId.HasValue
+            && send.Type == SendType.Text)
+        {
+            var orgContext = await _sendEventClassifier.BuildAccessContextAsync(
+                send.UserId.Value,
+                User.GetSendAccessEmail());
+
+            await _eventService.LogSendEventAsync(
+                send.UserId.Value,
+                send.Id,
+                EventType.Send_Accessed_Text,
+                orgContext);
+        }
+
+        return new ObjectResult(sendResponse);
+    }
+
+    [Authorize(Policy = Policies.Send)]
+    [HttpPost("access/file/{fileId}")]
+    [ProducesResponseType<SendFileDownloadDataResponseModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSendFileDownloadDataUsingAuth([FromRoute] string fileId)
+    {
+        var sendId = User.GetSendId();
+        var send = await _sendRepository.GetByIdAsync(sendId);
+
+        if (send == null)
+        {
+            throw new BadRequestException("Could not locate send");
+        }
+
+        var (url, result) = await _nonAnonymousSendCommand.GetSendFileDownloadUrlAsync(send, fileId);
+
+        if (result.Equals(SendAccessResult.Denied))
+        {
+            throw new NotFoundException();
+        }
+
+        if (send.UserId.HasValue)
+        {
+            var orgContext = await _sendEventClassifier.BuildAccessContextAsync(
+                send.UserId.Value,
+                User.GetSendAccessEmail());
+
+            await _eventService.LogSendEventAsync(
+                send.UserId.Value,
+                send.Id,
+                EventType.Send_Accessed_File,
+                orgContext);
+        }
+
+        return new ObjectResult(new SendFileDownloadDataResponseModel() { Id = fileId, Url = url });
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpPost("")]
+    public async Task<SendResponseModel> Post([FromBody] SendRequestModel model)
+    {
+        model.ValidateCreation();
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        if (model.Type == SendType.Item && !_featureService.IsEnabled(FeatureFlagKeys.TemporaryItemSharing))
+        {
+            throw new BadRequestException("Item type Sends are not yet enabled");
+        }
+        var hasPremium = await _hasPremiumAccessQuery.HasPremiumAccessAsync(userId);
+        if (!hasPremium && model.Type == SendType.Item)
+        {
+            throw new BadRequestException("Item type Sends require a premium membership");
+        }
+
+        if (!hasPremium && !string.IsNullOrWhiteSpace(model.Emails))
+        {
+            throw new BadRequestException("Email verified Sends require a premium membership");
+        }
+
+        var send = model.ToSend(userId, _sendAuthorizationService);
+        await _nonAnonymousSendCommand.SaveSendAsync(send);
+        return new SendResponseModel(send);
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpPost("file/v2")]
+    public async Task<SendFileUploadDataResponseModel> PostFile([FromBody] SendRequestModel model)
+    {
+        if (model.Type != SendType.File)
+        {
+            throw new BadRequestException("Invalid content.");
+        }
+
+        if (!model.FileLength.HasValue)
+        {
+            throw new BadRequestException("Invalid content. File size hint is required.");
+        }
+
+        if (model.FileLength.Value > Constants.FileSize501mb)
+        {
+            throw new BadRequestException($"Max file size is {SendFileSettingHelper.MAX_FILE_SIZE_READABLE}.");
+        }
+
+        var file = model.File ?? throw new BadRequestException("File metadata is required for file sends.");
+
+        model.ValidateCreation();
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        var hasPremium = await _hasPremiumAccessQuery.HasPremiumAccessAsync(userId);
+
+        if (!hasPremium && !string.IsNullOrWhiteSpace(model.Emails))
+        {
+            throw new BadRequestException("Email verified Sends require a premium membership");
+        }
+
+        var (send, data) = model.ToSend(userId, file.FileName!, _sendAuthorizationService);
+        var uploadUrl = await _nonAnonymousSendCommand.SaveFileSendAsync(send, data, model.FileLength.Value);
+        return new SendFileUploadDataResponseModel
+        {
+            Url = uploadUrl,
+            FileUploadType = _sendFileStorageService.FileUploadType,
+            SendResponse = new SendResponseModel(send)
+        };
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpGet("{id}/file/{fileId}")]
+    public async Task<SendFileUploadDataResponseModel> RenewFileUpload(string id, [FromRoute] string fileId)
+    {
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        var sendId = new Guid(id);
+        var send = await _sendRepository.GetByIdAsync(sendId);
+        var fileData = JsonSerializer.Deserialize<SendFileData>(send?.Data ?? string.Empty);
+
+        if (send == null || send.Type != SendType.File || (send.UserId.HasValue && send.UserId.Value != userId) ||
+            !send.UserId.HasValue || fileData?.Id != fileId || fileData.Validated)
+        {
+            // Not found if Send isn't found, user doesn't have access, request is faulty,
+            // or we've already validated the file. This last is to emulate create-only blob permissions for Azure
+            throw new NotFoundException();
+        }
+
+        return new SendFileUploadDataResponseModel
+        {
+            Url = await _sendFileStorageService.GetSendFileUploadUrlAsync(send, fileId),
+            FileUploadType = _sendFileStorageService.FileUploadType,
+            SendResponse = new SendResponseModel(send),
+        };
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpPost("{id}/file/{fileId}")]
+    [SelfHosted(SelfHostedOnly = true)]
+    [RequestSizeLimit(Constants.FileSize501mb)]
+    [DisableFormValueModelBinding]
+    public async Task PostFileForExistingSend(string id, [FromRoute] string fileId)
+    {
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        if (!Request?.ContentType?.Contains("multipart/") ?? true)
+        {
+            throw new BadRequestException("Invalid content.");
+        }
+
+        var send = await _sendRepository.GetByIdAsync(new Guid(id));
+        if (send == null || send.UserId != userId)
+        {
+            throw new NotFoundException();
+        }
+
+        await Request.GetFileAsync(async (stream) =>
+        {
+            await _nonAnonymousSendCommand.UploadFileToExistingSendAsync(stream, send);
+        });
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpPut("{id}")]
+    public async Task<SendResponseModel> Put(string id, [FromBody] SendRequestModel model)
+    {
+        model.ValidateEdit();
+        if (model.Type == SendType.Item && !_featureService.IsEnabled(FeatureFlagKeys.TemporaryItemSharing))
+        {
+            throw new BadRequestException("Item type Sends are not yet enabled");
+        }
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        var hasPremium = await _hasPremiumAccessQuery.HasPremiumAccessAsync(userId);
+
+        if (!hasPremium && model.Type == SendType.Item)
+        {
+            throw new BadRequestException("Item type Sends require a premium membership");
+        }
+        if (!hasPremium && !string.IsNullOrWhiteSpace(model.Emails))
+        {
+            throw new BadRequestException("Email verified Sends require a premium membership");
+        }
+
+        var send = await _sendRepository.GetByIdAsync(new Guid(id));
+        if (send == null || send.UserId != userId)
+        {
+            throw new NotFoundException();
+        }
+        if (send.Type != model.Type)
+        {
+            throw new BadRequestException("Cannot change a Send's type");
+        }
+
+        await _nonAnonymousSendCommand.SaveSendAsync(model.UpdateSend(send, _sendAuthorizationService));
+        return new SendResponseModel(send);
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpPut("{id}/remove-password")]
+    public async Task<SendResponseModel> PutRemovePassword(string id)
+    {
+        return await this.PutRemoveAuth(id);
+    }
+
+    // Removes ALL authentication (email or password) if any is present
+    [Authorize(Policies.Application)]
+    [HttpPut("{id}/remove-auth")]
+    public async Task<SendResponseModel> PutRemoveAuth(string id)
+    {
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        var send = await _sendRepository.GetByIdAsync(new Guid(id));
+        if (send == null || send.UserId != userId)
+        {
+            throw new NotFoundException();
+        }
+
+        send.Password = null;
+        send.Emails = null;
+        send.AuthType = AuthType.None;
+        await _nonAnonymousSendCommand.SaveSendAsync(send);
+        return new SendResponseModel(send);
+    }
+
+    [Authorize(Policies.Application)]
+    [HttpDelete("{id}")]
+    public async Task Delete(string id)
+    {
+        var userId = _userService.GetProperUserId(User) ?? throw new InvalidOperationException("User ID not found");
+        var send = await _sendRepository.GetByIdAsync(new Guid(id));
+        if (send == null || send.UserId != userId)
+        {
+            throw new NotFoundException();
+        }
+
+        await _nonAnonymousSendCommand.DeleteSendAsync(send);
+    }
+
+    #endregion
+}

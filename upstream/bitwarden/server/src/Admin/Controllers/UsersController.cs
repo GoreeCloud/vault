@@ -1,0 +1,253 @@
+﻿#nullable enable
+
+using Bit.Admin.Enums;
+using Bit.Admin.Models;
+using Bit.Admin.Services;
+using Bit.Admin.Utilities;
+using Bit.Core.Auth.UserFeatures.TwoFactorAuth.Interfaces;
+using Bit.Core.Billing.Constants;
+using Bit.Core.Billing.Models;
+using Bit.Core.Billing.Services;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+using Bit.Core.Settings;
+using Bit.Core.Utilities;
+using Bit.Core.Vault.Repositories;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Stripe;
+
+namespace Bit.Admin.Controllers;
+
+[Authorize]
+public class UsersController : Controller
+{
+    private readonly IUserRepository _userRepository;
+    private readonly ICipherRepository _cipherRepository;
+    private readonly IStripePaymentService _paymentService;
+    private readonly GlobalSettings _globalSettings;
+    private readonly IAccessControlService _accessControlService;
+    private readonly ITwoFactorIsEnabledQuery _twoFactorIsEnabledQuery;
+    private readonly IUserService _userService;
+    private readonly IFeatureService _featureService;
+    private readonly ISubscriberService _subscriberService;
+    private readonly ILogger<UsersController> _logger;
+
+    public UsersController(
+        IUserRepository userRepository,
+        ICipherRepository cipherRepository,
+        IStripePaymentService paymentService,
+        GlobalSettings globalSettings,
+        IAccessControlService accessControlService,
+        ITwoFactorIsEnabledQuery twoFactorIsEnabledQuery,
+        IUserService userService,
+        IFeatureService featureService,
+        ISubscriberService subscriberService,
+        ILogger<UsersController> logger)
+    {
+        _userRepository = userRepository;
+        _cipherRepository = cipherRepository;
+        _paymentService = paymentService;
+        _globalSettings = globalSettings;
+        _accessControlService = accessControlService;
+        _twoFactorIsEnabledQuery = twoFactorIsEnabledQuery;
+        _userService = userService;
+        _featureService = featureService;
+        _subscriberService = subscriberService;
+        _logger = logger;
+    }
+
+    [RequirePermission(Permission.User_List_View)]
+    public async Task<IActionResult> Index(string email, int page = 1, int count = 25)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (count < 1)
+        {
+            count = 1;
+        }
+
+        var skip = (page - 1) * count;
+        var users = await _userRepository.SearchAsync(email, skip, count);
+
+        var twoFactorAuthLookup = (await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(users.Select(u => u.Id))).ToList();
+        var userModels = UserViewModel.MapViewModels(users, twoFactorAuthLookup).ToList();
+
+        return View(new UsersModel
+        {
+            Items = userModels,
+            Email = string.IsNullOrWhiteSpace(email) ? null : email,
+            Page = page,
+            Count = count,
+            Action = _globalSettings.SelfHosted ? "View" : "Edit"
+        });
+    }
+
+    public async Task<IActionResult> View(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+
+        if (user == null)
+        {
+            return RedirectToAction("Index");
+        }
+
+        var ciphers = await _cipherRepository.GetManyByUserIdAsync(id, withOrganizations: false);
+
+        var isTwoFactorEnabled = await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(user);
+        var verifiedDomain = await _userService.IsClaimedByAnyOrganizationAsync(user.Id);
+        return View(UserViewModel.MapViewModel(user, isTwoFactorEnabled, ciphers, verifiedDomain));
+    }
+
+    [SelfHosted(NotSelfHostedOnly = true)]
+    public async Task<IActionResult> Edit(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+        {
+            return RedirectToAction("Index");
+        }
+
+        var ciphers = await _cipherRepository.GetManyByUserIdAsync(id, withOrganizations: false);
+        BillingInfo? billingInfo = null;
+        BillingHistoryInfo? billingHistoryInfo = null;
+        try
+        {
+            billingInfo = await _paymentService.GetBillingAsync(user);
+            billingHistoryInfo = await _paymentService.GetBillingHistoryAsync(user);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == StripeConstants.ErrorCodes.ResourceMissing)
+        {
+            billingInfo = null;
+            billingHistoryInfo = null;
+            _logger.LogError(ex,
+                "Billing information for user {UserId} could not be loaded because the Stripe customer was not found. It may have been deleted.",
+                user.Id);
+            TempData["Warning"] =
+                "Billing information could not be loaded. The Stripe customer may have been deleted. " +
+                "You can still edit the user and set a valid Gateway Customer ID.";
+        }
+        catch (Exception ex)
+        {
+            billingInfo = null;
+            billingHistoryInfo = null;
+            _logger.LogError(ex,
+                "Failed to load billing information for user {UserId}.",
+                user.Id);
+            TempData["Error"] =
+                "Billing information could not be loaded. You can still edit the user or try reloading the page. " +
+                "Contact support if the problem persists.";
+        }
+        var isTwoFactorEnabled = await _twoFactorIsEnabledQuery.TwoFactorIsEnabledAsync(user);
+        var verifiedDomain = await _userService.IsClaimedByAnyOrganizationAsync(user.Id);
+        var deviceVerificationRequired = await _userService.ActiveNewDeviceVerificationException(user.Id);
+
+        return View(new UserEditModel(user, isTwoFactorEnabled, ciphers, billingInfo, billingHistoryInfo, _globalSettings, verifiedDomain, deviceVerificationRequired));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [SelfHosted(NotSelfHostedOnly = true)]
+    public async Task<IActionResult> Edit(Guid id, UserEditModel model)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+        {
+            return RedirectToAction("Index");
+        }
+
+        var canUpgradePremium = _accessControlService.UserHasPermission(Permission.User_UpgradePremium);
+
+        var originalPremium = user.Premium;
+
+        if (_accessControlService.UserHasPermission(Permission.User_Premium_Edit) ||
+            canUpgradePremium)
+        {
+            user.MaxStorageGb = model.MaxStorageGb;
+            user.Premium = model.Premium;
+        }
+
+        if (_accessControlService.UserHasPermission(Permission.User_Billing_Edit))
+        {
+            user.Gateway = model.Gateway;
+            user.GatewayCustomerId = model.GatewayCustomerId;
+            user.GatewaySubscriptionId = model.GatewaySubscriptionId;
+        }
+
+        if (_accessControlService.UserHasPermission(Permission.User_Licensing_Edit) ||
+            canUpgradePremium)
+        {
+            user.LicenseKey = model.LicenseKey;
+            user.PremiumExpirationDate = model.PremiumExpirationDate;
+        }
+
+        await _userRepository.ReplaceAsync(user);
+
+        // Clear any pending unpaid-lifecycle cancellation when re-enabling premium on a billing-disabled user
+        if (!originalPremium && user.Premium)
+        {
+            try
+            {
+                await _subscriberService.ResumeFromUnpaidCancellationAsync(user);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to clear pending unpaid cancellation for user {UserId} on premium re-enable.",
+                    user.Id);
+                TempData["Warning"] = "User updated successfully, but clearing the pending Stripe cancellation failed.";
+            }
+        }
+
+        // Schedule the unpaid-lifecycle cancellation when disabling premium on a user whose Stripe subscription
+        // is unpaid but was never scheduled by the webhook handler.
+        if (originalPremium && !user.Premium)
+        {
+            try
+            {
+                await _subscriberService.ScheduleUnpaidCancellationAsync(user);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to schedule unpaid cancellation for user {UserId} on premium disable.",
+                    user.Id);
+                TempData["Warning"] = "User updated successfully, but scheduling the Stripe cancellation failed.";
+            }
+        }
+
+        return RedirectToAction("Edit", new { id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequirePermission(Permission.User_Delete)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user != null)
+        {
+            await _userRepository.DeleteAsync(user);
+        }
+
+        return RedirectToAction("Index");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [RequirePermission(Permission.User_NewDeviceException_Edit)]
+    public async Task<IActionResult> ToggleNewDeviceVerification(Guid id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+        {
+            return RedirectToAction("Index");
+        }
+
+        await _userService.ToggleNewDeviceVerificationException(user.Id);
+        return RedirectToAction("Edit", new { id });
+    }
+}

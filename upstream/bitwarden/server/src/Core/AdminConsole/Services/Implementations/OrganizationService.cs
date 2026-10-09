@@ -1,0 +1,1219 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Core.AdminConsole.AbilitiesCache;
+using Bit.Core.AdminConsole.Entities;
+using Bit.Core.AdminConsole.Enums.Provider;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.Interfaces;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.InviteUsers;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.InviteUsers.Models;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationUsers.InviteUsers.Validation.PasswordManager;
+using Bit.Core.AdminConsole.Repositories;
+using Bit.Core.Auth.Enums;
+using Bit.Core.Auth.Repositories;
+using Bit.Core.Billing.Constants;
+using Bit.Core.Billing.Enums;
+using Bit.Core.Billing.Extensions;
+using Bit.Core.Billing.Organizations.Commands;
+using Bit.Core.Billing.Organizations.Models;
+using Bit.Core.Billing.Pricing;
+using Bit.Core.Billing.Services;
+using Bit.Core.Context;
+using Bit.Core.Entities;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.Models.Business;
+using Bit.Core.Models.Data;
+using Bit.Core.OrganizationFeatures.OrganizationSubscriptions.Interface;
+using Bit.Core.Repositories;
+using Bit.Core.Settings;
+using Bit.Core.Utilities;
+using Microsoft.Extensions.Logging;
+using Stripe;
+using OrganizationUserInvite = Bit.Core.Models.Business.OrganizationUserInvite;
+
+namespace Bit.Core.Services;
+
+public class OrganizationService : IOrganizationService
+{
+    private readonly IOrganizationRepository _organizationRepository;
+    private readonly IOrganizationUserRepository _organizationUserRepository;
+    private readonly IMailService _mailService;
+    private readonly IEventService _eventService;
+    private readonly IOrganizationAbilityCacheService _organizationAbilityCacheService;
+    private readonly IStripePaymentService _paymentService;
+    private readonly ISsoUserRepository _ssoUserRepository;
+    private readonly IGlobalSettings _globalSettings;
+    private readonly ICurrentContext _currentContext;
+    private readonly ILogger<OrganizationService> _logger;
+    private readonly IProviderOrganizationRepository _providerOrganizationRepository;
+    private readonly IProviderUserRepository _providerUserRepository;
+    private readonly ICountNewSmSeatsRequiredQuery _countNewSmSeatsRequiredQuery;
+    private readonly IUpdateSecretsManagerSubscriptionCommand _updateSecretsManagerSubscriptionCommand;
+    private readonly IProviderRepository _providerRepository;
+    private readonly Bitwarden.Server.Sdk.Features.IFeatureService _featureService;
+    private readonly IHasConfirmedOwnersExceptQuery _hasConfirmedOwnersExceptQuery;
+    private readonly IPricingClient _pricingClient;
+    private readonly ISendOrganizationInvitesCommand _sendOrganizationInvitesCommand;
+    private readonly IStripeAdapter _stripeAdapter;
+    private readonly IUpdateOrganizationSubscriptionCommand _updateOrganizationSubscriptionCommand;
+    private readonly TimeProvider _timeProvider;
+
+    public OrganizationService(
+        IOrganizationRepository organizationRepository,
+        IOrganizationUserRepository organizationUserRepository,
+        IMailService mailService,
+        IEventService eventService,
+        IOrganizationAbilityCacheService organizationAbilityCacheService,
+        IStripePaymentService paymentService,
+        ISsoUserRepository ssoUserRepository,
+        IGlobalSettings globalSettings,
+        ICurrentContext currentContext,
+        ILogger<OrganizationService> logger,
+        IProviderOrganizationRepository providerOrganizationRepository,
+        IProviderUserRepository providerUserRepository,
+        ICountNewSmSeatsRequiredQuery countNewSmSeatsRequiredQuery,
+        IUpdateSecretsManagerSubscriptionCommand updateSecretsManagerSubscriptionCommand,
+        IProviderRepository providerRepository,
+        Bitwarden.Server.Sdk.Features.IFeatureService featureService,
+        IHasConfirmedOwnersExceptQuery hasConfirmedOwnersExceptQuery,
+        IPricingClient pricingClient,
+        ISendOrganizationInvitesCommand sendOrganizationInvitesCommand,
+        IStripeAdapter stripeAdapter,
+        IUpdateOrganizationSubscriptionCommand updateOrganizationSubscriptionCommand,
+        TimeProvider timeProvider)
+    {
+        _organizationRepository = organizationRepository;
+        _organizationUserRepository = organizationUserRepository;
+        _mailService = mailService;
+        _eventService = eventService;
+        _organizationAbilityCacheService = organizationAbilityCacheService;
+        _paymentService = paymentService;
+        _ssoUserRepository = ssoUserRepository;
+        _globalSettings = globalSettings;
+        _currentContext = currentContext;
+        _logger = logger;
+        _providerOrganizationRepository = providerOrganizationRepository;
+        _providerUserRepository = providerUserRepository;
+        _countNewSmSeatsRequiredQuery = countNewSmSeatsRequiredQuery;
+        _updateSecretsManagerSubscriptionCommand = updateSecretsManagerSubscriptionCommand;
+        _providerRepository = providerRepository;
+        _featureService = featureService;
+        _hasConfirmedOwnersExceptQuery = hasConfirmedOwnersExceptQuery;
+        _pricingClient = pricingClient;
+        _sendOrganizationInvitesCommand = sendOrganizationInvitesCommand;
+        _stripeAdapter = stripeAdapter;
+        _updateOrganizationSubscriptionCommand = updateOrganizationSubscriptionCommand;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task<string> AdjustStorageAsync(Guid organizationId, short storageAdjustmentGb)
+    {
+        var organization = await GetOrgById(organizationId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        var plan = await _pricingClient.GetPlanOrThrow(organization.PlanType);
+
+        if (!plan.PasswordManager.HasAdditionalStorageOption)
+        {
+            throw new BadRequestException("Plan does not allow additional storage.");
+        }
+
+        var secret = await BillingHelpers.AdjustStorageAsync(
+            _paymentService,
+            _updateOrganizationSubscriptionCommand,
+            _featureService,
+            organization,
+            storageAdjustmentGb,
+            plan.PasswordManager.StripeStoragePlanId,
+            plan.PasswordManager.BaseStorageGb,
+            plan);
+        await ReplaceAndUpdateCacheAsync(organization);
+        return secret;
+    }
+
+    public async Task UpdateSubscription(Guid organizationId, int seatAdjustment, int? maxAutoscaleSeats)
+    {
+        var organization = await GetOrgById(organizationId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        var newSeatCount = organization.Seats + seatAdjustment;
+        if (maxAutoscaleSeats.HasValue && newSeatCount > maxAutoscaleSeats.Value)
+        {
+            throw new BadRequestException("Cannot set max seat autoscaling below seat count.");
+        }
+
+        if (seatAdjustment != 0)
+        {
+            await AdjustSeatsAsync(organization, seatAdjustment);
+        }
+
+        if (maxAutoscaleSeats != organization.MaxAutoscaleSeats)
+        {
+            await UpdateAutoscalingAsync(organization, maxAutoscaleSeats);
+        }
+    }
+
+    private async Task UpdateAutoscalingAsync(Organization organization, int? maxAutoscaleSeats)
+    {
+        if (maxAutoscaleSeats.HasValue &&
+            organization.Seats.HasValue &&
+            maxAutoscaleSeats.Value < organization.Seats.Value)
+        {
+            throw new BadRequestException($"Cannot set max seat autoscaling below current seat count.");
+        }
+
+        var plan = await _pricingClient.GetPlanOrThrow(organization.PlanType);
+        if (plan == null)
+        {
+            throw new BadRequestException("Existing plan not found.");
+        }
+
+        if (!plan.PasswordManager.AllowSeatAutoscale)
+        {
+            throw new BadRequestException("Your plan does not allow seat autoscaling.");
+        }
+
+        if (plan.PasswordManager.MaxSeats.HasValue && maxAutoscaleSeats.HasValue &&
+            maxAutoscaleSeats > plan.PasswordManager.MaxSeats)
+        {
+            throw new BadRequestException(string.Concat(
+                $"Your plan has a seat limit of {plan.PasswordManager.MaxSeats}, ",
+                $"but you have specified a max autoscale count of {maxAutoscaleSeats}.",
+                "Reduce your max autoscale seat count."));
+        }
+
+        organization.MaxAutoscaleSeats = maxAutoscaleSeats;
+
+        await ReplaceAndUpdateCacheAsync(organization);
+    }
+
+    public async Task<string> AdjustSeatsAsync(Guid organizationId, int seatAdjustment)
+    {
+        var organization = await GetOrgById(organizationId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        return await AdjustSeatsAsync(organization, seatAdjustment);
+    }
+
+    private async Task<string> AdjustSeatsAsync(Organization organization, int seatAdjustment,
+        IEnumerable<string> ownerEmails = null)
+    {
+        if (organization.Seats == null)
+        {
+            throw new BadRequestException("Organization has no seat limit, no need to adjust seats");
+        }
+
+        if (string.IsNullOrWhiteSpace(organization.GatewayCustomerId))
+        {
+            throw new BadRequestException("No payment method found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(organization.GatewaySubscriptionId))
+        {
+            throw new BadRequestException("No subscription found.");
+        }
+
+        var plan = await _pricingClient.GetPlanOrThrow(organization.PlanType);
+
+        if (!plan.PasswordManager.HasAdditionalSeatsOption)
+        {
+            throw new BadRequestException("Plan does not allow additional seats.");
+        }
+
+        var newSeatTotal = organization.Seats.Value + seatAdjustment;
+        if (plan.PasswordManager.BaseSeats > newSeatTotal)
+        {
+            throw new BadRequestException($"Plan has a minimum of {plan.PasswordManager.BaseSeats} seats.");
+        }
+
+        if (newSeatTotal <= 0)
+        {
+            throw new BadRequestException("You must have at least 1 seat.");
+        }
+
+        var additionalSeats = newSeatTotal - plan.PasswordManager.BaseSeats;
+        if (plan.PasswordManager.MaxAdditionalSeats.HasValue &&
+            additionalSeats > plan.PasswordManager.MaxAdditionalSeats.Value)
+        {
+            throw new BadRequestException($"Organization plan allows a maximum of " +
+                                          $"{plan.PasswordManager.MaxAdditionalSeats.Value} additional seats.");
+        }
+
+        if (!organization.Seats.HasValue || organization.Seats.Value > newSeatTotal)
+        {
+            var seatCounts = await _organizationRepository.GetOccupiedSeatCountByOrganizationIdAsync(organization.Id);
+
+            if (seatCounts.Total > newSeatTotal)
+            {
+                if (organization.UseAdminSponsoredFamilies || seatCounts.Sponsored > 0)
+                {
+                    throw new BadRequestException(
+                        $"Your organization has {seatCounts.Users} members and {seatCounts.Sponsored} sponsored families. " +
+                        $"To decrease the seat count below {seatCounts.Total}, you must remove members or sponsorships.");
+                }
+                else
+                {
+                    throw new BadRequestException($"Your organization currently has {seatCounts.Total} seats filled. " +
+                                                  $"Your new plan only has ({newSeatTotal}) seats. Remove some users.");
+                }
+            }
+        }
+
+        if (organization.UseSecretsManager && organization.Seats + seatAdjustment < organization.SmSeats)
+        {
+            throw new BadRequestException("You cannot have more Secrets Manager seats than Password Manager seats.");
+        }
+
+        _logger.LogInformation("{Method}: Invoking _paymentService.AdjustSeatsAsync with {AdditionalSeats} additional seats for Organization ({OrganizationID})",
+            nameof(AdjustSeatsAsync), additionalSeats, organization.Id);
+
+        string paymentIntentClientSecret = null;
+
+        if (_featureService.IsEnabled(FeatureFlagKeys.PM32581_UseUpdateOrganizationSubscriptionCommand))
+        {
+            var changeSet = OrganizationSubscriptionChangeSet.Builder(plan)
+                .UpdatePasswordManagerSeats(additionalSeats)
+                .Build();
+            var result = await _updateOrganizationSubscriptionCommand.Run(organization, changeSet);
+            result.GetValueOrThrow();
+        }
+        else
+        {
+            paymentIntentClientSecret = await _paymentService.AdjustSeatsAsync(organization, plan, additionalSeats);
+        }
+
+        organization.Seats = (short?)newSeatTotal;
+
+        _logger.LogInformation("{Method}: Invoking _organizationRepository.ReplaceAsync with {Seats} seats for Organization ({OrganizationID})", nameof(AdjustSeatsAsync), organization.Seats, organization.Id); ;
+
+        await ReplaceAndUpdateCacheAsync(organization);
+
+        if (organization.Seats.HasValue && organization.MaxAutoscaleSeats.HasValue &&
+            organization.Seats == organization.MaxAutoscaleSeats)
+        {
+            try
+            {
+                if (ownerEmails == null)
+                {
+                    ownerEmails = (await _organizationUserRepository.GetManyByMinimumRoleAsync(organization.Id,
+                        OrganizationUserType.Owner)).Select(u => u.Email).Distinct();
+                }
+
+                await _mailService.SendOrganizationMaxSeatLimitReachedEmailAsync(organization,
+                    organization.MaxAutoscaleSeats.Value, ownerEmails);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error encountered notifying organization owners of seat limit reached.");
+            }
+        }
+
+        return paymentIntentClientSecret;
+    }
+
+    public async Task UpdateExpirationDateAsync(Guid organizationId, DateTime? expirationDate)
+    {
+        var org = await GetOrgById(organizationId);
+        if (org != null)
+        {
+            org.ExpirationDate = expirationDate;
+            org.RevisionDate = DateTime.UtcNow;
+            await ReplaceAndUpdateCacheAsync(org);
+        }
+    }
+
+    public async Task UpdateAsync(Organization organization, bool updateBilling = false)
+    {
+        if (organization.Id == default(Guid))
+        {
+            throw new ApplicationException("Cannot create org this way. Call SignUpAsync.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(organization.Identifier))
+        {
+            var orgById = await _organizationRepository.GetByIdentifierAsync(organization.Identifier);
+            if (orgById != null && orgById.Id != organization.Id)
+            {
+                throw new BadRequestException("Identifier already in use by another organization.");
+            }
+        }
+
+        await ReplaceAndUpdateCacheAsync(organization, EventType.Organization_Updated);
+
+        if (updateBilling && !string.IsNullOrWhiteSpace(organization.GatewayCustomerId))
+        {
+            var newDisplayName = organization.DisplayName();
+
+            await _stripeAdapter.UpdateCustomerAsync(organization.GatewayCustomerId,
+                new CustomerUpdateOptions
+                {
+                    Email = organization.BillingEmail,
+                    Description = organization.DisplayBusinessName(),
+                    InvoiceSettings = new CustomerInvoiceSettingsOptions
+                    {
+                        // This overwrites the existing custom fields for this organization
+                        CustomFields = [
+                            new CustomerInvoiceSettingsCustomFieldOptions
+                            {
+                                Name = organization.SubscriberType(),
+                                Value = newDisplayName.Length <= 30
+                                    ? newDisplayName
+                                    : newDisplayName[..30]
+                            }]
+                    },
+                });
+        }
+    }
+
+    public async Task UpdateTwoFactorProviderAsync(Organization organization, TwoFactorProviderType type)
+    {
+        if (!type.ToString().Contains("Organization"))
+        {
+            throw new ArgumentException("Not an organization provider type.");
+        }
+
+        if (!organization.Use2fa)
+        {
+            throw new BadRequestException("Organization cannot use 2FA.");
+        }
+
+        var providers = organization.GetTwoFactorProviders();
+        if (providers is null || !providers.TryGetValue(type, out var provider))
+        {
+            return;
+        }
+
+        provider.Enabled = true;
+        organization.SetTwoFactorProviders(providers);
+        await UpdateAsync(organization);
+    }
+
+    public async Task DisableTwoFactorProviderAsync(Organization organization, TwoFactorProviderType type)
+    {
+        if (!type.ToString().Contains("Organization"))
+        {
+            throw new ArgumentException("Not an organization provider type.");
+        }
+
+        var providers = organization.GetTwoFactorProviders();
+        if (!providers?.ContainsKey(type) ?? true)
+        {
+            return;
+        }
+
+        providers.Remove(type);
+        organization.SetTwoFactorProviders(providers);
+        await UpdateAsync(organization);
+    }
+
+    public async Task<OrganizationUser> InviteUserAsync(Guid organizationId, Guid? invitingUserId,
+        EventSystemUser? systemUser,
+        OrganizationUserInvite invite, string externalId)
+    {
+        // Ideally OrganizationUserInvite should represent a single user so that this doesn't have to be a runtime check
+        if (invite.Emails.Count() > 1)
+        {
+            throw new BadRequestException("This method can only be used to invite a single user.");
+        }
+
+        // Validate Collection associations
+        var invalidAssociations = invite.Collections?.Where(cas => cas.Manage && (cas.ReadOnly || cas.HidePasswords));
+        if (invalidAssociations?.Any() ?? false)
+        {
+            throw new BadRequestException(
+                "The Manage property is mutually exclusive and cannot be true while the ReadOnly or HidePasswords properties are also true.");
+        }
+
+        var results = await InviteUsersAsync(organizationId, invitingUserId, systemUser,
+            new (OrganizationUserInvite, string)[] { (invite, externalId) });
+
+        var result = results.FirstOrDefault();
+        if (result == null)
+        {
+            throw new BadRequestException("This user has already been invited.");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Invite users to an organization.
+    /// </summary>
+    /// <param name="organizationId">The organization Id</param>
+    /// <param name="invitingUserId">The current authenticated user who is sending the invite. Only used when inviting via a client app; null if using SCIM or Public API.</param>
+    /// <param name="systemUser">The system user which is sending the invite. Only used when inviting via SCIM; null if using a client app or Public API</param>
+    /// <param name="invites">Details about the users being invited</param>
+    /// <returns></returns>
+    public async Task<List<OrganizationUser>> InviteUsersAsync(Guid organizationId, Guid? invitingUserId,
+        EventSystemUser? systemUser,
+        IEnumerable<(OrganizationUserInvite invite, string externalId)> invites)
+    {
+        var inviteTypes = new HashSet<OrganizationUserType>(invites.Where(i => i.invite.Type.HasValue)
+            .Select(i => i.invite.Type.Value));
+
+        // If authenticating via a client app, verify the inviting user has permissions
+        // cf. SCIM and Public API have superuser permissions here
+        if (invitingUserId.HasValue && inviteTypes.Count > 0)
+        {
+            foreach (var (invite, _) in invites)
+            {
+                await ValidateOrganizationUserUpdatePermissions(organizationId, invite.Type.Value, null,
+                    invite.Permissions);
+                await ValidateOrganizationCustomPermissionsEnabledAsync(organizationId, invite.Type.Value);
+            }
+        }
+
+        var (organizationUsers, events) = await SaveUsersSendInvitesAsync(organizationId, invites, invitingUserId);
+
+        if (systemUser.HasValue)
+        {
+            // Log SCIM event
+            await _eventService.LogOrganizationUserEventsAsync(events.Select(e =>
+                (e.Item1, e.Item2, systemUser.Value, e.Item3)));
+        }
+        else
+        {
+            // Log client app or Public Api event
+            await _eventService.LogOrganizationUserEventsAsync(events);
+        }
+
+        return organizationUsers;
+    }
+
+    private async
+        Task<(List<OrganizationUser> organizationUsers, List<(OrganizationUser, EventType, DateTime?)> events)>
+        SaveUsersSendInvitesAsync(Guid organizationId,
+            IEnumerable<(OrganizationUserInvite invite, string externalId)> invites,
+            Guid? invitingUserId)
+    {
+        var organization = await GetOrgById(organizationId);
+        var initialSeatCount = organization.Seats;
+        if (organization == null || invites.Any(i => i.invite.Emails == null))
+        {
+            throw new NotFoundException();
+        }
+
+        var requestedEmails = invites.SelectMany(i => i.invite.Emails).ToList();
+
+        var existingEmails = new HashSet<string>(
+            await _organizationUserRepository.SelectKnownEmailsAsync(organizationId, requestedEmails, false),
+            StringComparer.InvariantCultureIgnoreCase);
+
+        var stagedUsersByEmail = (await _organizationUserRepository
+                .GetManyByOrganizationEmailsAsync(organizationId, requestedEmails))
+            .Where(ou => ou.Status == OrganizationUserStatusType.Staged)
+            .ToDictionary(ou => ou.Email, StringComparer.InvariantCultureIgnoreCase);
+
+        // Seat autoscaling
+        var initialSmSeatCount = organization.SmSeats;
+        var newSeatsRequired = 0;
+        if (organization.Seats.HasValue)
+        {
+            var seatCounts = await _organizationRepository.GetOccupiedSeatCountByOrganizationIdAsync(organization.Id);
+            var availableSeats = organization.Seats.Value - seatCounts.Total;
+            // Staged matches are promoted rather than skipped, so they still need a seat.
+            var skippedEmailCount = existingEmails.Count(email => !stagedUsersByEmail.ContainsKey(email));
+            newSeatsRequired = invites.Sum(i => i.invite.Emails.Count()) - skippedEmailCount - availableSeats;
+        }
+
+        if (newSeatsRequired > 0)
+        {
+            var (canScale, failureReason) = await CanScaleAsync(organization, newSeatsRequired);
+            if (!canScale)
+            {
+                throw new BadRequestException(await ToInviteSeatLimitMessageAsync(organization, failureReason));
+            }
+        }
+
+        // Secrets Manager seat autoscaling
+        SecretsManagerSubscriptionUpdate smSubscriptionUpdate = null;
+        var inviteWithSmAccessCount = invites
+            .Where(i => i.invite.AccessSecretsManager)
+            .SelectMany(i => i.invite.Emails)
+            .Count(email => !existingEmails.Contains(email) || stagedUsersByEmail.ContainsKey(email));
+
+        var additionalSmSeatsRequired =
+            await _countNewSmSeatsRequiredQuery.CountNewSmSeatsRequiredAsync(organization.Id, inviteWithSmAccessCount);
+        if (additionalSmSeatsRequired > 0)
+        {
+            var plan = await _pricingClient.GetPlanOrThrow(organization.PlanType);
+            smSubscriptionUpdate = new SecretsManagerSubscriptionUpdate(organization, plan, true)
+                .AdjustSeats(additionalSmSeatsRequired);
+        }
+
+        var invitedAreAllOwners = invites.All(i => i.invite.Type == OrganizationUserType.Owner);
+        if (!invitedAreAllOwners &&
+            !await _hasConfirmedOwnersExceptQuery.HasConfirmedOwnersExceptAsync(organizationId, new Guid[] { },
+                includeProvider: true))
+        {
+            throw new BadRequestException("Organization must have at least one confirmed owner.");
+        }
+
+        var orgUsersWithoutCollections = new List<OrganizationUser>();
+        var orgUsersWithCollections = new List<(OrganizationUser, IEnumerable<CollectionAccessSelection>)>();
+        var orgUserGroups = new List<(OrganizationUser, IEnumerable<Guid>)>();
+        var stagedInvitations = new Dictionary<Guid, (OrganizationUser OrgUser, OrganizationUserInvite Invite)>();
+        var orgUserInvitedCount = 0;
+        var exceptions = new List<Exception>();
+        var events = new List<(OrganizationUser, EventType, DateTime?)>();
+        foreach (var (invite, externalId) in invites)
+        {
+            // Prevent duplicate invitations
+            foreach (var email in invite.Emails.Distinct())
+            {
+                try
+                {
+                    // A Staged row already exists, so it is promoted below rather than created here. Emails
+                    // are deduplicated within an invite but not across them, so keying by row promotes once.
+                    if (stagedUsersByEmail.TryGetValue(email, out var stagedOrgUser))
+                    {
+                        stagedInvitations.TryAdd(stagedOrgUser.Id, (stagedOrgUser, invite));
+                        continue;
+                    }
+
+                    // Make sure user is not already invited
+                    if (existingEmails.Contains(email))
+                    {
+                        continue;
+                    }
+
+                    var orgUser = new OrganizationUser
+                    {
+                        OrganizationId = organizationId,
+                        UserId = null,
+                        Email = email.ToLowerInvariant(),
+                        Key = null,
+                        Type = invite.Type.Value,
+                        Status = OrganizationUserStatusType.Invited,
+                        AccessSecretsManager = invite.AccessSecretsManager,
+                        ExternalId = externalId,
+                        CreationDate = DateTime.UtcNow,
+                        RevisionDate = DateTime.UtcNow,
+                    };
+
+                    if (invite.Type == OrganizationUserType.Custom)
+                    {
+                        orgUser.SetPermissions(invite.Permissions ?? new Permissions());
+                    }
+
+                    if (invite.Collections.Any())
+                    {
+                        orgUsersWithCollections.Add((orgUser, invite.Collections));
+                    }
+                    else
+                    {
+                        orgUsersWithoutCollections.Add(orgUser);
+                    }
+
+                    if (invite.Groups != null && invite.Groups.Any())
+                    {
+                        orgUserGroups.Add((orgUser, invite.Groups));
+                    }
+
+                    events.Add((orgUser, EventType.OrganizationUser_Invited, DateTime.UtcNow));
+                    orgUserInvitedCount++;
+                }
+                catch (Exception e)
+                {
+                    exceptions.Add(e);
+                }
+            }
+        }
+
+        if (exceptions.Any())
+        {
+            throw new AggregateException("One or more errors occurred while inviting users.", exceptions);
+        }
+
+        // Snapshot the provisioned state before promoting in memory so it can be rolled back if needed
+        var stagedSnapshots = stagedInvitations.Values.ToDictionary(
+            staged => staged.OrgUser.Id,
+            staged => new StagedUserSnapshot(
+                staged.OrgUser.Status,
+                staged.OrgUser.Type,
+                staged.OrgUser.Permissions,
+                staged.OrgUser.AccessSecretsManager,
+                staged.OrgUser.RevisionDate));
+
+        // Promote the staged rows set aside above. They keep their Id and ExternalId because SCIM and
+        // Directory Connector key off both, and only the fields the invite specifies are overwritten.
+        foreach (var (orgUser, invite) in stagedInvitations.Values)
+        {
+            orgUser.Type = invite.Type.Value;
+            orgUser.Status = OrganizationUserStatusType.Invited;
+            orgUser.AccessSecretsManager = invite.AccessSecretsManager;
+            orgUser.RevisionDate = DateTime.UtcNow;
+            // Custom permissions only apply to the Custom role, and a staged row may already carry some.
+            orgUser.Permissions = null;
+
+            if (invite.Type == OrganizationUserType.Custom)
+            {
+                orgUser.SetPermissions(invite.Permissions ?? new Permissions());
+            }
+
+            events.Add((orgUser, EventType.OrganizationUser_Invited, DateTime.UtcNow));
+        }
+
+        var createdOrgUsers = orgUsersWithoutCollections
+            .Concat(orgUsersWithCollections.Select(u => u.Item1))
+            .ToList();
+
+        var allOrgUsers = createdOrgUsers
+            .Concat(stagedInvitations.Values.Select(s => s.OrgUser))
+            .ToList();
+
+        // Staged rows whose promotion has actually committed, and so must be put back if the batch fails.
+        var promotedStagedUsers = new List<OrganizationUser>();
+
+        try
+        {
+            await _organizationUserRepository.CreateManyAsync(orgUsersWithoutCollections);
+            foreach (var (orgUser, collections) in orgUsersWithCollections)
+            {
+                await _organizationUserRepository.CreateAsync(orgUser, collections);
+            }
+
+            var revisionDate = _timeProvider.GetUtcNow().UtcDateTime;
+            foreach (var (orgUser, groups) in orgUserGroups)
+            {
+                await _organizationUserRepository.UpdateGroupsAsync(orgUser.Id, groups, revisionDate);
+            }
+
+            if (!await _currentContext.ManageUsers(organization.Id))
+            {
+                throw new BadRequestException("Cannot add seats. Cannot manage organization users.");
+            }
+
+            await AutoAddSeatsAsync(organization, newSeatsRequired);
+
+            if (additionalSmSeatsRequired > 0)
+            {
+                await _updateSecretsManagerSubscriptionCommand.UpdateSubscriptionAsync(smSubscriptionUpdate);
+            }
+
+            await SendInvitesAsync(allOrgUsers, organization, invitingUserId);
+
+            // Staged users' changes are handled separately to avoid unnecessary conditions above
+            foreach (var (orgUser, invite) in stagedInvitations.Values)
+            {
+                if (invite.Collections != null && invite.Collections.Any())
+                {
+                    await _organizationUserRepository.ReplaceAsync(orgUser, invite.Collections);
+                }
+                else
+                {
+                    await _organizationUserRepository.ReplaceAsync(orgUser);
+                }
+
+                promotedStagedUsers.Add(orgUser);
+
+                if (invite.Groups != null && invite.Groups.Any())
+                {
+                    await _organizationUserRepository.UpdateGroupsAsync(orgUser.Id, invite.Groups, revisionDate);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // Revert any created/non-staged users.
+            await _organizationUserRepository.DeleteManyAsync(createdOrgUsers.Select(ou => ou.Id));
+
+            // Demote any staged rows that were promoted before the failure.
+            await RestorePromotedStagedUsersAsync(promotedStagedUsers, stagedSnapshots);
+
+            var currentOrganization = await _organizationRepository.GetByIdAsync(organization.Id);
+
+            // Revert autoscaling
+            // Do this first so that SmSeats never exceed PM seats (due to current billing requirements)
+            if (initialSmSeatCount.HasValue && currentOrganization.SmSeats.HasValue &&
+                currentOrganization.SmSeats.Value != initialSmSeatCount.Value)
+            {
+                var plan = await _pricingClient.GetPlanOrThrow(currentOrganization.PlanType);
+                var smSubscriptionUpdateRevert = new SecretsManagerSubscriptionUpdate(currentOrganization, plan, false)
+                {
+                    SmSeats = initialSmSeatCount.Value
+                };
+                await _updateSecretsManagerSubscriptionCommand.UpdateSubscriptionAsync(smSubscriptionUpdateRevert);
+            }
+
+            if (initialSeatCount.HasValue && currentOrganization.Seats.HasValue &&
+                currentOrganization.Seats.Value != initialSeatCount.Value)
+            {
+                await AdjustSeatsAsync(organization, initialSeatCount.Value - currentOrganization.Seats.Value);
+            }
+
+            exceptions.Add(e);
+        }
+
+        if (exceptions.Any())
+        {
+            throw new AggregateException("One or more errors occurred while inviting users.", exceptions);
+        }
+
+        return (allOrgUsers, events);
+    }
+
+    /// <summary>
+    /// The fields <see cref="SaveUsersSendInvitesAsync"/> overwrites when it promotes a staged member, captured
+    /// before the overwrite so the promotion can be undone.
+    /// </summary>
+    private sealed record StagedUserSnapshot(
+        OrganizationUserStatusType Status,
+        OrganizationUserType Type,
+        string Permissions,
+        bool AccessSecretsManager,
+        DateTime RevisionDate);
+
+    /// <summary>
+    /// Puts promoted staged members back to the state they were provisioned in. Collections and groups are
+    /// intentionally not restored here due to the increased chance of failures causing failures
+    /// </summary>
+    private async Task RestorePromotedStagedUsersAsync(
+        List<OrganizationUser> promotedStagedUsers,
+        Dictionary<Guid, StagedUserSnapshot> stagedSnapshots)
+    {
+        if (promotedStagedUsers.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var orgUser in promotedStagedUsers)
+        {
+            if (!stagedSnapshots.TryGetValue(orgUser.Id, out var snapshot))
+            {
+                continue;
+            }
+
+            orgUser.Status = snapshot.Status;
+            orgUser.Type = snapshot.Type;
+            orgUser.Permissions = snapshot.Permissions;
+            orgUser.AccessSecretsManager = snapshot.AccessSecretsManager;
+            orgUser.RevisionDate = snapshot.RevisionDate;
+        }
+
+        await _organizationUserRepository.ReplaceManyAsync(promotedStagedUsers);
+    }
+
+    private async Task SendInvitesAsync(IEnumerable<OrganizationUser> orgUsers, Organization organization, Guid? invitingUserId = null) =>
+        await _sendOrganizationInvitesCommand.SendInvitesAsync(new SendInvitesRequest(orgUsers, organization, initOrganization: false, invitingUserId: invitingUserId));
+
+    private async Task SendInviteAsync(OrganizationUser orgUser, Organization organization, bool initOrganization, Guid? invitingUserId = null) =>
+        await _sendOrganizationInvitesCommand.SendInvitesAsync(new SendInvitesRequest(
+            users: [orgUser],
+            organization: organization,
+            initOrganization: initOrganization,
+            invitingUserId: invitingUserId));
+
+    public async Task<(bool canScale, string failureReason)> CanScaleAsync(
+        Organization organization,
+        int seatsToAdd)
+    {
+        var failureReason = "";
+        if (_globalSettings.SelfHosted)
+        {
+            failureReason = "Cannot autoscale on self-hosted instance.";
+            return (false, failureReason);
+        }
+
+        if (seatsToAdd < 1)
+        {
+            return (true, failureReason);
+        }
+
+        var provider = await _providerRepository.GetByOrganizationIdAsync(organization.Id);
+
+        if (provider is { Enabled: true })
+        {
+            if (provider.IsBillable())
+            {
+                return (false, "Seat limit has been reached. Please contact your provider to add more seats.");
+            }
+
+            if (provider.Type == ProviderType.Reseller)
+            {
+                return (false, "Seat limit has been reached. Contact your provider to purchase additional seats.");
+            }
+        }
+
+        var subscription = await _paymentService.GetSubscriptionAsync(organization);
+        if (subscription?.Subscription?.Status == StripeConstants.SubscriptionStatus.Canceled)
+        {
+            return (false, "You do not have an active subscription. Reinstate your subscription to make changes");
+        }
+
+        if (organization.Seats.HasValue &&
+            organization.MaxAutoscaleSeats.HasValue &&
+            organization.MaxAutoscaleSeats.Value < organization.Seats.Value + seatsToAdd)
+        {
+            return (false, SeatLimitHasBeenReachedMessage);
+        }
+
+        return (true, failureReason);
+    }
+
+    /// <summary>
+    /// The flow-neutral seat limit message. <see cref="CanScaleAsync"/> also backs member restore, Families
+    /// sponsorship and SSO just-in-time provisioning, so it stays neutral for them. Only the invite flow swaps in
+    /// the seat-count wording, via <see cref="ToInviteSeatLimitMessageAsync"/>.
+    /// </summary>
+    public const string SeatLimitHasBeenReachedMessage = "Seat limit has been reached.";
+
+    /// <summary>
+    /// Design approved the seat-count wording for the invite flow only, so the substitution happens here rather
+    /// than inside <see cref="CanScaleAsync"/>. Any other failure reason is passed through untouched.
+    /// </summary>
+    private async Task<string> ToInviteSeatLimitMessageAsync(Organization organization, string failureReason)
+    {
+        if (failureReason != SeatLimitHasBeenReachedMessage)
+        {
+            return failureReason;
+        }
+
+        var seatLimitMessage = await CanManageBillingAsync(organization.Id)
+            ? PasswordManagerSeatLimitHasBeenReachedError.Code
+            : PasswordManagerSeatLimitHasBeenReachedNoBillingAccessError.Code;
+
+        return string.Format(seatLimitMessage, organization.MaxAutoscaleSeats!.Value);
+    }
+
+    /// <summary>
+    /// Seat scaling is also triggered by callers without an authenticated member (SCIM, the Public API, and
+    /// background work), where nobody could raise the seat limit in place. <see cref="ICurrentContext.EditSubscription"/>
+    /// requires a user, so short circuit those callers.
+    /// </summary>
+    private async Task<bool> CanManageBillingAsync(Guid organizationId) =>
+        _currentContext.UserId.HasValue && await _currentContext.EditSubscription(organizationId);
+
+    public async Task AutoAddSeatsAsync(Organization organization, int seatsToAdd)
+    {
+        if (seatsToAdd < 1 || !organization.Seats.HasValue)
+        {
+            return;
+        }
+
+        var (canScale, failureMessage) = await CanScaleAsync(organization, seatsToAdd);
+        if (!canScale)
+        {
+            throw new BadRequestException(failureMessage);
+        }
+
+        var providerOrg = await this._providerOrganizationRepository.GetByOrganizationId(organization.Id);
+
+        IEnumerable<string> ownerEmails;
+        if (providerOrg != null)
+        {
+            ownerEmails =
+                (await _providerUserRepository.GetManyDetailsByProviderAsync(providerOrg.ProviderId,
+                    ProviderUserStatusType.Confirmed))
+                .Select(u => u.Email).Distinct();
+        }
+        else
+        {
+            ownerEmails = (await _organizationUserRepository.GetManyByMinimumRoleAsync(organization.Id,
+                OrganizationUserType.Owner)).Select(u => u.Email).Distinct();
+        }
+
+        var initialSeatCount = organization.Seats.Value;
+
+        await AdjustSeatsAsync(organization, seatsToAdd, ownerEmails);
+
+        if (!organization.OwnersNotifiedOfAutoscaling.HasValue)
+        {
+            await _mailService.SendOrganizationAutoscaledEmailAsync(organization, initialSeatCount,
+                ownerEmails);
+            organization.OwnersNotifiedOfAutoscaling = DateTime.UtcNow;
+            await _organizationRepository.UpsertAsync(organization);
+        }
+    }
+
+
+    public async Task DeleteSsoUserAsync(Guid userId, Guid? organizationId)
+    {
+        await _ssoUserRepository.DeleteAsync(userId, organizationId);
+        if (organizationId.HasValue)
+        {
+            var organizationUser =
+                await _organizationUserRepository.GetByOrganizationAsync(organizationId.Value, userId);
+            if (organizationUser != null)
+            {
+                await _eventService.LogOrganizationUserEventAsync(organizationUser,
+                    EventType.OrganizationUser_UnlinkedSso);
+            }
+        }
+    }
+
+
+    public async Task ReplaceAndUpdateCacheAsync(Organization org, EventType? orgEvent = null)
+    {
+        try
+        {
+            await _organizationRepository.ReplaceAsync(org);
+            await _organizationAbilityCacheService.UpsertOrganizationAbilityAsync(org);
+
+            if (orgEvent.HasValue)
+            {
+                await _eventService.LogOrganizationEventAsync(org, orgEvent.Value);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "An error occurred while calling {Method} for Organization ({OrganizationID})", nameof(ReplaceAndUpdateCacheAsync), org.Id);
+            throw;
+        }
+    }
+
+    private async Task<Organization> GetOrgById(Guid id)
+    {
+        return await _organizationRepository.GetByIdAsync(id);
+    }
+
+    private static void ValidatePlan(Models.StaticStore.Plan plan, int additionalSeats, string productType)
+    {
+        if (plan is null)
+        {
+            throw new BadRequestException($"{productType} Plan was null.");
+        }
+
+        if (plan.Disabled)
+        {
+            throw new BadRequestException($"{productType} Plan not found.");
+        }
+
+        if (additionalSeats < 0)
+        {
+            throw new BadRequestException($"You can't subtract {productType} seats!");
+        }
+    }
+
+    public void ValidatePasswordManagerPlan(Models.StaticStore.Plan plan, OrganizationUpgrade upgrade)
+    {
+        ValidatePlan(plan, upgrade.AdditionalSeats, "Password Manager");
+
+        if (plan.PasswordManager.BaseSeats + upgrade.AdditionalSeats <= 0)
+        {
+            throw new BadRequestException($"You do not have any Password Manager seats!");
+        }
+
+        if (upgrade.AdditionalSeats < 0)
+        {
+            throw new BadRequestException($"You can't subtract Password Manager seats!");
+        }
+
+        if (!plan.PasswordManager.HasAdditionalStorageOption && upgrade.AdditionalStorageGb > 0)
+        {
+            throw new BadRequestException("Plan does not allow additional storage.");
+        }
+
+        if (upgrade.AdditionalStorageGb < 0)
+        {
+            throw new BadRequestException("You can't subtract storage!");
+        }
+
+        if (!plan.PasswordManager.HasPremiumAccessOption && upgrade.PremiumAccessAddon)
+        {
+            throw new BadRequestException("This plan does not allow you to buy the premium access addon.");
+        }
+
+        if (!plan.PasswordManager.HasAdditionalSeatsOption && upgrade.AdditionalSeats > 0)
+        {
+            throw new BadRequestException("Plan does not allow additional users.");
+        }
+
+        if (plan.PasswordManager.HasAdditionalSeatsOption && plan.PasswordManager.MaxAdditionalSeats.HasValue &&
+            upgrade.AdditionalSeats > plan.PasswordManager.MaxAdditionalSeats.Value)
+        {
+            throw new BadRequestException($"Selected plan allows a maximum of " +
+                                          $"{plan.PasswordManager.MaxAdditionalSeats.GetValueOrDefault(0)} additional users.");
+        }
+    }
+
+    public void ValidateSecretsManagerPlan(Models.StaticStore.Plan plan, OrganizationUpgrade upgrade)
+    {
+        if (plan.SupportsSecretsManager == false)
+        {
+            throw new BadRequestException("Invalid Secrets Manager plan selected.");
+        }
+
+        ValidatePlan(plan, upgrade.AdditionalSmSeats.GetValueOrDefault(), "Secrets Manager");
+
+        if (plan.SecretsManager.BaseSeats + upgrade.AdditionalSmSeats <= 0)
+        {
+            throw new BadRequestException($"You do not have any Secrets Manager seats!");
+        }
+
+        if (!plan.SecretsManager.HasAdditionalServiceAccountOption && upgrade.AdditionalServiceAccounts > 0)
+        {
+            throw new BadRequestException("Plan does not allow additional Machine Accounts.");
+        }
+
+        if ((plan.ProductTier == ProductTierType.TeamsStarter &&
+             upgrade.AdditionalSmSeats.GetValueOrDefault() > plan.PasswordManager.BaseSeats) ||
+            (plan.ProductTier != ProductTierType.TeamsStarter &&
+             upgrade.AdditionalSmSeats.GetValueOrDefault() > upgrade.AdditionalSeats))
+        {
+            throw new BadRequestException("You cannot have more Secrets Manager seats than Password Manager seats.");
+        }
+
+        if (upgrade.AdditionalServiceAccounts.GetValueOrDefault() < 0)
+        {
+            throw new BadRequestException("You can't subtract Machine Accounts!");
+        }
+
+        switch (plan.SecretsManager.HasAdditionalSeatsOption)
+        {
+            case false when upgrade.AdditionalSmSeats > 0:
+                throw new BadRequestException("Plan does not allow additional users.");
+            case true when plan.SecretsManager.MaxAdditionalSeats.HasValue &&
+                           upgrade.AdditionalSmSeats > plan.SecretsManager.MaxAdditionalSeats.Value:
+                throw new BadRequestException($"Selected plan allows a maximum of " +
+                                              $"{plan.SecretsManager.MaxAdditionalSeats.GetValueOrDefault(0)} additional users.");
+        }
+    }
+
+    public async Task ValidateOrganizationUserUpdatePermissions(Guid organizationId, OrganizationUserType newType,
+        OrganizationUserType? oldType, Permissions permissions)
+    {
+        if (await _currentContext.OrganizationOwner(organizationId))
+        {
+            return;
+        }
+
+        if (oldType == OrganizationUserType.Owner || newType == OrganizationUserType.Owner)
+        {
+            throw new BadRequestException("Only an Owner can configure another Owner's account.");
+        }
+
+        if (await _currentContext.OrganizationAdmin(organizationId))
+        {
+            return;
+        }
+
+        if (!await _currentContext.ManageUsers(organizationId))
+        {
+            throw new BadRequestException("Your account does not have permission to manage users.");
+        }
+
+        if (oldType == OrganizationUserType.Admin || newType == OrganizationUserType.Admin)
+        {
+            throw new BadRequestException("Custom users can not manage Admins or Owners.");
+        }
+
+        if (newType == OrganizationUserType.Custom &&
+            !await ValidateCustomPermissionsGrant(organizationId, permissions))
+        {
+            throw new BadRequestException("Custom users can only grant the same custom permissions that they have.");
+        }
+    }
+
+    public async Task ValidateOrganizationCustomPermissionsEnabledAsync(Guid organizationId,
+        OrganizationUserType newType)
+    {
+        if (newType != OrganizationUserType.Custom)
+        {
+            return;
+        }
+
+        var organization = await _organizationRepository.GetByIdAsync(organizationId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        if (!organization.UseCustomPermissions)
+        {
+            throw new BadRequestException(
+                "To enable custom permissions the organization must be on an Enterprise plan.");
+        }
+    }
+
+    private async Task<bool> ValidateCustomPermissionsGrant(Guid organizationId, Permissions permissions)
+    {
+        if (permissions == null || await _currentContext.OrganizationAdmin(organizationId))
+        {
+            return true;
+        }
+
+        if (permissions.ManageUsers && !await _currentContext.ManageUsers(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.AccessReports && !await _currentContext.AccessReports(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.ManageGroups && !await _currentContext.ManageGroups(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.ManagePolicies && !await _currentContext.ManagePolicies(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.ManageScim && !await _currentContext.ManageScim(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.ManageSso && !await _currentContext.ManageSso(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.AccessEventLogs && !await _currentContext.AccessEventLogs(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.AccessImportExport && !await _currentContext.AccessImportExport(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.EditAnyCollection && !await _currentContext.EditAnyCollection(organizationId))
+        {
+            return false;
+        }
+
+        if (permissions.ManageResetPassword && !await _currentContext.ManageResetPassword(organizationId))
+        {
+            return false;
+        }
+
+        var org = _currentContext.GetOrganization(organizationId);
+        if (org == null)
+        {
+            return false;
+        }
+
+        if (permissions.CreateNewCollections && !org.Permissions.CreateNewCollections)
+        {
+            return false;
+        }
+
+        if (permissions.DeleteAnyCollection && !org.Permissions.DeleteAnyCollection)
+        {
+            return false;
+        }
+
+        if (permissions.ManageAccessRules && !org.Permissions.ManageAccessRules)
+        {
+            return false;
+        }
+
+        return true;
+    }
+}

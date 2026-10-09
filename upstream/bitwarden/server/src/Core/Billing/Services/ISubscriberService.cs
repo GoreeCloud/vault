@@ -1,0 +1,151 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Core.Billing.Models;
+using Bit.Core.Entities;
+using Stripe;
+
+namespace Bit.Core.Billing.Services;
+
+public interface ISubscriberService
+{
+    /// <summary>
+    /// Cancels a subscriber's subscription.
+    /// If the <paramref name="cancelImmediately"/> flag is <see langword="false"/>,
+    /// this command sets the subscription's <b>"cancel_at_end_of_period"</b> property to <see langword="true"/>.
+    /// Otherwise, this command cancels the subscription immediately.
+    /// Optionally includes user-provided feedback via the <paramref name="offboardingSurveyResponse"/>.
+    /// </summary>
+    /// <param name="subscriber">The subscriber with the subscription to cancel.</param>
+    /// <param name="cancelImmediately">A flag indicating whether to cancel the subscription immediately or at the end of the subscription period.</param>
+    /// <param name="offboardingSurveyResponse">An optional <see cref="OffboardingSurveyResponse"/> DTO containing user-provided feedback on why they are cancelling the subscription.</param>
+    Task CancelSubscription(
+        ISubscriber subscriber,
+        bool cancelImmediately,
+        OffboardingSurveyResponse offboardingSurveyResponse = null);
+
+    /// <summary>
+    /// Creates a Braintree <see cref="Braintree.Customer"/> for the provided <paramref name="subscriber"/> while attaching the provided <paramref name="paymentMethodNonce"/>.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to create a Braintree customer for.</param>
+    /// <param name="paymentMethodNonce">A nonce representing the PayPal payment method the customer will use for payments.</param>
+    /// <returns>The <see cref="Braintree.Customer.Id"/> of the created Braintree customer.</returns>
+    Task<string> CreateBraintreeCustomer(
+        ISubscriber subscriber,
+        string paymentMethodNonce);
+
+    Task<Customer> CreateStripeCustomer(
+        ISubscriber subscriber);
+
+    /// <summary>
+    /// Retrieves a Stripe <see cref="Customer"/> using the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewayCustomerId"/> property.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to retrieve the Stripe customer for.</param>
+    /// <param name="customerGetOptions">Optional parameters that can be passed to Stripe to expand or modify the customer.</param>
+    /// <returns>A Stripe <see cref="Customer"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    /// <remarks>This method opts for returning <see langword="null"/> rather than throwing exceptions, making it ideal for surfacing data from API endpoints.</remarks>
+    Task<Customer> GetCustomer(
+        ISubscriber subscriber,
+        CustomerGetOptions customerGetOptions = null);
+
+    /// <summary>
+    /// Retrieves a Stripe <see cref="Customer"/> using the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewayCustomerId"/> property.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to retrieve the Stripe customer for.</param>
+    /// <param name="customerGetOptions">Optional parameters that can be passed to Stripe to expand or modify the customer.</param>
+    /// <returns>A Stripe <see cref="Customer"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="BillingException">Thrown when the subscriber's <see cref="ISubscriber.GatewayCustomerId"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="BillingException">Thrown when the <see cref="Customer"/> returned from Stripe's API is null.</exception>
+    Task<Customer> GetCustomerOrThrow(
+        ISubscriber subscriber,
+        CustomerGetOptions customerGetOptions = null);
+
+    /// <summary>
+    /// Retrieves a masked representation of the subscriber's payment source for presentation to a client.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to retrieve the payment source for.</param>
+    /// <returns>A <see cref="PaymentSource"/> containing a non-identifiable description of the subscriber's payment source. Example: VISA, *4242, 10/2026</returns>
+    Task<PaymentSource> GetPaymentSource(
+        ISubscriber subscriber);
+
+    /// <summary>
+    /// Retrieves a Stripe <see cref="Subscription"/> using the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewaySubscriptionId"/> property.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to retrieve the Stripe subscription for.</param>
+    /// <param name="subscriptionGetOptions">Optional parameters that can be passed to Stripe to expand or modify the subscription.</param>
+    /// <returns>A Stripe <see cref="Subscription"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    /// <remarks>This method opts for returning <see langword="null"/> rather than throwing exceptions, making it ideal for surfacing data from API endpoints.</remarks>
+    Task<Subscription> GetSubscription(
+        ISubscriber subscriber,
+        SubscriptionGetOptions subscriptionGetOptions = null);
+
+    /// <summary>
+    /// Retrieves a Stripe <see cref="Subscription"/> using the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewaySubscriptionId"/> property.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to retrieve the Stripe subscription for.</param>
+    /// <param name="subscriptionGetOptions">Optional parameters that can be passed to Stripe to expand or modify the subscription.</param>
+    /// <returns>A Stripe <see cref="Subscription"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="BillingException">Thrown when the subscriber's <see cref="ISubscriber.GatewaySubscriptionId"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="BillingException">Thrown when the <see cref="Subscription"/> returned from Stripe's API is null.</exception>
+    Task<Subscription> GetSubscriptionOrThrow(
+        ISubscriber subscriber,
+        SubscriptionGetOptions subscriptionGetOptions = null);
+
+    /// <summary>
+    /// Attempts to remove a subscriber's saved payment source. If the Stripe <see cref="Stripe.Customer"/> representing the
+    /// <paramref name="subscriber"/> contains a valid <b>"btCustomerId"</b> key in its <see cref="Stripe.Customer.Metadata"/> property,
+    /// this command will attempt to remove the Braintree <see cref="Braintree.PaymentMethod"/>. Otherwise, it will attempt to remove the
+    /// Stripe <see cref="Stripe.PaymentMethod"/>.
+    /// </summary>
+    /// <param name="subscriber">The subscriber to remove the saved payment source for.</param>
+    Task RemovePaymentSource(ISubscriber subscriber);
+
+    /// <summary>
+    /// Clears a pending platform-managed unpaid-lifecycle cancellation on the subscriber's Stripe subscription.
+    /// </summary>
+    /// <remarks>
+    /// Called by Admin Portal flows that re-enable a billing-disabled subscriber. If the subscriber's Stripe
+    /// subscription is currently <c>unpaid</c> and carries <c>Metadata[cancellation_origin] = unpaid_subscription</c>,
+    /// the pending cancellation is removed and the origin marker is unset so Stripe does not fire the scheduled
+    /// <c>customer.subscription.deleted</c> event and <c>SubscriptionDeletedHandler</c> does not void open invoices.
+    /// No-op on any other subscription state.
+    /// </remarks>
+    /// <param name="subscriber">The subscriber whose pending cancellation should be cleared.</param>
+    Task ResumeFromUnpaidCancellationAsync(ISubscriber subscriber);
+
+    /// <summary>
+    /// Schedules a platform-managed unpaid-lifecycle cancellation on the subscriber's Stripe subscription.
+    /// </summary>
+    /// <remarks>
+    /// Called by Admin Portal flows that disable a subscriber whose subscription is unpaid but was never
+    /// scheduled by the webhook handler. If the subscriber's Stripe subscription is currently <c>unpaid</c>
+    /// without a <c>cancel_at</c> timestamp and without the <c>Metadata[cancellation_origin] = unpaid_subscription</c>
+    /// marker, the method sets <c>cancel_at = now + 7d</c> and stamps the origin so
+    /// <c>SubscriptionDeletedHandler</c> voids open invoices when Stripe ultimately deletes the subscription.
+    /// No-op on any other subscription state.
+    /// </remarks>
+    /// <param name="subscriber">The subscriber whose unpaid-lifecycle cancellation should be scheduled.</param>
+    Task ScheduleUnpaidCancellationAsync(ISubscriber subscriber);
+
+    /// <summary>
+    /// Validates whether the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewayCustomerId"/> exists in the gateway.
+    /// If the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewayCustomerId"/> is <see langword="null"/> or empty, returns <see langword="true"/>.
+    /// </summary>
+    /// <param name="subscriber">The subscriber whose gateway customer ID should be validated.</param>
+    /// <returns><see langword="true"/> if the gateway customer ID is valid or empty; <see langword="false"/> if the customer doesn't exist in the gateway.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    Task<bool> IsValidGatewayCustomerIdAsync(ISubscriber subscriber);
+
+    /// <summary>
+    /// Validates whether the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewaySubscriptionId"/> exists in the gateway.
+    /// If the <paramref name="subscriber"/>'s <see cref="ISubscriber.GatewaySubscriptionId"/> is <see langword="null"/> or empty, returns <see langword="true"/>.
+    /// </summary>
+    /// <param name="subscriber">The subscriber whose gateway subscription ID should be validated.</param>
+    /// <returns><see langword="true"/> if the gateway subscription ID is valid or empty; <see langword="false"/> if the subscription doesn't exist in the gateway.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="subscriber"/> is <see langword="null"/>.</exception>
+    Task<bool> IsValidGatewaySubscriptionIdAsync(ISubscriber subscriber);
+}

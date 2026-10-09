@@ -1,0 +1,253 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using System.Diagnostics;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace Bit.Setup;
+
+public static class Helpers
+{
+    public static string SecureRandomString(int length, bool alpha = true, bool upper = true, bool lower = true,
+        bool numeric = true, bool special = false)
+    {
+        return SecureRandomString(length, RandomStringCharacters(alpha, upper, lower, numeric, special));
+    }
+
+    // ref https://stackoverflow.com/a/8996788/1090359 with modifications
+    public static string SecureRandomString(int length, string characters)
+    {
+        if (length < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length), "length cannot be less than zero.");
+        }
+
+        if ((characters?.Length ?? 0) == 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(characters), "characters invalid.");
+        }
+
+        const int byteSize = 0x100;
+        if (byteSize < characters.Length)
+        {
+            throw new ArgumentException(
+                string.Format("{0} may contain no more than {1} characters.", nameof(characters), byteSize),
+                nameof(characters));
+        }
+
+        var outOfRangeStart = byteSize - (byteSize % characters.Length);
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            var sb = new StringBuilder();
+            var buffer = new byte[128];
+            while (sb.Length < length)
+            {
+                rng.GetBytes(buffer);
+                for (var i = 0; i < buffer.Length && sb.Length < length; ++i)
+                {
+                    // Divide the byte into charSet-sized groups. If the random value falls into the last group and the
+                    // last group is too small to choose from the entire allowedCharSet, ignore the value in order to
+                    // avoid biasing the result.
+                    if (outOfRangeStart <= buffer[i])
+                    {
+                        continue;
+                    }
+
+                    sb.Append(characters[buffer[i] % characters.Length]);
+                }
+            }
+
+            return sb.ToString();
+        }
+    }
+
+    private static string RandomStringCharacters(bool alpha, bool upper, bool lower, bool numeric, bool special)
+    {
+        var characters = string.Empty;
+        if (alpha)
+        {
+            if (upper)
+            {
+                characters += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            }
+
+            if (lower)
+            {
+                characters += "abcdefghijklmnopqrstuvwxyz";
+            }
+        }
+
+        if (numeric)
+        {
+            characters += "0123456789";
+        }
+
+        if (special)
+        {
+            characters += "!@#$%^*&";
+        }
+
+        return characters;
+    }
+
+    public static string GetValueFromEnvFile(Application config, string envFile, string key)
+    {
+        if (!File.Exists($"{config.RootDirectory}/env/{envFile}.override.env"))
+        {
+            return null;
+        }
+
+        var lines = File.ReadAllLines($"{config.RootDirectory}/env/{envFile}.override.env");
+        foreach (var line in lines)
+        {
+            if (line.StartsWith($"{key}="))
+            {
+                return line.Split(new char[] { '=' }, 2)[1].Trim('"').Replace("\\\"", "\"");
+            }
+        }
+
+        return null;
+    }
+
+    public static string Exec(string cmd, string[] arguments = null, bool returnStdout = false, bool returnStderr = false)
+    {
+        var startInfo = new ProcessStartInfo(cmd, arguments ?? [])
+        {
+            RedirectStandardOutput = returnStdout,
+            RedirectStandardError = returnStderr,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+
+        var process = new Process { StartInfo = startInfo };
+
+        var result = new StringBuilder();
+        // OutputDataReceived and ErrorDataReceived are raised on separate threads, so appends to the
+        // shared StringBuilder must be synchronized. Without this lock, simultaneous stdout/stderr
+        // output corrupts the builder's internal buffer and throws
+        // "System.ArgumentException: Destination is too short", crashing the setup process.
+        var resultLock = new object();
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (!returnStdout || e.Data == null) return;
+            lock (resultLock)
+            {
+                result.AppendLine(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (!returnStderr || e.Data == null) return;
+            lock (resultLock)
+            {
+                result.AppendLine(e.Data);
+            }
+        };
+
+        process.Start();
+
+        if (returnStdout) process.BeginOutputReadLine();
+        if (returnStderr) process.BeginErrorReadLine();
+
+        process.WaitForExit();
+
+        return result.ToString();
+    }
+
+    public static string ReadInput(string prompt)
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("(!) ");
+        Console.ResetColor();
+        Console.Write(prompt);
+        if (prompt.EndsWith("?"))
+        {
+            Console.Write(" (y/N)");
+        }
+        Console.Write(": ");
+        var input = Console.ReadLine();
+        Console.WriteLine();
+        return input;
+    }
+
+    public static bool ReadQuestion(string prompt)
+    {
+        var input = ReadInput(prompt).ToLowerInvariant().Trim();
+        return input == "y" || input == "yes";
+    }
+
+    public static void ShowBanner(Context context, string title, string message, ConsoleColor? color = null)
+    {
+        if (!context.PrintToScreen())
+        {
+            return;
+        }
+        if (color != null)
+        {
+            Console.ForegroundColor = color.Value;
+        }
+        Console.WriteLine($"!!!!!!!!!! {title} !!!!!!!!!!");
+        Console.WriteLine(message);
+        Console.WriteLine();
+        Console.ResetColor();
+    }
+
+    public static HandlebarsDotNet.HandlebarsTemplate<object, object> ReadTemplate(string templateName)
+    {
+        var assembly = typeof(Helpers).GetTypeInfo().Assembly;
+        var fullTemplateName = $"Bit.Setup.Templates.{templateName}.hbs";
+        if (!assembly.GetManifestResourceNames().Any(f => f == fullTemplateName))
+        {
+            return null;
+        }
+        using (var s = assembly.GetManifestResourceStream(fullTemplateName))
+        using (var sr = new StreamReader(s))
+        {
+            var templateText = sr.ReadToEnd();
+            return HandlebarsDotNet.Handlebars.Compile(templateText);
+        }
+    }
+
+    public static void WriteLine(Context context, string format = null, object arg0 = null, object arg1 = null,
+        object arg2 = null)
+    {
+        if (!context.PrintToScreen())
+        {
+            return;
+        }
+        if (format != null && arg0 != null && arg1 != null && arg2 != null)
+        {
+            Console.WriteLine(format, arg0, arg1, arg2);
+        }
+        else if (format != null && arg0 != null && arg1 != null)
+        {
+            Console.WriteLine(format, arg0, arg1);
+        }
+        else if (format != null && arg0 != null)
+        {
+            Console.WriteLine(format, arg0);
+        }
+        else if (format != null)
+        {
+            Console.WriteLine(format);
+        }
+        else
+        {
+            Console.WriteLine();
+        }
+    }
+
+    public static void WriteError(string errorMessage)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.Write("(!) ");
+        Console.ResetColor();
+        Console.Write(errorMessage);
+        Console.WriteLine();
+    }
+}

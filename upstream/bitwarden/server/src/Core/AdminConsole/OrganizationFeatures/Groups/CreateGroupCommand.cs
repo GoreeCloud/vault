@@ -1,0 +1,132 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+using Bit.Core.AdminConsole.Entities;
+using Bit.Core.AdminConsole.OrganizationFeatures.Groups.Interfaces;
+using Bit.Core.AdminConsole.Repositories;
+using Bit.Core.Enums;
+using Bit.Core.Exceptions;
+using Bit.Core.Models.Data;
+using Bit.Core.Repositories;
+using Bit.Core.Services;
+
+namespace Bit.Core.AdminConsole.OrganizationFeatures.Groups;
+
+public class CreateGroupCommand : ICreateGroupCommand
+{
+    private readonly IEventService _eventService;
+    private readonly IGroupRepository _groupRepository;
+    private readonly IOrganizationUserRepository _organizationUserRepository;
+    private readonly IGroupCollectionAccessValidator _groupCollectionAccessValidator;
+    private readonly TimeProvider _timeProvider;
+
+    public CreateGroupCommand(
+        IEventService eventService,
+        IGroupRepository groupRepository,
+        IOrganizationUserRepository organizationUserRepository,
+        IGroupCollectionAccessValidator groupCollectionAccessValidator,
+        TimeProvider timeProvider
+        )
+    {
+        _eventService = eventService;
+        _groupRepository = groupRepository;
+        _organizationUserRepository = organizationUserRepository;
+        _groupCollectionAccessValidator = groupCollectionAccessValidator;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task CreateGroupAsync(Group group, Organization organization,
+        ICollection<CollectionAccessSelection> collections = null,
+        IEnumerable<Guid> users = null)
+    {
+        await ValidateAsync(organization, group, collections);
+        await GroupRepositoryCreateGroupAsync(group, organization, collections);
+
+        if (users != null)
+        {
+            await GroupRepositoryUpdateUsersAsync(group, users);
+        }
+
+        await _eventService.LogGroupEventAsync(group, Core.Enums.EventType.Group_Created);
+    }
+
+    public async Task CreateGroupAsync(Group group, Organization organization, EventSystemUser systemUser,
+        ICollection<CollectionAccessSelection> collections = null,
+        IEnumerable<Guid> users = null)
+    {
+        await ValidateAsync(organization, group, collections);
+        await GroupRepositoryCreateGroupAsync(group, organization, collections);
+
+        if (users != null)
+        {
+            await GroupRepositoryUpdateUsersAsync(group, users, systemUser);
+        }
+
+        await _eventService.LogGroupEventAsync(group, Core.Enums.EventType.Group_Created, systemUser);
+    }
+
+    private async Task GroupRepositoryCreateGroupAsync(Group group, Organization organization, IEnumerable<CollectionAccessSelection> collections = null)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        group.CreationDate = group.RevisionDate = now;
+
+        if (collections == null)
+        {
+            await _groupRepository.CreateAsync(group);
+        }
+        else
+        {
+            await _groupRepository.CreateAsync(group, collections);
+        }
+    }
+
+    private async Task GroupRepositoryUpdateUsersAsync(Group group, IEnumerable<Guid> userIds,
+        EventSystemUser? systemUser = null)
+    {
+        var usersToAddToGroup = userIds as Guid[] ?? userIds.ToArray();
+
+        await _groupRepository.UpdateUsersAsync(group.Id, usersToAddToGroup, group.RevisionDate);
+
+        var users = await _organizationUserRepository.GetManyAsync(usersToAddToGroup);
+        var eventDate = group.RevisionDate;
+
+        if (systemUser.HasValue)
+        {
+            await _eventService.LogOrganizationUserEventsAsync(users.Select(u =>
+                (u, EventType.OrganizationUser_UpdatedGroups, systemUser.Value, (DateTime?)eventDate)));
+        }
+        else
+        {
+            await _eventService.LogOrganizationUserEventsAsync(users.Select(u =>
+                (u, EventType.OrganizationUser_UpdatedGroups, (DateTime?)eventDate)));
+        }
+    }
+
+    private async Task ValidateAsync(Organization organization, Group group, ICollection<CollectionAccessSelection> collections)
+    {
+        if (organization == null)
+        {
+            throw new BadRequestException("Organization not found");
+        }
+
+        if (!organization.UseGroups)
+        {
+            throw new BadRequestException("This organization cannot use groups.");
+        }
+
+        if (collections?.Any() == true)
+        {
+            var error = await _groupCollectionAccessValidator.ValidateAsync(group.OrganizationId, collections);
+            if (error is not null)
+            {
+                throw error.ToException();
+            }
+        }
+
+        var invalidAssociations = collections?.Where(cas => cas.Manage && (cas.ReadOnly || cas.HidePasswords));
+        if (invalidAssociations?.Any() ?? false)
+        {
+            throw new BadRequestException("The Manage property is mutually exclusive and cannot be true while the ReadOnly or HidePasswords properties are also true.");
+        }
+    }
+}

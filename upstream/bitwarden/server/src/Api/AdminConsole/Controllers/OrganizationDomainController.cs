@@ -1,0 +1,187 @@
+﻿using Bit.Api.AdminConsole.Models.Request;
+using Bit.Api.AdminConsole.Models.Request.Organizations;
+using Bit.Api.AdminConsole.Models.Response.Organizations;
+using Bit.Api.Models.Response;
+using Bit.Core.AdminConsole.OrganizationFeatures.OrganizationDomains.Interfaces;
+using Bit.Core.Context;
+using Bit.Core.Entities;
+using Bit.Core.Exceptions;
+using Bit.Core.Repositories;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Bit.Api.AdminConsole.Controllers;
+
+[Route("organizations")]
+[Authorize("Application")]
+public class OrganizationDomainController : Controller
+{
+    private readonly ICreateOrganizationDomainCommand _createOrganizationDomainCommand;
+    private readonly IVerifyOrganizationDomainCommand _verifyOrganizationDomainCommand;
+    private readonly IDeleteOrganizationDomainCommand _deleteOrganizationDomainCommand;
+    private readonly IGetOrganizationDomainByIdOrganizationIdQuery _getOrganizationDomainByIdAndOrganizationIdQuery;
+    private readonly IGetOrganizationDomainByOrganizationIdQuery _getOrganizationDomainByOrganizationIdQuery;
+    private readonly ICurrentContext _currentContext;
+    private readonly IOrganizationRepository _organizationRepository;
+    private readonly IOrganizationDomainRepository _organizationDomainRepository;
+
+    public OrganizationDomainController(
+        ICreateOrganizationDomainCommand createOrganizationDomainCommand,
+        IVerifyOrganizationDomainCommand verifyOrganizationDomainCommand,
+        IDeleteOrganizationDomainCommand deleteOrganizationDomainCommand,
+        IGetOrganizationDomainByIdOrganizationIdQuery getOrganizationDomainByIdAndOrganizationIdQuery,
+        IGetOrganizationDomainByOrganizationIdQuery getOrganizationDomainByOrganizationIdQuery,
+        ICurrentContext currentContext,
+        IOrganizationRepository organizationRepository,
+        IOrganizationDomainRepository organizationDomainRepository)
+    {
+        _createOrganizationDomainCommand = createOrganizationDomainCommand;
+        _verifyOrganizationDomainCommand = verifyOrganizationDomainCommand;
+        _deleteOrganizationDomainCommand = deleteOrganizationDomainCommand;
+        _getOrganizationDomainByIdAndOrganizationIdQuery = getOrganizationDomainByIdAndOrganizationIdQuery;
+        _getOrganizationDomainByOrganizationIdQuery = getOrganizationDomainByOrganizationIdQuery;
+        _currentContext = currentContext;
+        _organizationRepository = organizationRepository;
+        _organizationDomainRepository = organizationDomainRepository;
+    }
+
+    [HttpGet("{orgId}/domain")]
+    public async Task<ListResponseModel<OrganizationDomainResponseModel>> GetAll(Guid orgId)
+    {
+        // The Send Policy edit dialog will call this endpoint to read all claimed domains
+        // The validation used elsewhere in this controller gates on ManageSso policy alone
+        if (!await _currentContext.ManageSso(orgId) && !await _currentContext.ManagePolicies(orgId))
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var organization = await _organizationRepository.GetByIdAsync(orgId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        var domains = await _getOrganizationDomainByOrganizationIdQuery
+            .GetDomainsByOrganizationIdAsync(orgId);
+        var response = domains.Select(x => new OrganizationDomainResponseModel(x)).ToList();
+        return new ListResponseModel<OrganizationDomainResponseModel>(response);
+    }
+
+    /// <summary>
+    /// Returns the name and verification status of every domain claimed by the organization. This is available to
+    /// members who can manage users as well as those who can manage SSO, because the member invite flow needs to
+    /// read claimed domains. It omits the DNS verification token and the verification job metadata returned by
+    /// <see cref="GetAll"/>, so it discloses nothing about the organization's SSO configuration.
+    /// </summary>
+    /// <param name="orgId">Organization identifier</param>
+    /// <returns>List of claimed domains for the organization.</returns>
+    [HttpGet("{orgId}/domain/mini")]
+    public async Task<Bit.HttpExtensions.ListResponseModel<OrganizationDomainMiniResponseModel>> GetAllMini(Guid orgId)
+    {
+        if (!await _currentContext.ManageSso(orgId) && !await _currentContext.ManageUsers(orgId))
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var organization = await _organizationRepository.GetByIdAsync(orgId);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+
+        var domains = await _getOrganizationDomainByOrganizationIdQuery
+            .GetDomainsByOrganizationIdAsync(orgId);
+
+        return new Bit.HttpExtensions.ListResponseModel<OrganizationDomainMiniResponseModel>(
+            domains.Select(domain => new OrganizationDomainMiniResponseModel(domain)));
+    }
+
+    [HttpGet("{orgId}/domain/{id}")]
+    public async Task<OrganizationDomainResponseModel> Get(Guid orgId, Guid id)
+    {
+        await ValidateOrganizationAccessAsync(orgId);
+
+        var organizationDomain = await _getOrganizationDomainByIdAndOrganizationIdQuery
+            .GetOrganizationDomainByIdOrganizationIdAsync(id, orgId);
+        if (organizationDomain is null)
+        {
+            throw new NotFoundException();
+        }
+
+        return new OrganizationDomainResponseModel(organizationDomain);
+    }
+
+    [HttpPost("{orgId}/domain")]
+    public async Task<OrganizationDomainResponseModel> Post(Guid orgId,
+        [FromBody] OrganizationDomainRequestModel model)
+    {
+        await ValidateOrganizationAccessAsync(orgId);
+
+        var organizationDomain = new OrganizationDomain
+        {
+            OrganizationId = orgId,
+            DomainName = model.DomainName.ToLowerInvariant()
+        };
+
+        organizationDomain = await _createOrganizationDomainCommand.CreateAsync(organizationDomain);
+
+        return new OrganizationDomainResponseModel(organizationDomain);
+    }
+
+    [HttpPost("{orgId}/domain/{id}/verify")]
+    public async Task<OrganizationDomainResponseModel> Verify(Guid orgId, Guid id)
+    {
+        await ValidateOrganizationAccessAsync(orgId);
+
+        var organizationDomain = await _organizationDomainRepository.GetDomainByIdOrganizationIdAsync(id, orgId);
+        if (organizationDomain is null)
+        {
+            throw new NotFoundException();
+        }
+
+        organizationDomain = await _verifyOrganizationDomainCommand.UserVerifyOrganizationDomainAsync(organizationDomain);
+
+        return new OrganizationDomainResponseModel(organizationDomain);
+    }
+
+    [HttpDelete("{orgId}/domain/{id}")]
+    public async Task RemoveDomain(Guid orgId, Guid id)
+    {
+        await ValidateOrganizationAccessAsync(orgId);
+
+        var domain = await _organizationDomainRepository.GetDomainByIdOrganizationIdAsync(id, orgId);
+        if (domain is null)
+        {
+            throw new NotFoundException();
+        }
+
+        await _deleteOrganizationDomainCommand.DeleteAsync(domain);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("domain/sso/verified")]
+    public async Task<VerifiedOrganizationDomainSsoDetailsResponseModel> GetVerifiedOrgDomainSsoDetailsAsync(
+        [FromBody] OrganizationDomainSsoDetailsRequestModel model)
+    {
+        var ssoResults = (await _organizationDomainRepository
+            .GetVerifiedOrganizationDomainSsoDetailsAsync(model.Email))
+            .ToList();
+
+        return new VerifiedOrganizationDomainSsoDetailsResponseModel(
+            ssoResults.Select(ssoResult => new VerifiedOrganizationDomainSsoDetailResponseModel(ssoResult)));
+    }
+
+    private async Task ValidateOrganizationAccessAsync(Guid orgIdGuid)
+    {
+        if (!await _currentContext.ManageSso(orgIdGuid))
+        {
+            throw new UnauthorizedAccessException();
+        }
+
+        var organization = await _organizationRepository.GetByIdAsync(orgIdGuid);
+        if (organization == null)
+        {
+            throw new NotFoundException();
+        }
+    }
+}

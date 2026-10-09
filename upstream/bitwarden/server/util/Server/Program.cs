@@ -1,0 +1,47 @@
+﻿// FIXME: Update this file to be null safe and then delete the line below
+#nullable disable
+
+namespace Bit.Server;
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        var config = new ConfigurationBuilder()
+            .AddCommandLine(args)
+            .Build();
+
+        var builder = new HostBuilder()
+            .ConfigureWebHost(builder =>
+            {
+                builder.UseConfiguration(config);
+                builder.UseKestrel();
+                builder.UseStartup<Startup>();
+                builder.ConfigureKestrel((_, _) => { });
+
+                var webRoot = config.GetValue<string>("webRoot");
+                if (string.IsNullOrWhiteSpace(webRoot))
+                {
+                    builder.UseWebRoot(webRoot);
+                }
+            })
+            .ConfigureLogging(logging =>
+            {
+                logging.AddConsole()
+                    .AddDebug();
+            });
+
+        var contentRoot = config.GetValue<string>("contentRoot");
+        if (!string.IsNullOrWhiteSpace(contentRoot))
+        {
+            builder.UseContentRoot(contentRoot);
+        }
+        else
+        {
+            builder.UseContentRoot(Directory.GetCurrentDirectory());
+        }
+
+        var host = builder.Build();
+        host.Run();
+    }
+}
