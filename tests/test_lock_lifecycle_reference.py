@@ -28,6 +28,17 @@ class LockLifecycleReferenceTests(unittest.TestCase):
                 self.assertEqual(transition(snapshot, Event.REQUEST_UNLOCK), LockSnapshot())
         self.assertEqual(transition(LockSnapshot(), "unlock_success"), LockSnapshot())
 
+    def test_state_space_never_has_unlocked_output(self):
+        for state in LockState:
+            for pending in (False, True):
+                for event in Event:
+                    with self.subTest(state=state, pending=pending, event=event):
+                        outcome = transition(LockSnapshot(state, pending), event)
+                        self.assertIsInstance(outcome.state, LockState)
+                        self.assertIn(outcome.state, (LockState.LOCKED, LockState.UNLOCK_REQUESTED))
+                        self.assertEqual(outcome.pending_attempt,
+                                         outcome.state == LockState.UNLOCK_REQUESTED)
+
     def test_snapshot_is_immutable(self):
         pending = transition(LockSnapshot(), Event.REQUEST_UNLOCK)
         with self.assertRaises(AttributeError):
