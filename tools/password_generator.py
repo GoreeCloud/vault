@@ -19,9 +19,12 @@ def generate_password(
     digits: bool = True,
     symbols: bool = True,
     exclude_ambiguous: bool = False,
+    exclude_characters: str = "",
 ) -> str:
-    """Return a password containing each enabled class, using OS CSPRNG entropy.
+    """Generate a password containing each enabled character class.
 
+    Entropy comes from Python's OS-backed cryptographic secrets module.
+    The returned Python string cannot be guaranteed to be cleared from memory.
     No master-password handling or vault encryption is performed here.
     """
     if isinstance(length, bool) or not isinstance(length, int) or not 12 <= length <= 256:
@@ -29,17 +32,23 @@ def generate_password(
     options = (lowercase, uppercase, digits, symbols, exclude_ambiguous)
     if any(not isinstance(option, bool) for option in options):
         raise TypeError("character class options must be booleans")
+    if not isinstance(exclude_characters, str):
+        raise TypeError("exclude_characters must be a string")
+
     groups = [alphabet for enabled, alphabet in (
         (lowercase, LOWERCASE), (uppercase, UPPERCASE),
         (digits, DIGITS), (symbols, SYMBOLS)
     ) if enabled]
+    if not groups:
+        raise ValueError("select at least one character class")
+
+    excluded = set(exclude_characters)
     if exclude_ambiguous:
-        ambiguous = set("O0Il1")
-        groups = ["".join(ch for ch in group if ch not in ambiguous) for group in groups]
-    if not groups or any(not group for group in groups):
-        raise ValueError("select at least one nonempty character class")
-    if length < len(groups):
-        raise ValueError("length must accommodate each selected class")
+        excluded.update("O0Il1")
+    groups = ["".join(ch for ch in group if ch not in excluded) for group in groups]
+    if any(not group for group in groups):
+        raise ValueError("exclusions removed every character from an enabled class")
+
     result = [secrets.choice(group) for group in groups]
     alphabet = "".join(groups)
     result.extend(secrets.choice(alphabet) for _ in range(length - len(result)))
