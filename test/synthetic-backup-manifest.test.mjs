@@ -73,3 +73,33 @@ test("accessors, symbols, prototypes and hostile proxies fail closed without ech
   assert.equal(JSON.stringify(screen(manifest())).includes(B), false);
   assert.equal(JSON.stringify(screen(manifest())).includes(V), false);
 });
+
+
+test("property-get traps cannot fabricate encryption or empty-target claims", () => {
+  for (const [unsafe, field, safeValue] of [
+    [{...manifest(), clientEncryptedClaim:false}, "clientEncryptedClaim", true],
+    [{...manifest(), serverCanDecryptClaim:true}, "serverCanDecryptClaim", false]
+  ]) {
+    let reads = 0;
+    const proxy = new Proxy(unsafe, {get(target,k) {
+      if (k === field) {reads++;return safeValue;}
+      return Reflect.get(target,k);
+    }});
+    assert.equal(screen(proxy).candidate, false);
+    assert.equal(restore(proxy, context()).candidate, false);
+    assert.equal(reads, 0);
+  }
+  for (const [field, unsafeValue, safeValue] of [
+    ["targetEmpty",false,true], ["currentRevision",1,0],
+    ["rollbackEvidenceClaim",false,true], ["integrityEvidenceClaim",false,true],
+    ["operatorCanDecryptClaim",true,false]
+  ]) {
+    let reads = 0;
+    const proxy = new Proxy({...context(),[field]:unsafeValue}, {get(target,k) {
+      if (k === field) {reads++;return safeValue;}
+      return Reflect.get(target,k);
+    }});
+    assert.equal(restore(manifest(), proxy).candidate, false, field);
+    assert.equal(reads, 0, field);
+  }
+});

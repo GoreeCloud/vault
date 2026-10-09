@@ -72,3 +72,26 @@ test("accessors, symbols, unusual prototypes and proxies fail closed", () => {
     assert.equal(preflight(p).candidate, false);
   }
 });
+
+
+test("proxy cannot override declared no-write, consent, or recovery claims via property get", () => {
+  for (const [key, badValue, permittedValue] of [
+    ["dryRun", false, true],
+    ["sourceReadOnlyClaim", false, true],
+    ["temporaryPlaintextClaim", true, false],
+    ["explicitUserConsentClaim", false, true],
+    ["destinationEmptyClaim", false, true],
+    ["checksumEvidenceClaim", false, true]
+  ]) {
+    let reads = 0;
+    const data = {...plan(), [key]:badValue};
+    const trick = new Proxy(data, {
+      get(target, property, receiver) {
+        if (property === key) { reads++; return permittedValue; }
+        return Reflect.get(target, property, receiver);
+      }
+    });
+    assert.equal(preflight(trick).candidate, false, key);
+    assert.equal(reads, 0, "unexpected property read: " + key);
+  }
+});

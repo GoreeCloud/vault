@@ -5,6 +5,8 @@
  * transmitted. Caller claims about encryption/integrity are not evidence.
  * schemaVersion 0 is deliberately unshippable.
  */
+import { snapshotSyntheticExactRecord } from "./synthetic-exact-record.mjs";
+
 const MANIFEST_KEYS = Object.freeze([
   "schemaVersion", "backupId", "vaultId", "snapshotRevision", "itemCount",
   "opaqueBytes", "format", "clientEncryptedClaim", "serverCanDecryptClaim"
@@ -15,19 +17,6 @@ const RESTORE_KEYS = Object.freeze([
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const deny = reason => Object.freeze({ candidate: false, reason });
-
-function exactDataRecord(value, expected) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return false;
-  const keys = Reflect.ownKeys(value);
-  if (keys.length !== expected.length) return false;
-  return keys.every(key => {
-    if (typeof key !== "string" || !expected.includes(key)) return false;
-    const d = Object.getOwnPropertyDescriptor(value, key);
-    return d && Object.hasOwn(d, "value");
-  });
-}
 const uuid = value => typeof value === "string" && UUID.test(value);
 const count = (value, max) => Number.isSafeInteger(value) && value >= 0 && value <= max;
 const bool = value => value === true || value === false;
@@ -43,9 +32,10 @@ function validManifest(m) {
     m.serverCanDecryptClaim === false;
 }
 
-export function screenSyntheticBackupManifest(manifest) {
+export function screenSyntheticBackupManifest(manifestInput) {
   try {
-    if (!exactDataRecord(manifest, MANIFEST_KEYS)) return deny("invalid-shape");
+    const manifest = snapshotSyntheticExactRecord(manifestInput, MANIFEST_KEYS);
+    if (!manifest) return deny("invalid-shape");
     if (!validManifest(manifest)) return deny("invalid-development-manifest");
     if (manifest.itemCount === 0 && manifest.opaqueBytes !== 0) {
       return deny("empty-count-size-mismatch");
@@ -59,10 +49,11 @@ export function screenSyntheticBackupManifest(manifest) {
   }
 }
 
-export function planSyntheticRestoreMetadata(manifest, context) {
+export function planSyntheticRestoreMetadata(manifestInput, contextInput) {
   try {
-    if (!exactDataRecord(manifest, MANIFEST_KEYS) ||
-        !exactDataRecord(context, RESTORE_KEYS)) return deny("invalid-shape");
+    const manifest = snapshotSyntheticExactRecord(manifestInput, MANIFEST_KEYS);
+    const context = snapshotSyntheticExactRecord(contextInput, RESTORE_KEYS);
+    if (!manifest || !context) return deny("invalid-shape");
     if (!validManifest(manifest) ||
         context.schemaVersion !== 0 ||
         !uuid(context.targetVaultId) ||
