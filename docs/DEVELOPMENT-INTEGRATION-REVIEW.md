@@ -26,7 +26,7 @@ The integration only reconciles `README.md`, adds this evidence record, and adds
 ## Review checklist
 
 1. Verify this branch's exact head, parent, base and changed-path inventory against the PRs above.
-2. Inspect the combined README, test fixture imports, complete `npm test` Node/source gates and relevant Python workflow; record actual counts and exact run IDs.
+2. Inspect the combined README and source-blob provenance. Run the exact-head foundation workflow, which must execute both `npm test` (Node/source) and Python lock-lifecycle reference unit tests on the same SHA; record counts, step status and run IDs. The separate path-filtered Python workflow does not always run on unrelated source changes.
 3. Review conflict and behavior coupling between profile isolation, idempotency, offline sync and access-boundary proposals; document gaps before authorizing operational code.
 4. Reconcile active task management and provider-native issues without duplicating obligations.
 5. Only request formal review on a frozen, fully identified target revision after all applicable foundational source, license and runtime requirements have adequate evidence.
