@@ -60,7 +60,7 @@ export function inspectDevelopmentBoundary({ manifest, html, css, workflow, lock
     !workflow.includes("permissions:\n  contents: read") ||
     !workflow.includes("persist-credentials: false") ||
     !workflow.includes("run: npm test") ||
-    !workflow.includes("python -m unittest discover -s tests -p 'test_lock_lifecycle*.py' -v") ||
+    !workflow.includes("python -m unittest discover -s tests -p 'test_*.py' -v") ||
     /(?:id-token|packages|actions):\s*write\b/i.test(workflow) ||
     /(?:npm publish|docker push|kubectl apply|deploy to production)\b/i.test(workflow),
     "ci-least-privilege-or-coverage-gap");
