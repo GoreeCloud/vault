@@ -26,8 +26,13 @@ function copySnapshot(source) {
 
 function copyQueue(input) {
   if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) return null;
-  const count = input.length;
-  if (!Number.isSafeInteger(count) || count < 1 || count > 16) return null;
+  // Snapshot the *own data descriptor*, never the caller's [[Get]] trap.
+  // Hostile proxies may still fabricate descriptors: this is fixture hygiene,
+  // not integrity, authorization, or a real offline queue.
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(input, "length");
+  const count = lengthDescriptor?.value;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value") ||
+      !Number.isSafeInteger(count) || count < 1 || count > 16) return null;
   const keys = Reflect.ownKeys(input);
   if (keys.length !== count+1 || !keys.includes("length")) return null;
   const copy = [];

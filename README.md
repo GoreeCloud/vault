@@ -17,7 +17,7 @@ GoreeCloud Vault is the planned self-hostable, local-first, zero-knowledge crede
 - `src/autofill-preflight.mjs` — non-authoritative browser autofill candidate screening; never reads or fills secrets
 - `src/opaque-sync-preflight.mjs` — synthetic encrypted-record shape screening; schema v0, never persists, decrypts or authorizes real data
 - `src/synthetic-revision-model.mjs` — pure no-storage revision/tombstone conflict proposals for fixture tests only
-- `src/synthetic-offline-queue.mjs` — bounded metadata-only sequencing of fabricated offline edits; no storage or retries
+- `src/synthetic-offline-queue.mjs` — bounded descriptor-snapshotted metadata-only sequencing of fabricated offline edits; no storage or retries
 - `src/synthetic-access-boundary.mjs` — non-operational single-owner role/scope screening for synthetic fixtures only
 - `src/synthetic-client-item-schema.mjs` — client-private field-name templates only, with no credential values, persistence or encryption
 - `src/synthetic-device-revocation.mjs` — bounded fabricated device/session revocation proposals, not real session invalidation or authorization
@@ -52,7 +52,7 @@ npm test
 
 This tests repository import boundaries, isolated origin matching, an unapproved password-generation prototype, hardened autofill candidate screening and hostile-input checks, opaque-sync envelope shape checks, synthetic access-boundary tests, client-private item template shape screening, synthetic revision/conflict transitions, bounded offline-queue ordering, fabricated lock/reauth lifecycle transitions, metadata-only backup/restore screening, identifier-free coarse observability envelopes, conservative passkey RP/origin screening, no-write migration dry-run planning, and clipboard clear-lifecycle proposals. None is a working browser extension, cryptographic vault, or server. It **does not** test the upstream server/clients, deployed cryptography, password storage, browser autofill integration, or production readiness.
 
-## Security default
+See the [security review evidence map](docs/SECURITY-REVIEW-EVIDENCE.md) for the exact-revision release blockers and evidence categories.\n\n## Security default
 
 No credential ingestion, key storage, public enrollment, extension permissions, deployment, or automatic migration is authorized by this foundation. The approved product must use reviewed libraries and cryptographic protocols, with end-to-end client-side encryption, failure-case testing, explicit human crypto security review, auditability, and rollback.
 
