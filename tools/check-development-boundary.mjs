@@ -100,7 +100,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     css: at("preview/styles.css"),
     workflow: at(".github/workflows/foundation.yml"),
     lock: JSON.parse(at("source-lock.json")),
-    trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8"}).split("\0").filter(Boolean)
+    trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8", maxBuffer: 64 * 1024 * 1024}).split("\0").filter(Boolean)
   });
   if (!result.ok) {
     process.stderr.write("Development release boundary violations: " + result.violations.join(", ") + "\n");

@@ -11,7 +11,7 @@ const initial = {
   css: read("preview/styles.css"),
   workflow: read(".github/workflows/foundation.yml"),
   lock: JSON.parse(read("source-lock.json")),
-  trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8"}).split("\0").filter(Boolean)
+  trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8", maxBuffer: 64 * 1024 * 1024}).split("\0").filter(Boolean)
 };
 const fixture = () => structuredClone(initial);
 const contains = (result, code) => {
