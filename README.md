@@ -54,6 +54,8 @@ npm test
 
 The PR foundation workflow also runs the isolated Python lock-lifecycle regression suite against the **same exact commit**, regardless of whether Python files changed. This is Development test evidence, not an accepted lock service.
 
+The development-only build guard (`tools/check-development-boundary.mjs`) also fails closed on accidentally added package/release entrypoints, preview forms/remote resources, source-lock promotion or weakened CI checks. It cannot replace licensing, cryptographic security, runtime or release review. See [guard limits](docs/DEVELOPMENT-BOUNDARY.md).
+
 This tests repository import boundaries, isolated origin matching, an unapproved password-generation prototype, hardened autofill candidate screening and hostile-input checks, opaque-sync envelope shape checks, synthetic access-boundary tests, client-private item template shape screening, synthetic revision/conflict transitions, bounded offline-queue ordering, untrusted idempotency/revision lifecycle screening, anonymous multi-profile switch proposals, fabricated lock/reauth lifecycle transitions, metadata-only backup/restore screening, identifier-free coarse observability envelopes, conservative passkey RP/origin screening, no-write migration dry-run planning, and clipboard clear-lifecycle proposals. None is a working browser extension, cryptographic vault, or server. It **does not** test the upstream server/clients, deployed cryptography, password storage, browser autofill integration, or production readiness.
 
 See the [security review evidence map](docs/SECURITY-REVIEW-EVIDENCE.md) for the exact-revision release blockers and evidence categories.
