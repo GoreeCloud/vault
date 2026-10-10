@@ -10,6 +10,7 @@ const initial = {
   html: read("preview/index.html"),
   css: read("preview/styles.css"),
   workflow: read(".github/workflows/foundation.yml"),
+  referenceWorkflow: read(".github/workflows/lock-lifecycle-reference.yml"),
   lock: JSON.parse(read("source-lock.json")),
   trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8", maxBuffer: 64 * 1024 * 1024}).split("\0").filter(Boolean)
 };
@@ -102,4 +103,40 @@ test("fails closed for absent or untrusted evidence and never leaks caller bytes
   const r=inspect(x);
   contains(r,"first-party-sensitive-or-commercial-path");
   assert.ok(!JSON.stringify(r).includes("synthetic-example-credential"));
+});
+
+test("rejects new workflows outside the exact reviewed CI allowlist", () => {
+  for (const path of [
+    ".github/workflows/deploy.yml",
+    ".github/workflows/extra.yaml",
+    ".github/workflows/unreviewed-lock-copy.yml"
+  ]) {
+    const f = fixture();
+    f.trackedPaths.push(path);
+    contains(inspect(f), "ci-unreviewed-workflow-path");
+  }
+  const missing=fixture();
+  missing.trackedPaths=missing.trackedPaths.filter(p =>
+    p !== ".github/workflows/lock-lifecycle-reference.yml");
+  contains(inspect(missing), "ci-unreviewed-workflow-path");
+});
+
+test("rejects unsafe secondary lock-lifecycle CI changes", () => {
+  const unsafe=[
+    value => value.replace("persist-credentials: false", "persist-credentials: true"),
+    value => value.replace("contents: read", "contents: write"),
+    value => value.replace("python -m unittest discover", "python -m changed discover"),
+    value => value + "\n  id-token: write\n",
+    value => value + "\n  pull_request_target:\n",
+    value => value.replace("actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+      "actions/checkout@v4"),
+  ];
+  for(const mutate of unsafe) {
+    const f=fixture();
+    f.referenceWorkflow=mutate(f.referenceWorkflow);
+    contains(inspect(f), "ci-unreviewed-secondary-workflow");
+  }
+  const absent=fixture();
+  delete absent.referenceWorkflow;
+  contains(inspect(absent), "ci-unreviewed-secondary-workflow");
 });
