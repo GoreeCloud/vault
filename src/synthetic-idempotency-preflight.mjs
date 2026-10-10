@@ -1,31 +1,58 @@
-/** DEVELOPMENT ONLY. Untrusted metadata preflight; never enforces idempotency. */
-const fields=["schemaVersion","expectedRevision","observedRevision","requestSequence","lastAcceptedSequence","operation"];
-const operations=new Set(["create","replace","delete"]);
-const reject=reason=>Object.freeze({candidate:false,reason});
-export function screenSyntheticIdempotency(input){
- try{
-  if(!input||typeof input!=="object"||Array.isArray(input))return reject("invalid-fixture");
-  const proto=Object.getPrototypeOf(input);
-  if(proto!==Object.prototype&&proto!==null)return reject("invalid-fixture");
-  const keys=Reflect.ownKeys(input);
-  if(keys.length!==fields.length)return reject("invalid-fixture");
-  const x=Object.create(null);
-  for(const key of keys){
-   if(typeof key!=="string"||!fields.includes(key))return reject("invalid-fixture");
-   const d=Object.getOwnPropertyDescriptor(input,key);
-   if(!d||!Object.hasOwn(d,"value"))return reject("invalid-fixture");
-   x[key]=d.value;
+/**
+ * DEVELOPMENT ONLY — synthetic sequence and lifecycle preflight.
+ *
+ * All metadata comes from a potentially malicious fixture; a passing proposal
+ * does NOT authorize, persist, encrypt, replay-protect or authenticate anything.
+ * Schema version 0 is deliberately not a production protocol.
+ */
+import { snapshotSyntheticExactRecord } from "./synthetic-exact-record.mjs";
+
+const FIELDS = Object.freeze([
+  "schemaVersion", "expectedRevision", "observedRevision", "observedStatus",
+  "requestSequence", "lastAcceptedSequence", "operation"
+]);
+const OPERATIONS = new Set(["create", "replace", "delete"]);
+const STATES = new Set(["empty", "active", "tombstone"]);
+const deny = reason => Object.freeze({ candidate: false, reason });
+const counter = value => Number.isSafeInteger(value) && value >= 0;
+
+/**
+ * A candidate only describes a possible transition for fabricated metadata.
+ * Never use it as an idempotency key, write grant, authenticated CAS, or
+ * decision on real vault contents.
+ */
+export function screenSyntheticIdempotency(input) {
+  try {
+    const x = snapshotSyntheticExactRecord(input, FIELDS);
+    if (!x || x.schemaVersion !== 0 ||
+        !OPERATIONS.has(x.operation) || !STATES.has(x.observedStatus) ||
+        !["expectedRevision", "observedRevision", "requestSequence",
+          "lastAcceptedSequence"].every(key => counter(x[key]))) {
+      return deny("invalid-fixture");
+    }
+    if (x.expectedRevision !== x.observedRevision) return deny("stale-revision");
+    if (x.requestSequence <= x.lastAcceptedSequence) return deny("replayed-sequence");
+    if (x.lastAcceptedSequence === Number.MAX_SAFE_INTEGER ||
+        x.requestSequence !== x.lastAcceptedSequence + 1) return deny("sequence-gap");
+    if (x.observedRevision === Number.MAX_SAFE_INTEGER) return deny("revision-overflow");
+    // A revision-zero item can only be empty; tombstones cannot be resurrected.
+    if ((x.observedStatus === "empty" && x.observedRevision !== 0) ||
+        (x.observedStatus !== "empty" && x.observedRevision < 1) ||
+        (x.operation === "create" && x.observedStatus !== "empty") ||
+        (x.operation !== "create" && x.observedStatus !== "active")) {
+      return deny("invalid-transition");
+    }
+    return Object.freeze({
+      candidate: true,
+      reason: "synthetic-idempotency-proposal-only",
+      plan: Object.freeze({
+        nextSequence: x.requestSequence,
+        nextRevision: x.observedRevision + 1,
+        nextStatus: x.operation === "delete" ? "tombstone" : "active",
+        requiresAuthenticatedAtomicAuthority: true
+      })
+    });
+  } catch {
+    return deny("invalid-fixture");
   }
-  if(x.schemaVersion!==0||!operations.has(x.operation))return reject("invalid-fixture");
-  for(const key of ["expectedRevision","observedRevision","requestSequence","lastAcceptedSequence"])
-   if(!Number.isSafeInteger(x[key])||x[key]<0)return reject("invalid-fixture");
-  if(x.expectedRevision!==x.observedRevision)return reject("stale-revision");
-  if(x.requestSequence<=x.lastAcceptedSequence)return reject("replayed-sequence");
-  if(x.lastAcceptedSequence===Number.MAX_SAFE_INTEGER||
-     x.requestSequence!==x.lastAcceptedSequence+1)return reject("sequence-gap");
-  if(x.expectedRevision===Number.MAX_SAFE_INTEGER)return reject("revision-overflow");
-  return Object.freeze({candidate:true,reason:"synthetic-idempotency-proposal-only",
-   plan:Object.freeze({nextSequence:x.requestSequence,nextRevision:x.expectedRevision+1,
-    requiresAuthenticatedAtomicAuthority:true})});
- }catch{return reject("invalid-fixture");}
 }
