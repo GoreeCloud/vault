@@ -4,6 +4,8 @@
 
 The command `node tools/check-development-boundary.mjs` is included in `npm test` on each pull request. It inspects the checked-out source and emits stable violation codes without reflecting caller-provided bytes. It fails if the current Development-only package grows executable/release scripts, unapproved package dependencies or binary entrypoints; if the static preview gains forms, executable elements, remote fetches or loses its warning/CSP; if the source-lock no longer classifies the imported Bitwarden source as reference-only; or if CI drops current limited permissions and combined Node/Python tests. It also screens first-party tracked paths for sensitive-file and early deployment surfaces.
 
+The CI guard now checks **both** allowlisted workflow files: `.github/workflows/foundation.yml` and `.github/workflows/lock-lifecycle-reference.yml`. A new or removed workflow path fails closed until reviewed and added to the Development policy. The lock-reference workflow's read-only permissions, SHA-pinned checkout/Python setup, non-persisting checkout credentials and regression-test command are checked; tests deliberately inject privilege escalation, dispatch widening and unreviewed workflow names. The guard is static and does not replace GitHub repository branch protection, runner isolation or a review of the complete Actions execution graph.
+
 ## Behavior and limits
 
 - Explicit fixture policy: `private: true`, `0.1.0-dev` version, named allowed package scripts and no declared runtime dependencies or distribution entrypoints. Any deliberate future expansion requires a code-reviewed guard update and relevant approvals.
