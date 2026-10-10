@@ -8,7 +8,14 @@
     "stableRuntime": "js/glaze-v1.7.0.mjs",
     "stableScope": "contracts/v1.7/stable-scope.json",
     "scopeBlobAtInspection": "187be631e91d1f0640eb144fc258fced3d94828d",
-    "consumerRegistry": "consumers/registry.json"
+    "consumerRegistry": "consumers/registry.json",
+    "glazeMainAtInspection": "0798de28fe0626d6cc8bd7986dc9c4b922119c35",
+    "stableRuntimeBlobAtInspection": "c669d9c6f1738b2a56cb02b2e00fa0ca229117c0",
+    "inheritedStableRuntime": "js/glaze-v1.6.0.mjs",
+    "retainedDev47Included": false,
+    "successorDev171IsStable": false,
+    "consumerRegistryBlobAtInspection": "8efbee7eaa7ae24f7c8eeb306088c22355ef9c15",
+    "vaultListedInConsumerRegistryAtInspection": false
   },
   "acceptance": {
     "runtimeImported": false,
@@ -31,5 +38,5 @@
     "registryAcceptance": null,
     "productionApproval": null
   },
-  "scopeNote": "Local read-only preview is unqualified. Glaze consumer acceptance cannot be inferred from upstream Stable status or screenshots."
+  "scopeNote": "Recorded source blobs and Glaze main revision represent an inspection snapshot, NOT runtime pinning. Local read-only preview is unqualified. No registered Vault Glaze consumer or production acceptance; the bounded 1.7.0 Stable entrypoint inherits 1.6.0, not unreviewed 1.7.1 Development."
 }
