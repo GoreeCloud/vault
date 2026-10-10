@@ -16,6 +16,15 @@ The test detects unexpected first-party promotion of the source-lock classificat
 
 **Examples to inspect in an approved reviewer environment:** server `src/Admin/package-lock.json`, `src/Api/packages.lock.json`, `src/Core/MailTemplates/Mjml/package-lock.json`; clients `package-lock.json` and `apps/desktop/desktop_native/Cargo.lock`.
 
+## Reference lockfile spot-check (automated Development regression)
+
+`test/pinned-lockfile-spotcheck.test.mjs` parses two **committed, reference-only** lockfiles in the imported trees without resolving or installing packages.
+
+- Server `src/Api/packages.lock.json` (Git blob `e29842fbbbf31784e2ab2f7aa06c7ea43050a085`): `net10.0` contains **175** dependency entries — **14 Direct, 144 Transitive, 17 Project**. The first 158 have resolved package versions; the 17 project entries are source-project references, not unversioned NuGet registry entries.
+- Clients `apps/desktop/desktop_native/Cargo.lock` (Git blob `3a239261ab8953d6eddba9f7d03f1cf59bea9177`): **646** package sections, partitioned by declared origin into **622 registry, 10 Git and 14 local/no source**. **24** package sections have no checksum field. That absence is not evidence of compromise and requires assessment in context.
+
+The regression asserts counts, source-type partitions and basic declared field presence. It does **not** validate content checksums, signatures, SPDX licenses, advisories or the dependencies of all workspaces. It is not a comprehensive TOML parser or a distributable SBOM. The checks passed at exact commit `e24447864427eb2d0278d047205fd58d3510d265` in [Actions run 38020013778](https://github.com/GoreeCloud/vault/actions/runs/38020013778) (178 Node, 27 Python). Any documentation change requires another exact-head validation.
+
 ## Critical limits
 
 A filename-pattern census is not a dependency graph and does not prove the packages are installed, used or reachable. The test includes common npm, .NET, Rust, Go, Python, JVM, Ruby, PHP, Dart, Swift and other declaration/lock formats; custom or embedded formats may be missed. No lockfile contents, package versions, transitive dependencies, license compatibility, attribution compliance, advisories, signing evidence, SAST results or release artifacts have been reviewed. This source inventory does not replace a qualified legal/security review of the *actual target distribution*.
