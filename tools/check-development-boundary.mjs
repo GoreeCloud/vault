@@ -21,12 +21,16 @@ const forbiddenManifestKeys = [
   "publishConfig", "dependencies", "devDependencies",
   "peerDependencies", "optionalDependencies"
 ];
+const expectedWorkflowPaths = Object.freeze([
+  ".github/workflows/foundation.yml",
+  ".github/workflows/lock-lifecycle-reference.yml"
+]);
 const expectedSourcePaths = Object.freeze({
   server: "upstream/bitwarden/server",
   clients: "upstream/bitwarden/clients"
 });
 
-export function inspectDevelopmentBoundary({ manifest, html, css, workflow, lock, trackedPaths } = {}) {
+export function inspectDevelopmentBoundary({ manifest, html, css, workflow, referenceWorkflow, lock, trackedPaths } = {}) {
   const violations = [];
   const flag = (bad, code) => { if (bad) violations.push(code); };
 
@@ -65,6 +69,18 @@ export function inspectDevelopmentBoundary({ manifest, html, css, workflow, lock
     /(?:npm publish|docker push|kubectl apply|deploy to production)\b/i.test(workflow),
     "ci-least-privilege-or-coverage-gap");
 
+  // Only the two reviewed Development workflows may execute on this branch.
+  // This is a static tripwire, not a guarantee that GitHub Actions is secure.
+  flag(typeof referenceWorkflow !== "string" ||
+    !referenceWorkflow.includes("permissions:\n  contents: read") ||
+    !referenceWorkflow.includes("persist-credentials: false") ||
+    !referenceWorkflow.includes("python -m unittest discover -s tests -p 'test_lock_lifecycle*.py' -v") ||
+    !referenceWorkflow.includes("actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683") ||
+    !referenceWorkflow.includes("actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065") ||
+    /(?:id-token|packages|actions|contents):\s*write\b/i.test(referenceWorkflow) ||
+    /\b(?:pull_request_target|workflow_run|repository_dispatch|npm publish|docker push|kubectl apply)\b/i.test(referenceWorkflow),
+    "ci-unreviewed-secondary-workflow");
+
   if (!isRecord(lock) || lock.classification !== "source-reference-only" ||
       lock.schemaVersion !== 1 || !Array.isArray(lock.upstream) ||
       lock.upstream.length !== 2 ||
@@ -80,6 +96,11 @@ export function inspectDevelopmentBoundary({ manifest, html, css, workflow, lock
   if (!Array.isArray(trackedPaths) || trackedPaths.some(x => typeof x !== "string")) {
     violations.push("tracked-paths-unavailable");
   } else {
+    const checked = trackedPaths.filter(p => p.startsWith(".github/workflows/"));
+    flag(checked.length !== expectedWorkflowPaths.length ||
+      checked.some(p => !expectedWorkflowPaths.includes(p)) ||
+      expectedWorkflowPaths.some(p => !checked.includes(p)),
+      "ci-unreviewed-workflow-path");
     // Upstream path trees retain upstream notices and are separately pinned
     // by check-foundation.mjs. This checks first-party additions, not upstream.
     const own = trackedPaths.filter(p => !p.startsWith("upstream/bitwarden/"));
@@ -99,6 +120,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     html: at("preview/index.html"),
     css: at("preview/styles.css"),
     workflow: at(".github/workflows/foundation.yml"),
+    referenceWorkflow: at(".github/workflows/lock-lifecycle-reference.yml"),
     lock: JSON.parse(at("source-lock.json")),
     trackedPaths: execFileSync("git", ["ls-files", "-z"], {encoding:"utf8", maxBuffer: 64 * 1024 * 1024}).split("\0").filter(Boolean)
   });
