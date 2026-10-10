@@ -2,7 +2,9 @@
 
 **No real credential handling.** The pure `src/synthetic-offline-queue.mjs` models 1–16 fabricated one-item edit intents containing only identifiers, proposed operations, and revisions. Schema `0` is not shippable. No ciphertext, secrets, keys, network calls, file writes, sessions, grants or persistent queues are used.
 
-The simulation passes a proposal through the existing synthetic revision model, with provisional create/replace/delete/tombstone transitions. It rejects missing or malformed context, stale or duplicate edits, item/vault mismatches and post-delete resurrection. An invalid item anywhere in the sequence yields a **whole-plan denial**, never a partially accepted output. Affirmative output includes only the proposed final revision/status and step count.
+The simulation passes a proposal through the existing synthetic revision model, with provisional create/replace/delete/tombstone transitions. It rejects missing or malformed context, stale or duplicate edits, item/vault mismatches and post-delete resurrection. Queue length is now taken from a bounded **own data descriptor** rather than an ordinary array `length` property read. This avoids invoking a caller-controlled Proxy `get` trap during shape validation; sparse, oversized, accessor-backed, decorated, and inconsistent arrays remain rejected. The array's elements are copied from own data descriptors before processing. These checks are defensive fixture hygiene only: a malicious Proxy can still forge descriptor claims, and this model provides no authenticated input provenance or atomic execution.
+
+An invalid item anywhere in the sequence yields a **whole-plan denial**, never a partially accepted output. Affirmative output includes only the proposed final revision/status and step count.
 
 ## Trust and race boundary
 
