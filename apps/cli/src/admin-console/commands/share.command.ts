@@ -19,7 +19,10 @@ export class ShareCommand {
   ) {}
 
   async run(id: string, organizationId: string, requestJson: string): Promise<Response> {
-    if (process.env.BW_SERVE !== "true" && (requestJson == null || requestJson === "")) {
+    if (
+      process.env.GOREECLOUD_VAULT_SERVE !== "true" &&
+      (requestJson == null || requestJson === "")
+    ) {
       requestJson = await CliUtils.readStdin();
     }
 

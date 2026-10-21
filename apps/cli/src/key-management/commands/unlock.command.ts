@@ -56,7 +56,7 @@ export class UnlockCommand {
     if (
       !passwordWasProvided &&
       !conversionRequired &&
-      process.env.BW_NOINTERACTION !== "true" &&
+      process.env.GOREECLOUD_VAULT_NOINTERACTION !== "true" &&
       (await this.tryUnlockWithDesktop(userId))
     ) {
       return this.successResponse();
@@ -107,7 +107,10 @@ export class UnlockCommand {
         return false;
       }
 
-      if (process.env.BW_QUIET !== "true" && process.env.BW_RESPONSE !== "true") {
+      if (
+        process.env.GOREECLOUD_VAULT_QUIET !== "true" &&
+        process.env.GOREECLOUD_VAULT_RESPONSE !== "true"
+      ) {
         CliUtils.writeLn("Unlocking with biometrics...", false, true);
       }
 

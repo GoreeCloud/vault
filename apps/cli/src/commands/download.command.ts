@@ -46,7 +46,7 @@ export abstract class DownloadCommand {
 
     try {
       const decBuf = await decrypt(response);
-      if (process.env.BW_SERVE === "true") {
+      if (process.env.GOREECLOUD_VAULT_SERVE === "true") {
         const res = new FileResponse(Buffer.from(decBuf), fileName);
         return Response.success(res);
       } else {

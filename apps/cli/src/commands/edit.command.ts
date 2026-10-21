@@ -56,7 +56,10 @@ export class EditCommand {
     requestJson: any,
     cmdOptions: Record<string, any>,
   ): Promise<Response> {
-    if (process.env.BW_SERVE !== "true" && (requestJson == null || requestJson === "")) {
+    if (
+      process.env.GOREECLOUD_VAULT_SERVE !== "true" &&
+      (requestJson == null || requestJson === "")
+    ) {
       requestJson = await CliUtils.readStdin();
     }
 
@@ -343,8 +346,8 @@ export class EditCommand {
     // When user has disabled interactivity or does not have the ability to prompt,
     // automatically move the item back to the vault and inform them.
     if (
-      process.env.BW_SERVE === "true" ||
-      process.env.BW_NOINTERACTION === "true" ||
+      process.env.GOREECLOUD_VAULT_SERVE === "true" ||
+      process.env.GOREECLOUD_VAULT_NOINTERACTION === "true" ||
       !process.stdin.isTTY
     ) {
       CliUtils.writeLn(

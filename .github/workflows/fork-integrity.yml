@@ -38,3 +38,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_user_agent_identity.py'
       - name: CLI development network entrypoint guard
         run: python3 -m unittest discover -s tests -p 'test_cli_send_hold.py'
+      - name: CLI inherited process environment isolation
+        run: python3 -m unittest discover -s tests -p 'test_cli_ambient_flags.py'

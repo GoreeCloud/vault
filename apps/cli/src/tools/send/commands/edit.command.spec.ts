@@ -344,15 +344,15 @@ describe("SendEditCommand", () => {
 
   describe("validation", () => {
     it("should return error when requestJson is empty", async () => {
-      // Set BW_SERVE to prevent readStdin call
-      process.env.BW_SERVE = "true";
+      // Set GOREECLOUD_VAULT_SERVE to prevent readStdin call
+      process.env.GOREECLOUD_VAULT_SERVE = "true";
 
       const response = await command.run("", {});
 
       expect(response.success).toBe(false);
       expect(response.message).toBe("`requestJson` was not provided.");
 
-      delete process.env.BW_SERVE;
+      delete process.env.GOREECLOUD_VAULT_SERVE;
     });
 
     it("should return error when id is not provided", async () => {

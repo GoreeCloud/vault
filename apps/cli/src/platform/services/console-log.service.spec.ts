@@ -21,15 +21,15 @@ describe("CLI Console log service", () => {
     restoreConsole();
   });
 
-  it("should redirect all console to error if BW_RESPONSE env is true", () => {
-    process.env.BW_RESPONSE = "true";
+  it("should redirect all console to error if GOREECLOUD_VAULT_RESPONSE env is true", () => {
+    process.env.GOREECLOUD_VAULT_RESPONSE = "true";
 
     logService.debug("this is a debug message", error, obj);
     expect(consoleSpy.error).toHaveBeenCalledWith("this is a debug message", error, obj);
   });
 
-  it("should not redirect console to error if BW_RESPONSE != true", () => {
-    process.env.BW_RESPONSE = "false";
+  it("should not redirect console to error if GOREECLOUD_VAULT_RESPONSE != true", () => {
+    process.env.GOREECLOUD_VAULT_RESPONSE = "false";
 
     logService.debug("debug", error, obj);
     logService.info("info", error, obj);

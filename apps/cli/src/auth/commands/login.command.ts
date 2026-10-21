@@ -82,7 +82,7 @@ export class LoginCommand {
     this.options = options;
     this.email = email;
 
-    this.canInteract = process.env.BW_NOINTERACTION !== "true";
+    this.canInteract = process.env.GOREECLOUD_VAULT_NOINTERACTION !== "true";
 
     let ssoCodeVerifier: string = null;
     let ssoCode: string = null;
@@ -505,7 +505,8 @@ export class LoginCommand {
     const additionalAuthenticationMessage = "Additional authentication required.\nAPI key ";
     let clientSecret: string = null;
 
-    const storedClientSecret: string = this.clientSecret || process.env.GOREECLOUD_VAULT_CLIENT_SECRET;
+    const storedClientSecret: string =
+      this.clientSecret || process.env.GOREECLOUD_VAULT_CLIENT_SECRET;
     if (storedClientSecret == null) {
       if (this.canInteract) {
         const answer: inquirer.Answers = await inquirer.createPromptModule({

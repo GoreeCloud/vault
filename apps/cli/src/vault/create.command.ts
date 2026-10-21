@@ -61,7 +61,10 @@ export class CreateCommand {
   ): Promise<Response> {
     let req: any = null;
     if (object !== "attachment") {
-      if (process.env.BW_SERVE !== "true" && (requestJson == null || requestJson === "")) {
+      if (
+        process.env.GOREECLOUD_VAULT_SERVE !== "true" &&
+        (requestJson == null || requestJson === "")
+      ) {
         requestJson = await CliUtils.readStdin();
       }
 
@@ -145,7 +148,7 @@ export class CreateCommand {
     }
     let fileBuf: Buffer = null;
     let fileName: string = null;
-    if (process.env.BW_SERVE === "true") {
+    if (process.env.GOREECLOUD_VAULT_SERVE === "true") {
       fileBuf = additionalData.fileBuffer;
       fileName = additionalData.fileName;
     } else {

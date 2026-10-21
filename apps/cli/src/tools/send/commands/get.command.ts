@@ -34,7 +34,7 @@ export class SendGetCommand extends DownloadCommand {
   }
 
   async run(id: string, options: OptionValues) {
-    const serveCommand = process.env.BW_SERVE === "true";
+    const serveCommand = process.env.GOREECLOUD_VAULT_SERVE === "true";
     if (serveCommand && !Utils.isGuid(id)) {
       return Response.badRequest("`" + id + "` is not a GUID.");
     }
