@@ -26,5 +26,7 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_dependency_security_versions.py'
       - name: Inherited cryptography call-site change detection
         run: python3 -m unittest discover -s tests -p 'test_legacy_dependency_review.py'
+      - name: CLI profile source boundary guards
+        run: python3 -m unittest discover -s tests -p 'test_cli_isolation_boundary.py'
       - name: CLI upstream update rejection guard
         run: python3 -m unittest discover -s tests -p 'test_cli_update_boundary.py'

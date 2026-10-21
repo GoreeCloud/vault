@@ -1,5 +1,6 @@
 {
   "name": "@bitwarden/cli",
+  "private": true,
   "description": "A secure and free password manager for all of your devices.",
   "version": "2026.10.1",
   "keywords": [
@@ -24,7 +25,7 @@
     "build:oss:prod": "cross-env NODE_ENV=production webpack",
     "build:oss:prod:watch": "cross-env NODE_ENV=production webpack --watch",
     "debug": "node --inspect ./build/bw.js",
-    "publish:npm": "npm run build:oss:prod && npm publish --access public",
+    "publish:npm": "node -e \"console.error('GoreeCloud Vault CLI publishing is blocked until release approval.');process.exit(1)\"",
     "build:bit": "webpack -c ../../bitwarden_license/bit-cli/webpack.config.js",
     "build:bit:debug": "npm run build:bit && node --inspect ./build/bw.js",
     "build:bit:watch": "webpack --watch -c ../../bitwarden_license/bit-cli/webpack.config.js",

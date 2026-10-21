@@ -31,6 +31,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: CLI OSS dev compilation
         run: npx nx build cli --configuration=oss-dev --verbose
+      - name: Verify fork-only CLI profile with disposable HOME
+        run: bash scripts/check_cli_profile_isolation.sh
       - name: Verify CLI update command fails closed
         run: bash scripts/check_cli_update_disabled.sh
       - name: Web Vault OSS dev compilation
