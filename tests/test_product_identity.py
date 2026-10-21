@@ -28,6 +28,18 @@ class ProductIdentityTests(unittest.TestCase):
                 self.assertEqual(data["homepage_url"], "https://github.com/GoreeCloud/vault")
                 self.assertNotIn("Bitwarden", json.dumps({k:v for k,v in data.items() if k in ("short_name","author","homepage_url")}))
 
+    def test_beta_desktop_identity_and_disabled_upstream_update(self):
+        beta=json.loads((ROOT/"apps/desktop/electron-builder.beta.json").read_text())
+        self.assertEqual(beta["productName"], "GoreeCloud Vault Beta")
+        self.assertEqual(beta["appId"], "com.goreecloud.vault.beta")
+        self.assertEqual(beta["publish"]["url"], "https://updates.goreecloud.invalid/vault-beta")
+
+    def test_runtime_update_checks_disabled_until_release_approval(self):
+        updater=(ROOT/"apps/desktop/src/main/updater.main.ts").read_text()
+        self.assertIn("const GoreeCloudReleaseUpdatesApproved = false;", updater)
+        self.assertIn("GoreeCloudReleaseUpdatesApproved &&", updater)
+        self.assertNotIn("github.com/bitwarden/clients/releases", updater)
+
     def test_web_shell_identity(self):
         manifest=json.loads((ROOT/"apps/web/src/manifest.json").read_text())
         html=(ROOT/"apps/web/src/index.html").read_text(encoding="utf-8-sig")
