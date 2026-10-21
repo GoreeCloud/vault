@@ -33,6 +33,8 @@ jobs:
         run: npx nx build cli --configuration=oss-dev --verbose
       - name: Validate development CLI endpoint rejection with synthetic profile
         run: bash scripts/check_cli_config_server_gate.sh
+      - name: Validate restricted CLI receive/serve paths in development
+        run: bash scripts/check_cli_disabled_receive_serve.sh
       - name: Validate CLI server URL syntax and upstream service rejection
         run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/platform/commands/server-config-validation.spec.ts
       - name: Verify CLI session environment isolation with synthetic keys
