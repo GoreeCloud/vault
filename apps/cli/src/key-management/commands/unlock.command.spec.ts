@@ -53,11 +53,11 @@ describe("UnlockCommand", () => {
   const expectedSuccessMessage = new MessageResponse(
     "Your vault is now unlocked!",
     "\n" +
-      "To unlock your vault, set your session key to the `BW_SESSION` environment variable. ex:\n" +
-      '$ export BW_SESSION="' +
+      "To unlock your vault, set your session key to the `GOREECLOUD_VAULT_SESSION` environment variable. ex:\n" +
+      '$ export GOREECLOUD_VAULT_SESSION="' +
       b64sessionKey +
       '"\n' +
-      '> $env:BW_SESSION="' +
+      '> $env:GOREECLOUD_VAULT_SESSION="' +
       b64sessionKey +
       '"\n\n' +
       "You can also pass the session key to any command with the `--session` option. ex:\n" +

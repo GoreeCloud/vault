@@ -441,7 +441,7 @@ export class LoginCommand {
   private async validatedParams() {
     await SdkLoadService.Ready;
     const key = SymmetricCryptoKey.fromSdk(PureCrypto.make_aes256_cbc_hmac_key());
-    process.env.BW_SESSION = key.toBase64();
+    process.env.GOREECLOUD_VAULT_SESSION = key.toBase64();
   }
 
   private async handleSuccessResponse(response: AuthResult): Promise<Response> {
@@ -462,18 +462,18 @@ export class LoginCommand {
     const res = new MessageResponse(
       "You are logged in!",
       "\n" +
-        "To unlock your vault, set your session key to the `BW_SESSION` environment variable. ex:\n" +
-        '$ export BW_SESSION="' +
-        process.env.BW_SESSION +
+        "To unlock your vault, set your session key to the `GOREECLOUD_VAULT_SESSION` environment variable. ex:\n" +
+        '$ export GOREECLOUD_VAULT_SESSION="' +
+        process.env.GOREECLOUD_VAULT_SESSION +
         '"\n' +
-        '> $env:BW_SESSION="' +
-        process.env.BW_SESSION +
+        '> $env:GOREECLOUD_VAULT_SESSION="' +
+        process.env.GOREECLOUD_VAULT_SESSION +
         '"\n\n' +
         "You can also pass the session key to any command with the `--session` option. ex:\n" +
         "$ bw list items --session " +
-        process.env.BW_SESSION,
+        process.env.GOREECLOUD_VAULT_SESSION,
     );
-    res.raw = process.env.BW_SESSION;
+    res.raw = process.env.GOREECLOUD_VAULT_SESSION;
     return Response.success(res);
   }
 

@@ -139,7 +139,7 @@ export abstract class BaseProgram {
   protected async exitIfLocked() {
     const userId = await this.exitIfNotAuthed();
 
-    // If the process.env does not have a BW_SESSION key, then we will never be able to retrieve
+    // If the process.env does not have a GOREECLOUD_VAULT_SESSION key, then we will never be able to retrieve
     // the auto user key from secure storage. This is because the auto user key is encrypted with
     // the session key.
     // A failed auto-unlock leaves the user locked, to be handled below, rather than aborting
