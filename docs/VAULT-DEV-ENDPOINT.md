@@ -55,3 +55,36 @@ To syntax-check the candidate in an isolated offline environment with the
 with disabled networking and synthetic environment variable values. Never
 run `caddy reload`, alter the shared Caddyfile, or issue live certificates as
 part of syntax validation. Full HTTPS acceptance remains blocked under issue #25.
+
+
+## Product identity and native backend foundation (owner clarified)
+
+The owner has explicitly identified two **different products**:
+
+- vault.goreecloud.com is the existing, independently operated Docker
+  **Vaultwarden** instance. Its users, persistent files, encryption data,
+  traffic, and Docker deployment are **not** the GoreeCloud Vault
+  development backend. This existing service is not to be renamed or
+  quietly swapped.
+- vault-dev.goreecloud.com is the replacement product **GoreeCloud Vault**
+  development hostname. A rewrite and an ingress candidate do **not** mean
+  the product is deployed.
+
+The repository contains a newly initialized **native Go development server
+foundation** at services/vault-dev-server (not currently installed on the
+VPS). This server defaults to 127.0.0.1:8187 and only implements
+credential-free health and capability disclosure. Identity, encrypted
+vault-item, and sync endpoints are explicitly unavailable (HTTP 503);
+no data is persisted. It is **not yet a working password manager**, does not
+provide the APIs required by the imported GoreeCloud Vault clients, and
+must not receive credentials, be added to the live Caddy ingress, or
+be confused with the existing Vaultwarden container.
+
+A functioning replacement still needs independently accepted identity,
+zero-knowledge encryption, key lifecycle, item/sync persistence, tenant
+isolation, account recovery, audited import/migration (with no live-data
+use during development), trusted private ingress, and platform runtime
+testing. Issues #3, #8 and #25 remain active. Issue #28 concerns verification
+of the existing Vaultwarden host's intended public/private access policy;
+ownership alone does not establish whether the previous public-IP
+reachability observation was desired.
