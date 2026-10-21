@@ -40,5 +40,7 @@ describe("GoreeCloud Vault development CLI server configuration", () => {
 
   it("rejects invalid address syntax", () => {
     expect(validateVaultServerUrls({ base: "https://[bad-ipv6" })).toMatch(/Invalid/);
+    expect(validateVaultServerUrls({ base: "null" })).toMatch(/Invalid/);
+    expect(validateVaultServerUrls({ base: "ftp://vault.example.test" })).toMatch(/Invalid/);
   });
 });
