@@ -22,6 +22,6 @@
 
 ## Not yet implemented or validated
 
-This repository has an initial GoreeCloud Vault shell name layer, but most upstream runtime behavior, embedded brand assets, IDs, links and compatibility contracts remain in place. No GoreeCloud Vault binaries, production runtime, service integration, mobile apps, browser-store submissions, external security acceptance, or Stable release are established by the import.
+This repository has an initial GoreeCloud Vault shell name layer, but most upstream runtime behavior, embedded brand assets, IDs, links and compatibility contracts remain in place. Desktop stable/beta development update feeds are nonfunctional and the runtime updater is explicitly disabled until review of owned signing and distribution. No GoreeCloud Vault binaries, production runtime, service integration, mobile apps, browser-store submissions, external security acceptance, or Stable release are established by the import.
 
 For live ongoing tasks use the authorized GoreeCloud task authority; GitHub issues and pull requests remain authoritative for repository-native implementation.

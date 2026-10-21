@@ -12,6 +12,10 @@ import { isDev } from "../utils";
 import { isMacAppStore, isWindowsPortable, isWindowsStore } from "./platform-utils.main";
 import { WindowMain } from "./window.main";
 
+// GoreeCloud Fork: never query an upstream update endpoint in Development.
+// Change only after release-feed ownership, package signing, rollback and update validation.
+const GoreeCloudReleaseUpdatesApproved = false;
+
 const UpdaterCheckInitialDelay = 5 * 1000; // 5 seconds
 const UpdaterCheckInterval = 12 * 60 * 60 * 1000; // 12 hours
 
@@ -52,7 +56,9 @@ export class UpdaterMain {
       process.platform === "win32" && !isWindowsStore() && !isWindowsPortable();
     const macCanUpdate = process.platform === "darwin" && !isMacAppStore();
     this.canUpdate =
-      !this.userDisabledUpdates() && (linuxCanUpdate || windowsCanUpdate || macCanUpdate);
+      GoreeCloudReleaseUpdatesApproved &&
+      !this.userDisabledUpdates() &&
+      (linuxCanUpdate || windowsCanUpdate || macCanUpdate);
   }
 
   async init() {
@@ -142,7 +148,7 @@ export class UpdaterMain {
     if (!this.canUpdate) {
       if (withFeedback) {
         void this.shell.openExternal(
-          "https://github.com/bitwarden/clients/releases",
+          "https://github.com/GoreeCloud/vault/releases",
           UrlType.WebUrl,
         );
       }

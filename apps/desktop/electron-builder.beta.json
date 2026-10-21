@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "extraMetadata": {
     "name": "bitwarden-beta",
-    "productName": "Bitwarden Beta"
+    "productName": "GoreeCloud Vault Beta"
   },
-  "productName": "Bitwarden Beta",
-  "appId": "com.bitwarden.beta.desktop",
+  "productName": "GoreeCloud Vault Beta",
+  "appId": "com.goreecloud.vault.beta",
   "buildDependenciesFromSource": true,
   "copyright": "Copyright © 2015-2026 Bitwarden Inc.",
   "directories": {
@@ -28,7 +28,7 @@
   "generateUpdatesFilesForAllChannels": true,
   "publish": {
     "provider": "generic",
-    "url": "https://artifacts.bitwarden.com/desktop"
+    "url": "https://updates.goreecloud.invalid/vault-beta"
   },
   "mac": {
     "electronUpdaterCompatibility": ">=0.0.1",
