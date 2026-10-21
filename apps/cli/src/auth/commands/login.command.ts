@@ -480,7 +480,7 @@ export class LoginCommand {
   private async apiClientId(): Promise<string> {
     let clientId: string = null;
 
-    const storedClientId: string = process.env.BW_CLIENTID;
+    const storedClientId: string = process.env.GOREECLOUD_VAULT_CLIENT_ID;
     if (storedClientId == null) {
       if (this.canInteract) {
         const answer: inquirer.Answers = await inquirer.createPromptModule({
@@ -505,7 +505,7 @@ export class LoginCommand {
     const additionalAuthenticationMessage = "Additional authentication required.\nAPI key ";
     let clientSecret: string = null;
 
-    const storedClientSecret: string = this.clientSecret || process.env.BW_CLIENTSECRET;
+    const storedClientSecret: string = this.clientSecret || process.env.GOREECLOUD_VAULT_CLIENT_SECRET;
     if (storedClientSecret == null) {
       if (this.canInteract) {
         const answer: inquirer.Answers = await inquirer.createPromptModule({
