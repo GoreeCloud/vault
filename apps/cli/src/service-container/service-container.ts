@@ -398,20 +398,27 @@ export class ServiceContainer {
   private v2UpgradeTokenStateService: V2UpgradeTokenStateService;
 
   constructor() {
-    let p = null;
-    const relativeDataDir = path.join(path.dirname(process.execPath), "bw-data");
-    if (fs.existsSync(relativeDataDir)) {
-      p = relativeDataDir;
-    } else if (process.env.BITWARDENCLI_APPDATA_DIR) {
-      p = path.resolve(process.env.BITWARDENCLI_APPDATA_DIR);
+    // GoreeCloud Fork isolation: never discover or open upstream Bitwarden CLI state.
+    // In particular, ignore inherited bw-data and BITWARDENCLI_APPDATA_DIR locations.
+    const profileName = "GoreeCloud Vault CLI";
+    const explicitDir = process.env.GOREECLOUD_VAULT_CLI_DATA_DIR;
+    let p: string;
+    if (explicitDir) {
+      if (!path.isAbsolute(explicitDir)) {
+        throw new Error("GOREECLOUD_VAULT_CLI_DATA_DIR must be an absolute path.");
+      }
+      p = path.resolve(explicitDir);
     } else if (process.platform === "darwin") {
-      p = path.join(process.env.HOME ?? "", "Library/Application Support/Bitwarden CLI");
+      p = path.join(process.env.HOME ?? "", "Library/Application Support", profileName);
     } else if (process.platform === "win32") {
-      p = path.join(process.env.APPDATA ?? "", "Bitwarden CLI");
+      p = path.join(process.env.APPDATA ?? "", profileName);
     } else if (process.env.XDG_CONFIG_HOME) {
-      p = path.join(process.env.XDG_CONFIG_HOME, "Bitwarden CLI");
+      p = path.join(process.env.XDG_CONFIG_HOME, profileName);
     } else {
-      p = path.join(process.env.HOME ?? "", ".config/Bitwarden CLI");
+      p = path.join(process.env.HOME ?? "", ".config", profileName);
+    }
+    if (!path.isAbsolute(p)) {
+      throw new Error("GoreeCloud Vault CLI requires an absolute profile directory.");
     }
 
     const logoutCallback = async () => await this.logout();
