@@ -38,6 +38,17 @@ async function main() {
     const showingHelp = args.some((arg) =>
       ["--help", "-h", "--version", "-v"].includes(arg),
     );
+    // Receiving external Send links or running the embedded HTTP server
+    // can bypass the command-level environment guard through SDK routes.
+    // Keep these entry points disabled until their transport boundaries are audited.
+    if (!showingHelp && args.some((arg) => arg === "receive" || arg === "serve")) {
+      process.stderr.write(
+        "GoreeCloud Vault CLI receive and serve are disabled until network isolation is verified.\n",
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     if (args.length > 0 && !showingHelp && !safeCommands.has(args[0])) {
       const environment = await firstValueFrom(serviceContainer.environmentService.environment$);
       const problem = environment.isCloud()
