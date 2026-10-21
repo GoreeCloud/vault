@@ -24,3 +24,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_vault_icon_provenance.py'
       - name: Dependency patch and lockfile integrity guards
         run: python3 -m unittest discover -s tests -p 'test_dependency_security_versions.py'
+      - name: Inherited cryptography call-site change detection
+        run: python3 -m unittest discover -s tests -p 'test_legacy_dependency_review.py'
