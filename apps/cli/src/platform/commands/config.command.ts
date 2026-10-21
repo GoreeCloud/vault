@@ -12,6 +12,7 @@ import {
 import { Response } from "../../models/response";
 import { MessageResponse } from "../../models/response/message.response";
 import { StringResponse } from "../../models/response/string.response";
+import { validateVaultServerUrls } from "./server-config-validation";
 
 export class ConfigCommand {
   constructor(
@@ -41,7 +42,7 @@ export class ConfigCommand {
     ) {
       const env = await firstValueFrom(this.environmentService.environment$);
       const stringRes = new StringResponse(
-        env.hasBaseUrl() ? env.getUrls().base : "https://bitwarden.com",
+        env.hasBaseUrl() && !env.isCloud() ? env.getUrls().base : "No GoreeCloud Vault development server configured.",
       );
       return Response.success(stringRes);
     }
@@ -52,8 +53,7 @@ export class ConfigCommand {
       return Response.error("Logout required before server config update.");
     }
 
-    url = url === "null" || url === "bitwarden.com" || url === "https://bitwarden.com" ? null : url;
-    await this.environmentService.setEnvironment(Region.SelfHosted, {
+    const urls = {
       base: url,
       webVault: options.webVault || null,
       api: options.api || null,
@@ -62,7 +62,12 @@ export class ConfigCommand {
       notifications: options.notifications || null,
       events: options.events || null,
       keyConnector: options.keyConnector || null,
-    });
+    };
+    const problem = validateVaultServerUrls(urls);
+    if (problem) {
+      return Response.error(problem);
+    }
+    await this.environmentService.setEnvironment(Region.SelfHosted, urls);
     const res = new MessageResponse("Saved setting `config`.", null);
     return Response.success(res);
   }
