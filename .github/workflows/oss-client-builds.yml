@@ -35,5 +35,7 @@ jobs:
         run: npx nx build web --configuration=oss-dev --verbose
       - name: Browser extension Chrome dev compilation
         run: npx nx build browser --configuration=chrome-dev --verbose
+      - name: Firefox Manifest V3 extension dev compilation
+        run: npx nx build browser --configuration=firefox-dev --verbose
       - name: Desktop main process OSS dev compilation
         run: npx nx run desktop:build-main --configuration=oss-dev --verbose
