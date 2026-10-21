@@ -20,6 +20,7 @@ class CliApiKeyNamespaceTests(unittest.TestCase):
     def test_mocked_login_rejects_upstream_credentials(self):
         self.assertIn('ignores inherited upstream API key variables',self.tests)
         self.assertIn('uses the GoreeCloud API key when upstream variables are also present',self.tests)
+        self.assertIn('does not substitute an upstream secret for a missing GoreeCloud secret',self.tests)
         self.assertIn('"client_id is required."',self.tests)
 
     def test_workflow_executes_api_login_tests(self):

@@ -218,6 +218,17 @@ describe("LoginCommand", () => {
         expect(loginStrategyService.logIn).not.toHaveBeenCalled();
       });
 
+      it("does not substitute an upstream secret for a missing GoreeCloud secret", async () => {
+        process.env.GOREECLOUD_VAULT_CLIENT_ID = "user.goreecloud";
+        process.env.BW_CLIENTSECRET = "upstream-test-secret";
+
+        const response = await command.run(NULL, NULL, apiKeyOptions);
+
+        expect(response.success).toBe(false);
+        expect(response.message).toBe("client_secret is required.");
+        expect(loginStrategyService.logIn).not.toHaveBeenCalled();
+      });
+
       it("uses the GoreeCloud API key when upstream variables are also present", async () => {
         process.env.BW_CLIENTID = "organization.upstream";
         process.env.BW_CLIENTSECRET = "upstream-test-secret";
