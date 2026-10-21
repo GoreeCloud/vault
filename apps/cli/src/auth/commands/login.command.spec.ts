@@ -106,7 +106,7 @@ describe("LoginCommand", () => {
 
   // Env var snapshot for save/restore
   const savedEnv: Record<string, string | undefined> = {};
-  const ENV_KEYS = ["BW_NOINTERACTION", "BW_SESSION", "BW_CLIENTID", "BW_CLIENTSECRET", "MY_PW"];
+  const ENV_KEYS = ["BW_NOINTERACTION", "GOREECLOUD_VAULT_SESSION", "BW_CLIENTID", "BW_CLIENTSECRET", "MY_PW"];
 
   beforeEach(() => {
     // Save env vars
@@ -115,7 +115,7 @@ describe("LoginCommand", () => {
     }
     // Non-interactive by default to avoid inquirer prompts
     process.env.BW_NOINTERACTION = "true";
-    delete process.env.BW_SESSION;
+    delete process.env.GOREECLOUD_VAULT_SESSION;
     delete process.env.BW_CLIENTID;
     delete process.env.BW_CLIENTSECRET;
     delete process.env.MY_PW;
@@ -926,7 +926,7 @@ describe("LoginCommand", () => {
 
       expect(response.success).toBe(true);
       expect((response.data as any).title).toBe("You are logged in!");
-      expect((response.data as any).message).toContain("BW_SESSION");
+      expect((response.data as any).message).toContain("GOREECLOUD_VAULT_SESSION");
       expect((response.data as any).raw).toBe(B64_SESSION_KEY);
     });
 
@@ -940,14 +940,14 @@ describe("LoginCommand", () => {
 
       expect(response.success).toBe(true);
       // When usesKeyConnector is true, falls through to session key message
-      expect((response.data as any).message).toContain("BW_SESSION");
+      expect((response.data as any).message).toContain("GOREECLOUD_VAULT_SESSION");
       expect((response.data as any).raw).toBe(B64_SESSION_KEY);
     });
 
-    it("sets BW_SESSION env var via validatedParams", async () => {
+    it("sets GOREECLOUD_VAULT_SESSION env var via validatedParams", async () => {
       await command.run("a@b.c", "password", {});
 
-      expect(process.env.BW_SESSION).toBe(B64_SESSION_KEY);
+      expect(process.env.GOREECLOUD_VAULT_SESSION).toBe(B64_SESSION_KEY);
     });
   });
 

@@ -9,7 +9,7 @@
       "cwd": "${workspaceRoot}",
       "program": "${workspaceFolder}/build/bw.js",
       "env": {
-        "BW_SESSION": "fPZb0J+1NBzQ+HB512pLhSIIt2aRoOjqs6SrbxbTHVcsZdFk1cthzjBIMqBa2X7fjOOA3VU0bnR42fYeuWj2Vw=="
+        "GOREECLOUD_VAULT_SESSION": "${env:GOREECLOUD_VAULT_SESSION}"
       },
       "sourceMapPathOverrides": {
         "meteor://💻app/*": "${workspaceFolder}/*",

@@ -31,6 +31,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: CLI OSS dev compilation
         run: npx nx build cli --configuration=oss-dev --verbose
+      - name: Verify CLI session environment isolation with synthetic keys
+        run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/platform/services/node-env-secure-storage.service.spec.ts apps/cli/src/auth/commands/login.command.spec.ts apps/cli/src/key-management/commands/unlock.command.spec.ts
       - name: Verify fork-only CLI profile with disposable HOME
         run: bash scripts/check_cli_profile_isolation.sh
       - name: Verify CLI update command fails closed

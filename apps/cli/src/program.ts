@@ -64,7 +64,7 @@ export class Program extends BaseProgram {
     });
 
     program.on("option:session", (key) => {
-      process.env.BW_SESSION = key;
+      process.env.GOREECLOUD_VAULT_SESSION = key;
     });
 
     program.on("command:*", () => {

@@ -96,8 +96,8 @@ export class NodeEnvSecureStorageService implements AbstractStorageService {
 
   private getSessionKey() {
     try {
-      if (process.env.BW_SESSION != null) {
-        const sessionBuffer = Utils.fromB64ToArray(process.env.BW_SESSION);
+      if (process.env.GOREECLOUD_VAULT_SESSION != null) {
+        const sessionBuffer = Utils.fromB64ToArray(process.env.GOREECLOUD_VAULT_SESSION);
         if (sessionBuffer != null) {
           const sessionKey = new SymmetricCryptoKey(sessionBuffer);
           if (sessionBuffer != null) {

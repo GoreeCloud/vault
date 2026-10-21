@@ -30,3 +30,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_isolation_boundary.py'
       - name: CLI upstream update rejection guard
         run: python3 -m unittest discover -s tests -p 'test_cli_update_boundary.py'
+      - name: CLI secret session namespace guard
+        run: python3 -m unittest discover -s tests -p 'test_cli_session_boundary.py'
