@@ -1,0 +1,39 @@
+name: OSS client compilation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Compile OSS client entry points
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NX_DAEMON: "false"
+      NX_ISOLATE_PLUGINS: "false"
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install approved Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependency lockfile (no lifecycle scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: CLI OSS dev compilation
+        run: npx nx build cli --configuration=oss-dev --verbose
+      - name: Web Vault OSS dev compilation
+        run: npx nx build web --configuration=oss-dev --verbose
+      - name: Browser extension Chrome dev compilation
+        run: npx nx build browser --configuration=chrome-dev --verbose
+      - name: Desktop main process OSS dev compilation
+        run: npx nx run desktop:build-main --configuration=oss-dev --verbose
