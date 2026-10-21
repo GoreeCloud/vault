@@ -8,10 +8,10 @@ With Node from `.nvmrc` (v24) and npm 11:
 
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
-NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build cli --configuration=oss-dev
-NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build web --configuration=oss-dev
-NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build browser --configuration=chrome-dev
-NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx run desktop:build-main --configuration=oss-dev
+NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build cli --configuration=oss-dev --verbose
+NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build web --configuration=oss-dev --verbose
+NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build browser --configuration=chrome-dev --verbose
+NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx run desktop:build-main --configuration=oss-dev --verbose
 ```
 
 No passwords, customer accounts, signing keys, Vault Server endpoint, telemetry credentials, or release/publishing token are required for these bounded compile tests. The dependency install deliberately disables lifecycle scripts; production/runtime requirements may need additional reviewed native-building steps.
@@ -28,7 +28,7 @@ The GoreeCloud-controlled development laptop `personal-laptop-ideapad3-01` used 
 | browser chrome-dev | Pass | Nx/webpack Chrome development extension bundle; entrypoint and asset-size warnings |
 | desktop:build-main oss-dev | Pass | Nx/webpack Electron main-process compile, not full desktop package or native signing |
 
-The web success required a verbose re-run after a transient initial Nx invocation failed before a usable build result. Subsequent target passes do not erase upstream warnings or establish deterministic reproducibility across hosts.
+The web success required a verbose re-run after an initial Nx invocation failed during project setup. The first GitHub Actions CI candidate also stopped on Nx CLI project setup (undefined split, before compilation); exact runner stack and remediation are under investigation. The CI workflow uses verbose mode to expose actionable failure details and reproduce the verified local commands. Subsequent target passes do not erase upstream warnings or establish deterministic reproducibility across hosts.
 
 ## CI acceptance boundary
 

@@ -30,10 +30,10 @@ jobs:
       - name: Install dependency lockfile (no lifecycle scripts)
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: CLI OSS dev compilation
-        run: npx nx build cli --configuration=oss-dev
+        run: npx nx build cli --configuration=oss-dev --verbose
       - name: Web Vault OSS dev compilation
-        run: npx nx build web --configuration=oss-dev
+        run: npx nx build web --configuration=oss-dev --verbose
       - name: Browser extension Chrome dev compilation
-        run: npx nx build browser --configuration=chrome-dev
+        run: npx nx build browser --configuration=chrome-dev --verbose
       - name: Desktop main process OSS dev compilation
-        run: npx nx run desktop:build-main --configuration=oss-dev
+        run: npx nx run desktop:build-main --configuration=oss-dev --verbose
