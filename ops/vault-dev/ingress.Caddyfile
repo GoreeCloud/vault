@@ -3,31 +3,31 @@
 # All requests are deliberately denied until an independently isolated and
 # reviewed GoreeCloud Vault development backend exists.
 vault-dev.goreecloud.com {
-    tls {
-        dns porkbun {
-            api_key {$PORKBUN_API_KEY}
-            api_secret_key {$PORKBUN_API_SECRET_KEY}
-        }
-        propagation_delay 30s
-        propagation_timeout 10m
-        resolvers 1.1.1.1 8.8.8.8
-    }
+	tls {
+		dns porkbun {
+			api_key {$PORKBUN_API_KEY}
+			api_secret_key {$PORKBUN_API_SECRET_KEY}
+		}
+		propagation_delay 30s
+		propagation_timeout 10m
+		resolvers 1.1.1.1 8.8.8.8
+	}
 
-    header {
-        Strict-Transport-Security "max-age=31536000"
-        X-Content-Type-Options "nosniff"
-        Referrer-Policy "no-referrer"
-        X-Robots-Tag "noindex, nofollow"
-        Cache-Control "no-store"
-    }
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Robots-Tag "noindex, nofollow"
+		Cache-Control "no-store"
+	}
 
-    # A CGNAT address range alone is not identity or authenticated overlay
-    # membership. Firewall and NetBird policy are independently mandatory.
-    @private_overlay remote_ip 100.64.0.0/10
-    handle @private_overlay {
-        respond "Vault development service unavailable" 503
-    }
-    handle {
-        respond "Forbidden" 403
-    }
+	# A CGNAT address range alone is not identity or authenticated overlay
+	# membership. Firewall and NetBird policy are independently mandatory.
+	@private_overlay remote_ip 100.64.0.0/10
+	handle @private_overlay {
+		respond "Vault development service unavailable" 503
+	}
+	handle {
+		respond "Forbidden" 403
+	}
 }
