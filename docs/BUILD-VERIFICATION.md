@@ -11,6 +11,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build cli --configuration=oss-dev --verbose
 NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build web --configuration=oss-dev --verbose
 NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build browser --configuration=chrome-dev --verbose
+NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx build browser --configuration=firefox-dev --verbose
 NX_DAEMON=false NX_ISOLATE_PLUGINS=false npx nx run desktop:build-main --configuration=oss-dev --verbose
 ```
 
@@ -27,12 +28,13 @@ The GoreeCloud-controlled development laptop `personal-laptop-ideapad3-01` used 
 | cli oss-dev | Pass | Nx/webpack bundle, not CLI runtime or secret handling |
 | browser chrome-dev | Pass | Nx/webpack Chrome development extension bundle; entrypoint and asset-size warnings |
 | desktop:build-main oss-dev | Pass | Nx/webpack Electron main-process compile, not full desktop package or native signing |
+| browser firefox-dev (MV3) | Pass | Nx/webpack Firefox MV3 development bundle; bundle-size warnings, no store/installed-client approval |
 
 The web success required a verbose re-run after an initial Nx invocation failed during project setup. The first two GitHub Actions CI candidates also stopped before CLI compilation: Nx project-graph error formatting masked TS7016 declaration diagnostics for the untyped Tailwind CSS, RxJS and Angular RxJS ESLint plugins in `eslint.config.mjs`. Scoped upstream-compatible `// @ts-ignore` annotations now permit a clean local Nx project-graph rebuild; current exact-head hosted-runner remediation remains pending until Actions confirms it. Verbose Nx commands retain actionable diagnostics. Subsequent target passes do not erase upstream warnings or establish deterministic reproducibility across hosts.
 
 ## CI acceptance boundary
 
-`.github/workflows/oss-client-builds.yml` runs the same OSS-only targets under **read-only** repository permissions, nonpersisting checkout credentials, and pinned third-party Actions. It does not upload, sign, publish, release or deploy a build artifact. A workflow definition is **not** CI evidence until its exact-head GitHub Actions run passes. Consult live GitHub Checks for latest outcomes.
+`.github/workflows/oss-client-builds.yml` runs the same OSS-only targets (including Firefox MV3) under **read-only** repository permissions, nonpersisting checkout credentials, and pinned third-party Actions. It does not upload, sign, publish, release or deploy a build artifact. A workflow definition is **not** CI evidence until its exact-head GitHub Actions run passes. Consult live GitHub Checks for latest outcomes.
 
 ## Outstanding release prerequisites
 

@@ -21,6 +21,7 @@ class OssClientCiSafetyTests(unittest.TestCase):
             "npx nx build cli --configuration=oss-dev",
             "npx nx build web --configuration=oss-dev",
             "npx nx build browser --configuration=chrome-dev",
+            "npx nx build browser --configuration=firefox-dev",
             "npx nx run desktop:build-main --configuration=oss-dev",
         ):
             with self.subTest(target=command):
