@@ -11,6 +11,8 @@ class CliRestrictedEntryPoints(unittest.TestCase):
         self.assertIn('arg === "receive" || arg === "serve"', source)
         self.assertIn("receive and serve are disabled", source)
         self.assertLess(source.index("receive and serve are disabled"),
+                        source.index("new ServiceContainer()"))
+        self.assertLess(source.index("receive and serve are disabled"),
                         source.index("await registerOssPrograms(serviceContainer)"))
 
     def test_ci_exercises_compiled_cli(self):
