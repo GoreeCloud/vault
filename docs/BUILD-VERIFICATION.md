@@ -28,7 +28,7 @@ The GoreeCloud-controlled development laptop `personal-laptop-ideapad3-01` used 
 | browser chrome-dev | Pass | Nx/webpack Chrome development extension bundle; entrypoint and asset-size warnings |
 | desktop:build-main oss-dev | Pass | Nx/webpack Electron main-process compile, not full desktop package or native signing |
 
-The web success required a verbose re-run after an initial Nx invocation failed during project setup. The first GitHub Actions CI candidate also stopped on Nx CLI project setup (undefined split, before compilation); exact runner stack and remediation are under investigation. The CI workflow uses verbose mode to expose actionable failure details and reproduce the verified local commands. Subsequent target passes do not erase upstream warnings or establish deterministic reproducibility across hosts.
+The web success required a verbose re-run after an initial Nx invocation failed during project setup. The first two GitHub Actions CI candidates also stopped before CLI compilation: Nx project-graph error formatting masked TS7016 declaration diagnostics for the untyped Tailwind CSS, RxJS and Angular RxJS ESLint plugins in `eslint.config.mjs`. Scoped upstream-compatible `// @ts-ignore` annotations now permit a clean local Nx project-graph rebuild; current exact-head hosted-runner remediation remains pending until Actions confirms it. Verbose Nx commands retain actionable diagnostics. Subsequent target passes do not erase upstream warnings or establish deterministic reproducibility across hosts.
 
 ## CI acceptance boundary
 

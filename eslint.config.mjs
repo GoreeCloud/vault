@@ -6,8 +6,11 @@ import angular from "angular-eslint";
 // @ts-ignore
 import importPlugin from "eslint-plugin-import";
 import eslintConfigPrettier from "eslint-config-prettier";
+// @ts-ignore -- Tailwind CSS ESLint plugin currently lacks TypeScript declaration files.
 import eslintPluginTailwindCSS from "eslint-plugin-tailwindcss";
+// @ts-ignore -- RxJS ESLint plugin currently lacks TypeScript declaration files.
 import rxjs from "eslint-plugin-rxjs";
+// @ts-ignore -- Angular RxJS ESLint plugin currently lacks TypeScript declaration files.
 import angularRxjs from "eslint-plugin-rxjs-angular";
 import storybook from "eslint-plugin-storybook";
 import jest from "eslint-plugin-jest";
