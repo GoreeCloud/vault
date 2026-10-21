@@ -44,3 +44,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_api_transport_boundary.py'
       - name: Private Vault development endpoint probe offline tests
         run: python3 -m unittest discover -s tests -p 'test_vault_dev_endpoint_probe.py'
+      - name: Fail-closed Vault development ingress candidate contract
+        run: python3 -m unittest discover -s tests -p 'test_vault_dev_ingress_candidate.py'

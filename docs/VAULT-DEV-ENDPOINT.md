@@ -32,3 +32,26 @@ The check requires the explicit expected CGNAT-overlay IPv4, verifies the exact 
 4. Complete Vault issue #3 and related cryptography, licensing, sync, backup/recovery, GoreeCloud UI and native-OS acceptance gates before permitting real vault credentials.
 
 **No live DNS rewrite, Caddy routing, certificates, Vaultwarden data, or production service was changed by this repository preflight work.**
+
+## Prepared ingress candidate — not installed
+
+The repository now includes a review-only Caddy candidate at
+`ops/vault-dev/ingress.Caddyfile`. It uses the existing DNS-01 Porkbun module
+with environment-provided credentials, requests a certificate for the
+development hostname only, returns HTTP 503 for overlay-range clients, and
+returns HTTP 403 to all other peers. **It has no upstream route** and does
+not serve or proxy any vault data.
+
+This template is intentionally not mounted into the shared production Caddy
+configuration or an active service. The `remote_ip 100.64.0.0/10` matcher is
+not proof of NetBird device membership or an adequate public-network firewall.
+Before use, establish server-side overlay ACLs, firewall protection, private
+DNS, isolated service ownership, staging rollback, and a tested no-production-
+data boundary. A development hostname responding with 403/503 is not a
+deployed Vault application.
+
+To syntax-check the candidate in an isolated offline environment with the
+**same Caddy image and DNS provider module**, use an ephemeral container
+with disabled networking and synthetic environment variable values. Never
+run `caddy reload`, alter the shared Caddyfile, or issue live certificates as
+part of syntax validation. Full HTTPS acceptance remains blocked under issue #25.
