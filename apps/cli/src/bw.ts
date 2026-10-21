@@ -10,6 +10,18 @@ import { ServiceContainer } from "./service-container/service-container";
 import { validateVaultServerUrls } from "./platform/commands/server-config-validation";
 
 async function main() {
+  // Fail closed before initializing any account, network, or storage services.
+  const args = process.argv.slice(2);
+  const showingHelp = args.some((arg) =>
+    ["--help", "-h", "--version", "-v"].includes(arg),
+  );
+  if (!showingHelp && args.some((arg) => arg === "receive" || arg === "serve")) {
+    process.stderr.write(
+      "GoreeCloud Vault CLI receive and serve are disabled until network isolation is verified.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
   const serviceContainer = new ServiceContainer();
   let disposed = false;
   const dispose = () => {
@@ -30,14 +42,11 @@ async function main() {
 
     // Temporary development gate. Commands that can access a remote service
     // must not silently inherit the original application's production cloud.
-    const args = process.argv.slice(2);
     const safeCommands = new Set([
       "config", "status", "lock", "update", "encode", "generate",
       "completion", "sdk-version",
     ]);
-    const showingHelp = args.some((arg) =>
-      ["--help", "-h", "--version", "-v"].includes(arg),
-    );
+
     if (args.length > 0 && !showingHelp && !safeCommands.has(args[0])) {
       const environment = await firstValueFrom(serviceContainer.environmentService.environment$);
       const problem = environment.isCloud()

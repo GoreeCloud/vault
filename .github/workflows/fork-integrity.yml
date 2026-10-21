@@ -36,3 +36,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_api_key_namespace.py'
       - name: CLI outbound request User-Agent identity
         run: python3 -m unittest discover -s tests -p 'test_cli_user_agent_identity.py'
+      - name: CLI development network entrypoint guard
+        run: python3 -m unittest discover -s tests -p 'test_cli_send_hold.py'
