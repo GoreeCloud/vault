@@ -37,8 +37,10 @@ class DependencySecurityVersions(unittest.TestCase):
             self.assertEqual(nested["version"], "2.4.0")
 
     def test_webpack_peer_boundary_aligned_with_schema_utils(self):
-        self.assertEqual(self.manifest["devDependencies"]["webpack"], "5.112.0")
-        self.assertEqual(self.lock["node_modules/webpack"]["version"], "5.112.0")
+        self.assertEqual(self.manifest["devDependencies"]["webpack"], "5.106.2")
+        self.assertEqual(self.lock["node_modules/webpack"]["version"], "5.106.2")
+        self.assertEqual(self.manifest["devDependencies"]["schema-utils"], "4.5.0")
+        self.assertEqual(self.lock["node_modules/schema-utils"]["version"], "4.5.0")
 
 
 if __name__ == "__main__":
