@@ -15,6 +15,10 @@ export function validateVaultServerUrls(urls: Urls): string | null {
     if (candidate == null || candidate === "") {
       continue;
     }
+    const lower = candidate.trim().toLowerCase();
+    if (lower === "null" || (lower.includes("://") && !lower.startsWith("https://") && !lower.startsWith("http://"))) {
+      return "Invalid Vault service URL.";
+    }
     let parsed: URL;
     try {
       parsed = new URL(/^https?:\/\//i.test(candidate) ? candidate : "https://" + candidate);
