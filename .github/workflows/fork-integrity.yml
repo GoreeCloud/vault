@@ -34,3 +34,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_session_boundary.py'
       - name: CLI API credential environment boundary guard
         run: python3 -m unittest discover -s tests -p 'test_cli_api_key_namespace.py'
+      - name: CLI development network entrypoint guard
+        run: python3 -m unittest discover -s tests -p 'test_cli_unreviewed_entrypoint_hold.py'
