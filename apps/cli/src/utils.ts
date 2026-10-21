@@ -151,7 +151,7 @@ export class CliUtils {
    * @return an empty [Response] if written to stdout or a [Response] with the chosen output file otherwise.
    */
   static async saveResultToFile(data: string | Buffer, output: string, defaultFileName: string) {
-    if ((output == null || output === "") && process.env.BW_RAW === "true") {
+    if ((output == null || output === "") && process.env.GOREECLOUD_VAULT_RAW === "true") {
       // No output is given and the user expects raw output. Since the command result is about content,
       // we directly return the command result to stdout (and suppress further messages).
       process.stdout.write(data);
@@ -247,7 +247,7 @@ export class CliUtils {
     }
 
     if (Utils.isNullOrEmpty(password)) {
-      if (process.env.BW_NOINTERACTION !== "true") {
+      if (process.env.GOREECLOUD_VAULT_NOINTERACTION !== "true") {
         const answer: inquirer.Answers = await inquirer.createPromptModule({
           output: process.stderr,
         })({

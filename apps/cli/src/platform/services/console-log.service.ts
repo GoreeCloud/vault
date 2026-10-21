@@ -14,7 +14,7 @@ export class ConsoleLogService extends BaseConsoleLogService {
   }
 
   write(level: LogLevelType, message?: any, ...optionalParams: any[]) {
-    if (process.env.BW_RESPONSE !== "true") {
+    if (process.env.GOREECLOUD_VAULT_RESPONSE !== "true") {
       super.write(level, message, ...optionalParams);
       return;
     }

@@ -40,27 +40,27 @@ export class Program extends BaseProgram {
       );
 
     program.on("option:pretty", () => {
-      process.env.BW_PRETTY = "true";
+      process.env.GOREECLOUD_VAULT_PRETTY = "true";
     });
 
     program.on("option:raw", () => {
-      process.env.BW_RAW = "true";
+      process.env.GOREECLOUD_VAULT_RAW = "true";
     });
 
     program.on("option:quiet", () => {
-      process.env.BW_QUIET = "true";
+      process.env.GOREECLOUD_VAULT_QUIET = "true";
     });
 
     program.on("option:response", () => {
-      process.env.BW_RESPONSE = "true";
+      process.env.GOREECLOUD_VAULT_RESPONSE = "true";
     });
 
     program.on("option:cleanexit", () => {
-      process.env.BW_CLEANEXIT = "true";
+      process.env.GOREECLOUD_VAULT_CLEANEXIT = "true";
     });
 
     program.on("option:nointeraction", () => {
-      process.env.BW_NOINTERACTION = "true";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
     });
 
     program.on("option:session", (key) => {

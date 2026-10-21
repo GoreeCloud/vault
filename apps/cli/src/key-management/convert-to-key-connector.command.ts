@@ -25,7 +25,7 @@ export class ConvertToKeyConnectorCommand {
 
   async run(): Promise<Response> {
     // If no interaction available, alert user to use web vault
-    const canInteract = process.env.BW_NOINTERACTION !== "true";
+    const canInteract = process.env.GOREECLOUD_VAULT_NOINTERACTION !== "true";
     if (!canInteract) {
       await this.logout();
       return Response.error(

@@ -106,7 +106,15 @@ describe("LoginCommand", () => {
 
   // Env var snapshot for save/restore
   const savedEnv: Record<string, string | undefined> = {};
-  const ENV_KEYS = ["BW_NOINTERACTION", "GOREECLOUD_VAULT_SESSION", "GOREECLOUD_VAULT_CLIENT_ID", "GOREECLOUD_VAULT_CLIENT_SECRET", "BW_CLIENTID", "BW_CLIENTSECRET", "MY_PW"];
+  const ENV_KEYS = [
+    "GOREECLOUD_VAULT_NOINTERACTION",
+    "GOREECLOUD_VAULT_SESSION",
+    "GOREECLOUD_VAULT_CLIENT_ID",
+    "GOREECLOUD_VAULT_CLIENT_SECRET",
+    "BW_CLIENTID",
+    "BW_CLIENTSECRET",
+    "MY_PW",
+  ];
 
   beforeEach(() => {
     // Save env vars
@@ -114,7 +122,7 @@ describe("LoginCommand", () => {
       savedEnv[key] = process.env[key];
     }
     // Non-interactive by default to avoid inquirer prompts
-    process.env.BW_NOINTERACTION = "true";
+    process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
     delete process.env.GOREECLOUD_VAULT_SESSION;
     delete process.env.GOREECLOUD_VAULT_CLIENT_ID;
     delete process.env.GOREECLOUD_VAULT_CLIENT_SECRET;
@@ -238,7 +246,9 @@ describe("LoginCommand", () => {
         const response = await command.run(NULL, NULL, apiKeyOptions);
 
         expect(response.success).toBe(true);
-        expect(loginStrategyService.logIn).toHaveBeenCalledWith(expect.any(UserApiLoginCredentials));
+        expect(loginStrategyService.logIn).toHaveBeenCalledWith(
+          expect.any(UserApiLoginCredentials),
+        );
       });
 
       it("returns badRequest when client_id is null", async () => {
@@ -748,7 +758,7 @@ describe("LoginCommand", () => {
       // Spy-mock the private SSO helpers so the SSO login path can complete deterministically
       // without opening a real HTTP callback server on ports 8065-8070.
       beforeEach(() => {
-        process.env.BW_NOINTERACTION = "false";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
         jest.spyOn(command as any, "makeSsoPromptData").mockResolvedValue({
           ssoCodeVerifier: "mock-verifier",
           codeChallenge: "mock-challenge",
@@ -947,7 +957,7 @@ describe("LoginCommand", () => {
       process.env.GOREECLOUD_VAULT_CLIENT_ID = "user.xxx";
       process.env.GOREECLOUD_VAULT_CLIENT_SECRET = "secret";
       // Must be interactive for the SSO/apikey unlock message branch
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getUsesKeyConnector.mockResolvedValue(false);
 
       const response = await command.run(NULL, NULL, { apikey: true });
@@ -969,7 +979,7 @@ describe("LoginCommand", () => {
     it("returns session key message when uses key connector", async () => {
       process.env.GOREECLOUD_VAULT_CLIENT_ID = "user.xxx";
       process.env.GOREECLOUD_VAULT_CLIENT_SECRET = "secret";
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getUsesKeyConnector.mockResolvedValue(true);
 
       const response = await command.run(NULL, NULL, { apikey: true });

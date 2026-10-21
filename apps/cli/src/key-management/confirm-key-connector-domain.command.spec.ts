@@ -55,7 +55,7 @@ describe("ConfirmKeyConnectorDomainCommand", () => {
 
   describe("run", () => {
     it("should logout and return error response if no interaction available", async () => {
-      process.env.BW_NOINTERACTION = "true";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
       const response = await command.run();
 
@@ -73,7 +73,7 @@ describe("ConfirmKeyConnectorDomainCommand", () => {
     });
 
     it("should logout and return error response if interaction answer is cancel", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
 
       (createPromptModule as jest.Mock).mockImplementation(() =>
         jest.fn((prompt) => {
@@ -91,7 +91,7 @@ describe("ConfirmKeyConnectorDomainCommand", () => {
     });
 
     it("should convert new sso user to key connector and return success response if answer is confirmed", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
 
       (createPromptModule as jest.Mock).mockImplementation(() =>
         jest.fn((prompt) => {
@@ -108,7 +108,7 @@ describe("ConfirmKeyConnectorDomainCommand", () => {
     });
 
     it("should logout and throw error if convert new sso user to key connector failed", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
 
       (createPromptModule as jest.Mock).mockImplementation(() =>
         jest.fn((prompt) => {

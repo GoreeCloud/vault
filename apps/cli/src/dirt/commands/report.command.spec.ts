@@ -53,7 +53,7 @@ describe("ReportCommand", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.BW_QUIET;
+    delete process.env.GOREECLOUD_VAULT_QUIET;
     // Jest's stderr isn't a TTY, so the command takes the static-line fallback path.
     stderrSpy = jest.spyOn(process.stderr, "write").mockReturnValue(true);
     accountService.activeAccount$ = of(activeAccount);
@@ -65,7 +65,7 @@ describe("ReportCommand", () => {
 
   afterEach(() => {
     stderrSpy.mockRestore();
-    delete process.env.BW_QUIET;
+    delete process.env.GOREECLOUD_VAULT_QUIET;
   });
 
   it("returns a bad request for an unknown object", async () => {
@@ -192,8 +192,8 @@ describe("ReportCommand", () => {
     expect(output).toContain("Checking 1 logins");
   });
 
-  it("suppresses progress output when BW_QUIET is set", async () => {
-    process.env.BW_QUIET = "true";
+  it("suppresses progress output when GOREECLOUD_VAULT_QUIET is set", async () => {
+    process.env.GOREECLOUD_VAULT_QUIET = "true";
     cipherService.getAllDecrypted.mockResolvedValue([buildCipher("cipher-1", "Example")]);
 
     await command.run("password-health", {});

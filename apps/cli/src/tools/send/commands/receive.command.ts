@@ -114,7 +114,7 @@ export class SendReceiveCommand extends DownloadCommand {
   }
 
   async run(url: string, options: OptionValues): Promise<Response> {
-    this.canInteract = process.env.BW_NOINTERACTION !== "true";
+    this.canInteract = process.env.GOREECLOUD_VAULT_NOINTERACTION !== "true";
 
     let urlObject: URL;
     try {

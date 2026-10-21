@@ -267,7 +267,7 @@ export class ImportCommand {
       "Import file password:",
     );
     if (password instanceof Response) {
-      // BW_NOINTERACTION with no password source. Throwing surfaces as a badRequest via the
+      // GOREECLOUD_VAULT_NOINTERACTION with no password source. Throwing surfaces as a badRequest via the
       // import() catch block (and aborts the importer's credentials callback).
       throw new Error(
         "Import file password is required. Provide --passwordfile or --passwordenv, or run interactively.",

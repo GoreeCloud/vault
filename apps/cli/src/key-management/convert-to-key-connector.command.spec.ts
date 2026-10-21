@@ -73,7 +73,7 @@ describe("ConvertToKeyConnectorCommand", () => {
 
   describe("run", () => {
     it("should logout and return error response if no interaction available", async () => {
-      process.env.BW_NOINTERACTION = "true";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
       const response = await command.run();
 
@@ -91,7 +91,7 @@ describe("ConvertToKeyConnectorCommand", () => {
     });
 
     it("should logout and return error response if interaction answer is exit", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getManagingOrganization.mockResolvedValue(organization);
 
       (createPromptModule as jest.Mock).mockImplementation(() =>
@@ -110,7 +110,7 @@ describe("ConvertToKeyConnectorCommand", () => {
     });
 
     it("should key connector migrate user and return success response if answer is remove", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getManagingOrganization.mockResolvedValue(organization);
       environmentService.environment$ = of({
         getUrls: () =>
@@ -140,7 +140,7 @@ describe("ConvertToKeyConnectorCommand", () => {
     });
 
     it("should logout and throw error if key connector migrate user fails", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getManagingOrganization.mockResolvedValue(organization);
 
       (createPromptModule as jest.Mock).mockImplementation(() =>
@@ -157,7 +157,7 @@ describe("ConvertToKeyConnectorCommand", () => {
     });
 
     it("should leave organization and return success response if answer is leave", async () => {
-      process.env.BW_NOINTERACTION = "false";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "false";
       keyConnectorService.getManagingOrganization.mockResolvedValue(organization);
 
       (createPromptModule as jest.Mock).mockImplementation(() =>

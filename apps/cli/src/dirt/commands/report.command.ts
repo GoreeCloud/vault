@@ -66,11 +66,11 @@ export class ReportCommand {
   }
 
   /**
-   * Runs {@link work} with a progress indicator on stderr. Silent under `BW_QUIET`, and a single
+   * Runs {@link work} with a progress indicator on stderr. Silent under `GOREECLOUD_VAULT_QUIET`, and a single
    * static line when stderr isn't a TTY. Never writes to stdout.
    */
   private async withProgress<T>(message: string, work: () => Promise<T>): Promise<T> {
-    const quiet = process.env.BW_QUIET === "true";
+    const quiet = process.env.GOREECLOUD_VAULT_QUIET === "true";
     const stderr = process.stderr;
 
     if (quiet) {

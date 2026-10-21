@@ -82,3 +82,7 @@ If the desktop app is installed in a non-standard location, set
 ### Help Center
 
 We provide detailed documentation and examples for using the CLI in our help center at https://help.bitwarden.com/article/cli/.
+
+## GoreeCloud Vault development process flags
+
+The GoreeCloud Vault CLI intentionally does not consume upstream Bitwarden `BW_*` process-mode flags. Fork-specific equivalents are `GOREECLOUD_VAULT_PRETTY`, `GOREECLOUD_VAULT_RAW`, `GOREECLOUD_VAULT_RESPONSE`, `GOREECLOUD_VAULT_QUIET`, `GOREECLOUD_VAULT_CLEANEXIT`, `GOREECLOUD_VAULT_NOINTERACTION`, and the internal-only `GOREECLOUD_VAULT_SERVE`. Supported command-line options such as `--raw` and `--nointeraction` remain available. A false-valued clean-exit flag cannot suppress failure exit codes. The local API server and Send receive entry points remain disabled in Development pending security acceptance. These changes are not approval to store real credentials.

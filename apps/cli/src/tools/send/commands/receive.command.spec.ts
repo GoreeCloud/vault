@@ -109,7 +109,7 @@ describe("SendReceiveCommand", () => {
     });
 
     it("should refuse a mismatched domain in non-interactive mode", async () => {
-      process.env.BW_NOINTERACTION = "true";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
       const response = await command.run("https://send.example.com/#/send/abc123/key456", {});
 
@@ -117,7 +117,7 @@ describe("SendReceiveCommand", () => {
       expect(response.message).toContain("does not match the configured domain");
       expect(sendTokenService.tryGetSendAccessToken$).not.toHaveBeenCalled();
 
-      delete process.env.BW_NOINTERACTION;
+      delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
     });
 
     it("should return error when URL is missing send ID or key", async () => {
@@ -198,7 +198,7 @@ describe("SendReceiveCommand", () => {
       });
 
       it("should return error for invalid password", async () => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
         sendTokenService.tryGetSendAccessToken$.mockReturnValue(
           of({
@@ -225,12 +225,12 @@ describe("SendReceiveCommand", () => {
         expect(response.success).toBe(false);
         expect(response.message).toContain("Invalid password");
 
-        delete process.env.BW_NOINTERACTION;
+        delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
       });
 
       it("should work with --passwordenv option", async () => {
         process.env.TEST_SEND_PASSWORD = "env-password";
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
         sendTokenService.tryGetSendAccessToken$.mockReturnValue(
           of({
@@ -251,13 +251,13 @@ describe("SendReceiveCommand", () => {
         expect(response.success).toBe(true);
 
         delete process.env.TEST_SEND_PASSWORD;
-        delete process.env.BW_NOINTERACTION;
+        delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
       });
     });
 
     describe("Email OTP Authentication (V2)", () => {
       it("should return error in non-interactive mode for email OTP", async () => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
         sendTokenService.tryGetSendAccessToken$.mockReturnValue(
           of({
@@ -275,7 +275,7 @@ describe("SendReceiveCommand", () => {
         expect(response.message).toContain("Email verification required");
         expect(response.message).toContain("interactive mode");
 
-        delete process.env.BW_NOINTERACTION;
+        delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
       });
 
       it("should handle email submission and OTP prompt flow", async () => {
@@ -1054,7 +1054,7 @@ describe("SendReceiveCommand", () => {
 
     afterEach(() => {
       stdoutSpy.mockRestore();
-      delete process.env.BW_NOINTERACTION;
+      delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
     });
 
     describe("end to end", () => {
@@ -1106,7 +1106,7 @@ describe("SendReceiveCommand", () => {
       });
 
       it("reports a rejected password", async () => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
         receiveClient.request_send_access_token
           .mockRejectedValueOnce(
             expectedTokenError("invalid_request", "password_hash_b64_required"),
@@ -1121,7 +1121,7 @@ describe("SendReceiveCommand", () => {
       });
 
       it("requires a password when none is given non-interactively", async () => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
         receiveClient.request_send_access_token.mockRejectedValueOnce(
           expectedTokenError("invalid_request", "password_hash_b64_required"),
         );
@@ -1170,7 +1170,7 @@ describe("SendReceiveCommand", () => {
       });
 
       it("refuses the email flow non-interactively", async () => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
         receiveClient.request_send_access_token.mockRejectedValueOnce(
           expectedTokenError("invalid_request", "email_required"),
         );

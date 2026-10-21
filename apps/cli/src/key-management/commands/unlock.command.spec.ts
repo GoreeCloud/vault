@@ -69,9 +69,9 @@ describe("UnlockCommand", () => {
   beforeEach(async () => {
     jest.restoreAllMocks();
     jest.clearAllMocks();
-    delete process.env.BW_NOINTERACTION;
-    delete process.env.BW_QUIET;
-    delete process.env.BW_RESPONSE;
+    delete process.env.GOREECLOUD_VAULT_NOINTERACTION;
+    delete process.env.GOREECLOUD_VAULT_QUIET;
+    delete process.env.GOREECLOUD_VAULT_RESPONSE;
 
     i18nService.t.mockImplementation((key: string) => key);
     accountService.activeAccount$ = of(activeAccount);
@@ -118,7 +118,7 @@ describe("UnlockCommand", () => {
     test.each([null as unknown as string, undefined as unknown as string, ""])(
       "returns error response when the provided password is %s",
       async (mockMasterPassword) => {
-        process.env.BW_NOINTERACTION = "true";
+        process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
         const response = await command.run(mockMasterPassword, {});
 
@@ -147,7 +147,7 @@ describe("UnlockCommand", () => {
     });
 
     it("unlocks with a desktop biometric user key when no password was provided", async () => {
-      process.env.BW_QUIET = "true";
+      process.env.GOREECLOUD_VAULT_QUIET = "true";
       const userKey = mock<UserKey>();
       biometricsService.getBiometricsStatusForUser.mockResolvedValue(BiometricsStatus.Available);
       biometricsService.unlockWithBiometricsForUser.mockResolvedValue(userKey);
@@ -183,7 +183,7 @@ describe("UnlockCommand", () => {
     });
 
     it("falls back when desktop biometric unlock is cancelled", async () => {
-      process.env.BW_QUIET = "true";
+      process.env.GOREECLOUD_VAULT_QUIET = "true";
       biometricsService.getBiometricsStatusForUser.mockResolvedValue(BiometricsStatus.Available);
       biometricsService.unlockWithBiometricsForUser.mockResolvedValue(null);
       jest.spyOn(CliUtils, "getPassword").mockResolvedValue(mockMasterPassword);
@@ -199,7 +199,7 @@ describe("UnlockCommand", () => {
     });
 
     it("does not attempt biometrics in non-interactive mode", async () => {
-      process.env.BW_NOINTERACTION = "true";
+      process.env.GOREECLOUD_VAULT_NOINTERACTION = "true";
 
       const response = await command.run(null, {});
 
