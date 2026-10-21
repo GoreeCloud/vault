@@ -20,6 +20,12 @@
 - Validate platform integrations with appropriate GoreeCloud systems only through documented, current contracts with narrow permissions.
 - Document a versioned release candidate with exact commit, CI status, relevant runtime/device evidence, known risks, recovery and rollback.
 
+## Tracked dependency security gate (development)
+
+GitHub [issue #8](https://github.com/GoreeCloud/vault/issues/8) is the live dependency vulnerability blocker. On the isolated `security/angular-multer-peer-safe` candidate, compatible patch updates to nine Angular components, root and CLI multer, and webpack reduce `npm audit --omit=dev` from **5 high / 4 moderate** installed-package findings to **1 high / 0 moderate** (October 21, 2026). The remaining **high** finding is `node-forge@1.4.0`: npm reports no fixed version. It is actually imported in inherited Keeper import and legacy crypto code, and must receive a focused reachability and signature-verification review plus an upstream remediation or approved replacement. No release waiver is implied.
+
+This audit is a dependency-scanner observation against candidate lockfile metadata, *not* confirmation of a secure production runtime, human cryptographic approval or completed dependency remediation. The coordinated package-lock rebuild has other transitive movement; exact CI installation, build compatibility and lockfile review must pass before merging. The historic inherited RxJS ESLint peer warnings also remain unsolved and must not be hidden with `--force` or `--legacy-peer-deps`.
+
 ## Not yet implemented or validated
 
 This repository has an initial GoreeCloud Vault shell name layer, but most upstream runtime behavior, embedded brand assets, IDs, links and compatibility contracts remain in place. Desktop stable/beta development update feeds are nonfunctional and the runtime updater is explicitly disabled until review of owned signing and distribution. No GoreeCloud Vault binaries, production runtime, service integration, mobile apps, browser-store submissions, external security acceptance, or Stable release are established by the import.
