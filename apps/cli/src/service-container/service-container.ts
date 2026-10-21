@@ -519,7 +519,7 @@ export class ServiceContainer {
     this.appIdService = new AppIdService(this.storageService, this.logService);
 
     const customUserAgent =
-      "Bitwarden_CLI/" +
+      "GoreeCloudVault_CLI/" +
       this.platformUtilsService.getApplicationVersionSync() +
       " (" +
       this.platformUtilsService.getDeviceString().toUpperCase() +
