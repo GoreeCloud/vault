@@ -40,3 +40,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_send_hold.py'
       - name: CLI inherited process environment isolation
         run: python3 -m unittest discover -s tests -p 'test_cli_ambient_flags.py'
+      - name: CLI outbound API transport source guard
+        run: python3 -m unittest discover -s tests -p 'test_cli_api_transport_boundary.py'

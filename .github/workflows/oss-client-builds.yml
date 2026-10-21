@@ -39,6 +39,8 @@ jobs:
         run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/platform/commands/server-config-validation.spec.ts
       - name: Verify fork-only CLI process flags and failure exit behavior
         run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/base-program.spec.ts
+      - name: Verify CLI outbound API origins and redirect rejection using loopback
+        run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/platform/services/cli-api-destination-policy.spec.ts apps/cli/src/platform/services/node-api.service.spec.ts
       - name: Verify CLI session environment isolation with synthetic keys
         run: npx jest --config apps/cli/jest.config.js --runInBand --runTestsByPath apps/cli/src/platform/services/node-env-secure-storage.service.spec.ts apps/cli/src/auth/commands/login.command.spec.ts apps/cli/src/key-management/commands/unlock.command.spec.ts
       - name: Verify fork-only CLI profile with disposable HOME
