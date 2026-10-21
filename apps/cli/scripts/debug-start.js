@@ -29,7 +29,7 @@ const DEBUG_PROXY = path.resolve(CLI_DIR, "../desktop/desktop_native/target/debu
 
 const environment = {
   ...process.env,
-  BITWARDENCLI_APPDATA_DIR: path.join(DEBUG_DIR, "cli-profile"),
+  GOREECLOUD_VAULT_CLI_DATA_DIR: path.join(DEBUG_DIR, "cli-profile"),
   BITWARDEN_IPC_SOCKET_DIR: DEBUG_DIR,
 };
 
@@ -39,7 +39,9 @@ if (fs.existsSync(DEBUG_PROXY)) {
   environment.BITWARDEN_DESKTOP_PROXY_PATH = DEBUG_PROXY;
 }
 
-fs.mkdirSync(environment.BITWARDENCLI_APPDATA_DIR, { recursive: true });
+// Never allow inherited upstream profile overrides in a GoreeCloud debug launch.
+delete environment.BITWARDENCLI_APPDATA_DIR;
+fs.mkdirSync(environment.GOREECLOUD_VAULT_CLI_DATA_DIR, { recursive: true });
 
 function run(command, commandArgs) {
   const result = spawnSync(command, commandArgs, {
