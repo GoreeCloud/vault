@@ -18,3 +18,5 @@ jobs:
         run: python3 scripts/check_fork_integrity.py
       - name: Regression tests for import guard
         run: python3 -m unittest discover -s tests -p 'test_fork_integrity.py'
+      - name: Product shell identity smoke tests
+        run: python3 -m unittest discover -s tests -p 'test_product_identity.py'
