@@ -42,3 +42,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_cli_ambient_flags.py'
       - name: CLI outbound API transport source guard
         run: python3 -m unittest discover -s tests -p 'test_cli_api_transport_boundary.py'
+      - name: Private Vault development endpoint probe offline tests
+        run: python3 -m unittest discover -s tests -p 'test_vault_dev_endpoint_probe.py'
