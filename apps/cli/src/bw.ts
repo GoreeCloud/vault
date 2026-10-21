@@ -1,11 +1,13 @@
 import "core-js/proposals/explicit-resource-management";
 
 import { program } from "commander";
+import { firstValueFrom } from "rxjs";
 
 import { OssServeConfigurator } from "./oss-serve-configurator";
 import { registerOssPrograms } from "./register-oss-programs";
 import { ServeProgram } from "./serve.program";
 import { ServiceContainer } from "./service-container/service-container";
+import { validateVaultServerUrls } from "./platform/commands/server-config-validation";
 
 async function main() {
   const serviceContainer = new ServiceContainer();
@@ -25,6 +27,28 @@ async function main() {
 
   try {
     await serviceContainer.init();
+
+    // Temporary development gate. Commands that can access a remote service
+    // must not silently inherit the original application's production cloud.
+    const args = process.argv.slice(2);
+    const safeCommands = new Set([
+      "config", "status", "lock", "update", "encode", "generate",
+      "completion", "sdk-version",
+    ]);
+    const showingHelp = args.some((arg) =>
+      ["--help", "-h", "--version", "-v"].includes(arg),
+    );
+    if (args.length > 0 && !showingHelp && !safeCommands.has(args[0])) {
+      const environment = await firstValueFrom(serviceContainer.environmentService.environment$);
+      const problem = environment.isCloud()
+        ? "Inherited Bitwarden cloud regions are disabled. Configure a GoreeCloud Vault development server."
+        : validateVaultServerUrls(environment.getUrls());
+      if (problem) {
+        process.stderr.write(problem + "\n");
+        process.exitCode = 1;
+        return;
+      }
+    }
 
     await registerOssPrograms(serviceContainer);
 
