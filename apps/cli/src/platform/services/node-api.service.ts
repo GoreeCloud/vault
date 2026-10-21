@@ -2,6 +2,7 @@
 // @ts-strict-ignore
 import * as FormData from "form-data";
 import * as fe from "node-fetch";
+import { firstValueFrom } from "rxjs";
 
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { TokenService } from "@bitwarden/common/auth/abstractions/token.service";
@@ -11,6 +12,8 @@ import { EnvironmentService } from "@bitwarden/common/platform/abstractions/envi
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ApiService } from "@bitwarden/common/services/api.service";
+
+import { validateCliApiDestination } from "./cli-api-destination-policy";
 
 (global as any).fetch = fe.default;
 (global as any).Request = fe.Request;
@@ -44,15 +47,31 @@ export class NodeApiService extends ApiService {
       { createRequest: (url, request) => new Request(url, request) },
       customUserAgent,
     );
+    this.cliEnvironmentService = environmentService;
   }
 
+  private cliEnvironmentService: EnvironmentService;
+
   async nativeFetch(request: Request): Promise<Response> {
+    const environment = await firstValueFrom(this.cliEnvironmentService.environment$);
+    const problem = validateCliApiDestination(request.url, environment);
+    if (problem) {
+      throw new Error(problem);
+    }
+
+    // Disable automatic redirects so an allowed host cannot forward an API request
+    // to an unconfigured recipient, particularly with authentication attached.
+    const guardedRequest = new fe.Request(request as any, { redirect: "manual" });
     const proxy = process.env.http_proxy || process.env.https_proxy;
     if (proxy) {
       const { HttpsProxyAgent } = await import("https-proxy-agent");
-      (request as any).agent = new HttpsProxyAgent(proxy);
+      (guardedRequest as any).agent = new HttpsProxyAgent(proxy);
     }
-    return fetch(request);
+    const response = await fe.default(guardedRequest);
+    if (response.status >= 300 && response.status < 400) {
+      throw new Error("CLI API redirects are disabled pending verified destination handling.");
+    }
+    return response as unknown as Response;
   }
 
   /** XMLHttpRequest is not supported in Node.js, fallback to fetch */
