@@ -3,8 +3,8 @@
   "extraMetadata": {
     "name": "bitwarden"
   },
-  "productName": "Bitwarden",
-  "appId": "com.bitwarden.desktop",
+  "productName": "GoreeCloud Vault",
+  "appId": "com.goreecloud.vault",
   "buildDependenciesFromSource": true,
   "copyright": "Copyright © 2015-2026 Bitwarden Inc.",
   "directories": {
@@ -27,7 +27,7 @@
   "generateUpdatesFilesForAllChannels": true,
   "publish": {
     "provider": "generic",
-    "url": "https://artifacts.bitwarden.com/desktop"
+    "url": "https://updates.goreecloud.invalid/vault"
   },
   "mac": {
     "electronUpdaterCompatibility": ">=0.0.1",

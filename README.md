@@ -6,7 +6,7 @@ GoreeCloud Vault is a GoreeCloud-controlled password-manager project based initi
 
 ## Current implementation
 
-The imported baseline contains upstream web vault, browser extension, desktop application, and CLI source plus shared libraries. This baseline is **not yet a production-ready GoreeCloud Vault**: GoreeCloud UI adaptation, security acceptance, interoperability verification, packaging, backend integration, and mobile clients remain pending.
+The imported baseline contains upstream web vault, browser extension, desktop application, and CLI source plus shared libraries. GoreeCloud Vault naming has been added to initial web, browser-extension, and desktop shell metadata; full GoreeCloud UI adaptation and branding remain outstanding. This baseline is **not yet a production-ready GoreeCloud Vault**: security acceptance, interoperability verification, packaging, backend integration, and mobile clients remain pending.
 
 The independently managed GoreeCloud Vault Server is a separate workstream; this import does not implement or deploy a backend.
 

@@ -1,20 +1,20 @@
 {
   "appName": {
-    "message": "Bitwarden"
+    "message": "GoreeCloud Vault"
   },
   "appLogoLabel": {
     "message": "រូបសញ្ញា Bitwarden"
   },
   "extName": {
-    "message": "កម្មវិធីគ្រប់គ្រងពាក្យសម្ងាត់ Bitwarden",
+    "message": "GoreeCloud Vault",
     "description": "Extension name, MUST be less than 40 characters (Safari restriction)"
   },
   "extNameBeta": {
-    "message": "Bitwarden Password Manager Beta",
+    "message": "GoreeCloud Vault Beta",
     "description": "Extension name for the beta channel, MUST be less than 40 characters (Safari restriction)"
   },
   "extDesc": {
-    "message": "នៅផ្ទះ នៅកន្លែងធ្វើការ ឬពេលធ្វើដំណើរ Bitwarden ការពារពាក្យសម្ងាត់ សោចូល និងព័ត៌មានសំខាន់ៗរបស់អ្នកយ៉ាងងាយស្រួល",
+    "message": "នៅផ្ទះ នៅកន្លែងធ្វើការ ឬពេលធ្វើដំណើរ GoreeCloud Vault ការពារពាក្យសម្ងាត់ សោចូល និងព័ត៌មានសំខាន់ៗរបស់អ្នកយ៉ាងងាយស្រួល",
     "description": "Extension description, MUST be less than 112 characters (Safari restriction)"
   },
   "loginOrCreateNewAccount": {
