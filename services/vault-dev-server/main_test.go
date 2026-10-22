@@ -62,7 +62,7 @@ func TestOtherRoutesAndMethodsDeny(t *testing.T) {
 		method, path string
 		status       int
 	}{
-		{"GET", "/unknown", 404},
+		{"GET", "/unknown", 503},
 		{"POST", "/healthz", 405},
 		{"OPTIONS", "/healthz", 405},
 	} {

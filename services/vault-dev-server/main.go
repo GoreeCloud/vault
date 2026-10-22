@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -58,17 +59,23 @@ func handler() http.Handler {
 	mux.HandleFunc("/healthz", health)
 	mux.HandleFunc("/v1/dev/capabilities", health)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// No request payload, path or authentication header is logged or echoed.
-		if strings.HasPrefix(r.URL.Path, "/identity/") ||
-			strings.HasPrefix(r.URL.Path, "/api/") ||
-			strings.HasPrefix(r.URL.Path, "/notifications/") {
-			w.Header().Set("Retry-After", "3600")
-			disclose(w, r, http.StatusServiceUnavailable)
+		// Fail closed for every other route. The imported Vault client may
+		// introduce new identity, item or sync paths; none are implemented.
+		// Do not inspect, persist, log or reflect request payloads.
+		w.Header().Set("Retry-After", "3600")
+		disclose(w, r, http.StatusServiceUnavailable)
+	})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ServeMux normally redirects malformed slash paths. This temporary
+		// server must not issue redirect responses or normalize API paths.
+		if r.URL == nil || r.URL.Path == "" ||
+			path.Clean(r.URL.Path) != r.URL.Path ||
+			strings.Contains(strings.ToLower(r.URL.EscapedPath()), "%2f") {
+			disclose(w, r, http.StatusBadRequest)
 			return
 		}
-		disclose(w, r, http.StatusNotFound)
+		mux.ServeHTTP(w, r)
 	})
-	return mux
 }
 
 func listenAddress(value string) (string, error) {
