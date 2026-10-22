@@ -43,3 +43,17 @@ tombstones do not survive process restart.
 
 This code remains intentionally excluded from the native server executable.
 No endpoint exposes it, and no real passwords may be submitted.
+
+## Synthetic full-resynchronization after expired journal history
+
+The laboratory also models an atomic `Snapshot(scope)` fallback. A client
+whose incremental `Pull` returns `ErrHistoryExpired` may retrieve the
+current set of synthetic opaque ciphertext items and a matching cursor,
+then use that cursor for subsequent changes. Snapshot returns deterministic,
+deep-copied records and omits deleted items. Tests exercise recovery after
+history truncation, resumed deltas, deletion propagation, tenant-scope
+separation, concurrent writes, and invalid/empty accounts.
+
+This snapshot is **ephemeral and unauthenticated**, not a backup or recovery
+service. It does not provide real tenant authorization, durable storage,
+rollback protection, migration, key recovery, or application integration.
