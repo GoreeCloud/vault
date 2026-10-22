@@ -112,6 +112,13 @@ func serve(ctx context.Context, address string) error {
 	if err != nil {
 		return err
 	}
+	return serveListener(ctx, listener)
+}
+
+// serveListener owns its listener until cancellation or server failure.
+// Keeping listener ownership explicit makes actual TCP startup/shutdown and
+// connection refusal verifiable without real users or production networking.
+func serveListener(ctx context.Context, listener net.Listener) error {
 	defer listener.Close()
 	server := &http.Server{
 		Handler: handler(), ReadHeaderTimeout: 4 * time.Second,
