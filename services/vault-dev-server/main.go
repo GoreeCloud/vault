@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -45,6 +46,24 @@ func disclose(w http.ResponseWriter, r *http.Request, code int) {
 	}
 }
 
+// isDisabledVaultAPI covers the actual root-relative routes requested by
+// inherited clients, including /sync, /ciphers, and /accounts, rather than
+// relying only on the /api and /identity proxy prefixes. A segment boundary
+// prevents denying unrelated paths that happen to share a string prefix.
+func isDisabledVaultAPI(requestPath string) bool {
+	for _, prefix := range []string{
+		"/identity", "/api", "/notifications", "/accounts", "/ciphers",
+		"/sync", "/folders", "/collections", "/organizations", "/sends",
+		"/attachments", "/devices", "/two-factor", "/settings",
+		"/policies", "/events", "/config", "/hibp",
+	} {
+		if requestPath == prefix || strings.HasPrefix(requestPath, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	health := func(w http.ResponseWriter, r *http.Request) {
@@ -59,16 +78,24 @@ func handler() http.Handler {
 	mux.HandleFunc("/v1/dev/capabilities", health)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// No request payload, path or authentication header is logged or echoed.
-		if strings.HasPrefix(r.URL.Path, "/identity/") ||
-			strings.HasPrefix(r.URL.Path, "/api/") ||
-			strings.HasPrefix(r.URL.Path, "/notifications/") {
+		if isDisabledVaultAPI(r.URL.Path) {
 			w.Header().Set("Retry-After", "3600")
 			disclose(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		disclose(w, r, http.StatusNotFound)
 	})
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ServeMux normally redirects malformed slash paths. This temporary
+		// server must not issue redirect responses or normalize API paths.
+		if r.URL == nil || r.URL.Path == "" ||
+			path.Clean(r.URL.Path) != r.URL.Path ||
+			strings.Contains(strings.ToLower(r.URL.EscapedPath()), "%2f") {
+			disclose(w, r, http.StatusBadRequest)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func listenAddress(value string) (string, error) {
