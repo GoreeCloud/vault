@@ -48,3 +48,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_vault_dev_ingress_candidate.py'
       - name: Synthetic encrypted-item laboratory must remain test-only
         run: python3 -m unittest discover -s tests -p 'test_vault_synthetic_lab_boundary.py'
+      - name: Imported client API surface must match source and stay unsupported
+        run: python3 -m unittest discover -s tests -p 'test_vault_imported_client_contract.py'

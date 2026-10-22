@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "classification": "development-only-inventory",
+  "implemented": false,
+  "credential_storage_supported": false,
+  "description": "Observed subset of imported Bitwarden client request routes, not a compatible GoreeCloud Vault API or promise of response formats.",
+  "routes": [
+    {"method":"POST","path":"/accounts/prelogin/password","target":"identity","source":"libs/common/src/auth/password-prelogin/password-prelogin-api.service.ts","client_method":"getPreloginData","implemented":false},
+    {"method":"POST","path":"/connect/token","target":"identity","source":"libs/common/src/services/api.service.ts","client_method":"postIdentityToken","implemented":false},
+    {"method":"GET","path":"/sync","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"getSync","implemented":false},
+    {"method":"GET","path":"/sync?excludeDomains=true","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"getSync","implemented":false},
+    {"method":"GET","path":"/ciphers/{id}","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"getCipher","implemented":false},
+    {"method":"POST","path":"/ciphers","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"postCipher","implemented":false},
+    {"method":"POST","path":"/ciphers/create","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"postCipherCreate","implemented":false},
+    {"method":"PUT","path":"/ciphers/{id}","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"putCipher","implemented":false},
+    {"method":"DELETE","path":"/ciphers/{id}","target":"api","source":"libs/common/src/services/api.service.ts","client_method":"deleteCipher","implemented":false}
+  ]
+}
