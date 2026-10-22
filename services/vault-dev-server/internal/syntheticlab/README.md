@@ -27,3 +27,19 @@ authenticated-data formats, KDF parameters, key protection, rotation, recovery,
 tenant authorization, offline conflict and audit requirements. Adopt only
 reviewed crypto protocols and real-client tests. Never import live Vaultwarden
 data for this laboratory.
+
+## Synthetic incremental sync journal
+
+`NewSyncLedger` composes the in-memory ciphertext store with a sequence of
+synthetic change events. It models per-scope cursors, bounded pages (16
+events), tombstones on deletion, optimistic revision conflict detection,
+atomic sequencing, and stale-history errors after a 64-event rolling window.
+It deep-copies ciphertext across the boundary, and cross-scope pulls never
+expose other synthetic users. Its test suite models two isolated clients
+pulling and decrypting invented values. It does **not** implement user
+authentication, cryptographic identity, network transport, a backup database,
+real app serialization, recovery or a durable sync protocol. Cursors and
+tombstones do not survive process restart.
+
+This code remains intentionally excluded from the native server executable.
+No endpoint exposes it, and no real passwords may be submitted.

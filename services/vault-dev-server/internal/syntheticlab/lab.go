@@ -21,10 +21,11 @@ const (
 )
 
 var (
-	ErrInvalid  = errors.New("synthetic contract: invalid input")
-	ErrNotFound = errors.New("synthetic contract: not found")
-	ErrConflict = errors.New("synthetic contract: revision conflict")
-	ErrCapacity = errors.New("synthetic contract: capacity exceeded")
+	ErrInvalid        = errors.New("synthetic contract: invalid input")
+	ErrNotFound       = errors.New("synthetic contract: not found")
+	ErrConflict       = errors.New("synthetic contract: revision conflict")
+	ErrCapacity       = errors.New("synthetic contract: capacity exceeded")
+	ErrHistoryExpired = errors.New("synthetic contract: journal cursor expired")
 )
 var identifier = regexp.MustCompile("^[a-zA-Z0-9_-]{1,64}$")
 
