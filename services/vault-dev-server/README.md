@@ -34,3 +34,14 @@ The production Vaultwarden instance at vault.goreecloud.com is a **separate**
 Docker deployment and source of existing user data. The new replacement
 target is vault-dev.goreecloud.com; it is not deployed by this change and
 must never point at existing Vaultwarden data. See issues #3, #8, #25, #28.
+
+## Process liveness versus Vault readiness
+
+`/healthz` is **liveness only** (HTTP 200). It does not establish that the
+backend can authenticate or store credentials. `/readyz` is HTTP **503**
+with a retry hint until a genuine password service passes its security and
+runtime gates. Every capability disclosure includes `"ready": false`,
+in addition to disabled credential, storage and sync fields. Unsupported
+methods cannot change readiness. Do not configure a production or development
+load balancer, container readiness probe, or domain route using `/healthz`
+as the acceptance gate for a working password vault.

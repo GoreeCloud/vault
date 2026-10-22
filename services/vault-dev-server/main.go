@@ -26,6 +26,7 @@ type capabilities struct {
 	CredentialsEnabled bool   `json:"credentials_enabled"`
 	SyncEnabled        bool   `json:"sync_enabled"`
 	StorageEnabled     bool   `json:"storage_enabled"`
+	Ready              bool   `json:"ready"`
 }
 
 func disclose(w http.ResponseWriter, r *http.Request, code int) {
@@ -42,6 +43,7 @@ func disclose(w http.ResponseWriter, r *http.Request, code int) {
 			CredentialsEnabled: false,
 			SyncEnabled:        false,
 			StorageEnabled:     false,
+			Ready:              false,
 		})
 	}
 }
@@ -57,6 +59,16 @@ func handler() http.Handler {
 		disclose(w, r, http.StatusOK)
 	}
 	mux.HandleFunc("/healthz", health)
+	// Process liveness must not be mistaken for an operational Vault.
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			disclose(w, r, http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Retry-After", "3600")
+		disclose(w, r, http.StatusServiceUnavailable)
+	})
 	mux.HandleFunc("/v1/dev/capabilities", health)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Fail closed for every other route. The imported Vault client may
