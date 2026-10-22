@@ -45,3 +45,13 @@ in addition to disabled credential, storage and sync fields. Unsupported
 methods cannot change readiness. Do not configure a production or development
 load balancer, container readiness probe, or domain route using `/healthz`
 as the acceptance gate for a working password vault.
+
+## Process lifecycle verification
+
+The development server keeps transport and handler responsibilities separate.
+Synthetic-only loopback TCP integration tests assert that the live process
+responds to liveness but **not** readiness, rejects duplicate port binding,
+and stops accepting new connections after graceful cancellation. No
+production host, external network, container, real identity or user data is
+required for these checks. These tests do not establish authentication,
+production uptime, installed service lifecycle or crash recovery.
