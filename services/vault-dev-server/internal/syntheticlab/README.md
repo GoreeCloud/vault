@@ -57,3 +57,14 @@ separation, concurrent writes, and invalid/empty accounts.
 This snapshot is **ephemeral and unauthenticated**, not a backup or recovery
 service. It does not provide real tenant authorization, durable storage,
 rollback protection, migration, key recovery, or application integration.
+
+## Deletion conflict protection (synthetic only)
+
+A delete retains an in-memory, ciphertext-free tombstone with the incremented
+revision. Re-creating the same item requires acknowledging that deletion
+revision; old revision-zero creates and pre-delete updates fail with a
+conflict instead of silently resurrecting deleted data (an ABA race).
+The laboratory deliberately caps lifetime item identifiers per scope,
+including tombstones, at 32. A full production backend needs a reviewed
+retention, garbage-collection, authenticated item identity, audit, and
+cross-device recovery policy before lifting this cap.

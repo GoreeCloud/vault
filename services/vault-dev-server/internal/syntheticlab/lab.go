@@ -36,6 +36,7 @@ type Envelope struct {
 type record struct {
 	envelope Envelope
 	revision uint64
+	deleted  bool
 }
 type Store struct {
 	mu      sync.RWMutex
@@ -123,6 +124,8 @@ func (s *Store) Put(scope, id string, expected uint64, e Envelope) (uint64, erro
 		s.records[scope] = group
 	}
 	old, found := group[id]
+	// A tombstone retains the latest revision: re-creation must acknowledge
+	// the deletion. A stale create at revision zero cannot resurrect data.
 	if !found && expected != 0 {
 		return 0, ErrConflict
 	}
@@ -144,7 +147,7 @@ func (s *Store) Get(scope, id string) (Envelope, uint64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	entry, ok := s.records[scope][id]
-	if !ok {
+	if !ok || entry.deleted {
 		return Envelope{}, 0, ErrNotFound
 	}
 	return clone(entry.envelope), entry.revision, nil
@@ -163,10 +166,9 @@ func (s *Store) Delete(scope, id string, expected uint64) error {
 	if entry.revision != expected {
 		return ErrConflict
 	}
-	delete(group, id)
-	// Entire scope is removed when empty, so limits remain bounded.
-	if len(group) == 0 {
-		delete(s.records, scope)
-	}
+	// Keep only the version marker, never deleted ciphertext. Retaining a
+	// bounded tombstone prevents the ABA deletion/recreation race. The
+	// synthetic in-memory scope has a finite lifetime/identifier budget.
+	group[id] = record{revision: expected + 1, deleted: true}
 	return nil
 }

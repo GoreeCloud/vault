@@ -21,6 +21,9 @@ func (s *Store) Snapshot(scope string) ([]SnapshotItem, error) {
 	group := s.records[scope]
 	items := make([]SnapshotItem, 0, len(group))
 	for id, entry := range group {
+		if entry.deleted {
+			continue
+		}
 		items = append(items, SnapshotItem{ID: id, Revision: entry.revision, Envelope: clone(entry.envelope)})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
