@@ -9,11 +9,11 @@ import (
 
 func TestInheritedClientRoutesFailClosed(t *testing.T) {
 	paths := []string{
-		"/identity", "/identity/connect/token", "/api", "/api/ciphers",
+		"/identity", "/identity/connect/token", "/connect/token", "/api", "/api/ciphers",
 		"/notifications/hub", "/accounts", "/accounts/prelogin/password",
 		"/ciphers", "/ciphers/00000000-0000-0000-0000-000000000001",
 		"/ciphers/create", "/sync", "/folders", "/collections",
-		"/organizations", "/sends", "/attachments", "/devices",
+		"/organizations", "/providers/id", "/users/id/public-key", "/emergency-access/id", "/sends", "/attachments", "/devices",
 		"/two-factor", "/settings/domains", "/policies", "/events",
 		"/config", "/hibp",
 	}
@@ -61,11 +61,11 @@ func TestMalformedPathsDoNotRedirectToOtherRoutes(t *testing.T) {
 	}
 }
 
-func TestPrefixNearMissesAreNotInventedAPIs(t *testing.T) {
+func TestUnknownFutureRoutesAlsoFailClosed(t *testing.T) {
 	for _, route := range []string{"/synchronicity", "/cipherstone", "/accountsettings"} {
 		w := httptest.NewRecorder()
 		handler().ServeHTTP(w, httptest.NewRequest("GET", route, nil))
-		if w.Code != http.StatusNotFound {
+		if w.Code != http.StatusServiceUnavailable {
 			t.Errorf("%s got %d", route, w.Code)
 		}
 	}

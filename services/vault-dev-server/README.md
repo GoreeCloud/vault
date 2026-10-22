@@ -18,7 +18,7 @@ The server only binds 127.0.0.1:8187 by default. It rejects wildcard and
 private-overlay bind addresses. The only successful response paths are
 GET/HEAD /healthz and GET/HEAD /v1/dev/capabilities, which disclose that
 credential storage, encrypted sync, and persisted storage are disabled.
-Identity, account, item and sync API routes return 503, not fabricated success. These include direct root-relative client paths such as /accounts, /ciphers, /sync, /folders and /organizations; malformed slash paths are rejected without HTTP redirects.
+All non-health, non-capability routes return HTTP 503, even when newly introduced by the imported clients (for example /connect/token, /accounts, /ciphers and /sync). No account, login, encrypted-item or sync route can appear to succeed; malformed slash paths are rejected without HTTP redirects.
 There is no data store or default account. No secrets, auth headers or request
 bodies are logged or echoed. This foundation neither opens public ports nor
 modifies production Vaultwarden, NetBird, Caddy, or DNS.

@@ -46,24 +46,6 @@ func disclose(w http.ResponseWriter, r *http.Request, code int) {
 	}
 }
 
-// isDisabledVaultAPI covers the actual root-relative routes requested by
-// inherited clients, including /sync, /ciphers, and /accounts, rather than
-// relying only on the /api and /identity proxy prefixes. A segment boundary
-// prevents denying unrelated paths that happen to share a string prefix.
-func isDisabledVaultAPI(requestPath string) bool {
-	for _, prefix := range []string{
-		"/identity", "/api", "/notifications", "/accounts", "/ciphers",
-		"/sync", "/folders", "/collections", "/organizations", "/sends",
-		"/attachments", "/devices", "/two-factor", "/settings",
-		"/policies", "/events", "/config", "/hibp",
-	} {
-		if requestPath == prefix || strings.HasPrefix(requestPath, prefix+"/") {
-			return true
-		}
-	}
-	return false
-}
-
 func handler() http.Handler {
 	mux := http.NewServeMux()
 	health := func(w http.ResponseWriter, r *http.Request) {
@@ -77,13 +59,11 @@ func handler() http.Handler {
 	mux.HandleFunc("/healthz", health)
 	mux.HandleFunc("/v1/dev/capabilities", health)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// No request payload, path or authentication header is logged or echoed.
-		if isDisabledVaultAPI(r.URL.Path) {
-			w.Header().Set("Retry-After", "3600")
-			disclose(w, r, http.StatusServiceUnavailable)
-			return
-		}
-		disclose(w, r, http.StatusNotFound)
+		// Fail closed for every other route. The imported Vault client may
+		// introduce new identity, item or sync paths; none are implemented.
+		// Do not inspect, persist, log or reflect request payloads.
+		w.Header().Set("Retry-After", "3600")
+		disclose(w, r, http.StatusServiceUnavailable)
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// ServeMux normally redirects malformed slash paths. This temporary
