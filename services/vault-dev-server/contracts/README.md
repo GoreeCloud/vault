@@ -22,3 +22,5 @@ Never plug in existing Docker Vaultwarden data or real passwords in testing.
 Run `python3 -m unittest discover -s tests -p test_vault_imported_client_contract.py`
 from the repository root to check that source-grounded route assumptions
 have not drifted without review.
+
+Native Go client_contract_test.go exercises every catalogued route with synthetic-only inputs and verifies HTTP 503, no redirect, and no input reflection. This is not live client interoperability.

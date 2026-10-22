@@ -38,6 +38,7 @@ class ImportedClientContractTests(unittest.TestCase):
         self.assertIn("env.getIdentityUrl()",self.prelogin)
 
     def test_token_is_identity_routed(self):
+        self.assertIn("postIdentityToken(",self.api)
         self.assertIn('env.getIdentityUrl() + "/connect/token"',self.api)
         self.assertRegex(self.api,re.compile(
             r'createRequest\(env\.getIdentityUrl\(\) \+ "/connect/token",\s*\{[\s\S]{0,260}method: "POST"',re.M))
