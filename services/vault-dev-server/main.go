@@ -121,7 +121,7 @@ func serve(ctx context.Context, address string) error {
 func serveListener(ctx context.Context, listener net.Listener) error {
 	defer listener.Close()
 	server := &http.Server{
-		Handler: handler(), ReadHeaderTimeout: 4 * time.Second,
+		Handler: loopbackBrowserBoundary(handler(), listener.Addr().String()), ReadHeaderTimeout: 4 * time.Second,
 		ReadTimeout: 6 * time.Second, WriteTimeout: 6 * time.Second,
 		IdleTimeout: 12 * time.Second, MaxHeaderBytes: 8192,
 	}
