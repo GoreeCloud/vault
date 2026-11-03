@@ -275,6 +275,20 @@ function renderDetail() {
     const codeLine = createText("div", "", "detail-value");
     const code = createText("strong", "••••••", "otp-code");
     code.id = "otp-code";
+    const reveal = createText("button", "Show code", "tiny-action");
+    reveal.type = "button";
+    reveal.id = "reveal-otp-code";
+    reveal.setAttribute("aria-label", "Show authenticator code");
+    reveal.setAttribute("aria-pressed", "false");
+    reveal.addEventListener("click", () => {
+      const shown = reveal.getAttribute("aria-pressed") !== "true";
+      reveal.setAttribute("aria-pressed", String(shown));
+      reveal.setAttribute("aria-label",
+        shown ? "Hide authenticator code" : "Show authenticator code");
+      reveal.textContent = shown ? "Hide code" : "Show code";
+      if (shown) void refreshTotp();
+      else code.textContent = "••••••";
+    });
     const copy = createText("button", "Copy code", "tiny-action");
     copy.type = "button";
     copy.addEventListener("click", async () => {
@@ -283,7 +297,7 @@ function renderDetail() {
     });
     const countdown = createText("small", "", "muted");
     countdown.id = "otp-remaining";
-    codeLine.append(code, copy, countdown);
+    codeLine.append(code, reveal, copy, countdown);
     group.append(codeLine);
     panel.append(group);
     refreshTotp();
@@ -320,13 +334,29 @@ async function refreshTotp() {
   const record = documentData.items.find(item => item.id === selection);
   if (!record?.totpSecret) return;
   const target = byId("otp-code");
+  const reveal = byId("reveal-otp-code");
+  if (!reveal) return;
+  message("otp-remaining", (30 - Math.floor(Date.now() / 1000) % 30) + " seconds remaining");
+  if (reveal.getAttribute("aria-pressed") !== "true") {
+    target.textContent = "••••••";
+    return;
+  }
+  const epoch = sessionId;
   try {
     const result = await generateTotp(record.totpSecret);
-    if (byId("otp-code") === target && documentData) {
+    // A request started while visible may finish after Hide, a lock, or an
+    // item switch. Never reveal stale codes across those UI boundaries.
+    if (sessionId === epoch && documentData && byId("otp-code") === target &&
+        byId("reveal-otp-code") === reveal &&
+        reveal.getAttribute("aria-pressed") === "true") {
       target.textContent = result;
-      message("otp-remaining", (30 - Math.floor(Date.now() / 1000) % 30) + " seconds remaining");
     }
-  } catch { if (byId("otp-code") === target) target.textContent = "Invalid secret"; }
+  } catch {
+    if (sessionId === epoch && documentData && byId("otp-code") === target &&
+        reveal.getAttribute("aria-pressed") === "true") {
+      target.textContent = "Invalid secret";
+    }
+  }
 }
 function render() {
   if (!documentData) return;

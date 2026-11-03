@@ -207,7 +207,19 @@ try {
   await until("document.getElementById('editor-dialog').open === false && document.getElementById('item-detail').textContent.includes('Updated exactly once')", "edited item saved once");
   assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true, "rapid duplicate submit does not create another item");
   await until("document.getElementById('edit-notes').value === ''", "editor notes scrub after save");
-  await until("document.getElementById('otp-code')?.textContent.match(/^\\d{6}$/)", "valid authenticator code generated from saved secret");
+  assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
+    "authenticator code starts masked by default");
+  assert.equal(await script("document.getElementById('reveal-otp-code').getAttribute('aria-pressed')"), "false",
+    "TOTP reveal has an accessible hidden state");
+  await script("document.getElementById('reveal-otp-code').click()");
+  await until("document.getElementById('otp-code')?.textContent.match(/^\\d{6}$/)", "explicitly revealed valid authenticator code");
+  assert.equal(await script("document.getElementById('reveal-otp-code').getAttribute('aria-pressed')"), "true");
+  await script("document.getElementById('reveal-otp-code').click()");
+  assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
+    "Hide returns the code to a masked state");
+  await pause(1250);
+  assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
+    "periodic refresh must not re-expose a hidden TOTP code");
   await script("document.getElementById('security-check').click()");
   await until("document.getElementById('health-dialog').open", "local security check opens");
   assert.equal(await script("document.getElementById('health-summary').textContent.includes('Logins reviewed')"), true);
@@ -461,7 +473,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
