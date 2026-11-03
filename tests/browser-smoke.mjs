@@ -168,7 +168,7 @@ try {
   // Exercise the actual Export backup control; do not manufacture the backup
   // by copying localStorage into a fixture file.
   await script("document.getElementById('export-vault').click()");
-  const exportPattern = /^goreecloud-vault-encrypted-\\d{4}-\\d{2}-\\d{2}\\.vault\\.json$/;
+  const exportPattern = /^goreecloud-vault-encrypted-\d{4}-\d{2}-\d{2}\.vault\.json$/;
   let backupPath = "";
   for (let i = 0; i < 100; i++) {
     const names = await readdir(workspace);
