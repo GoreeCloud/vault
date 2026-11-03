@@ -25,7 +25,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 
 ## Try it locally
 
-Requirements: a current browser with Web Crypto; Node.js 22 for tests; Python 3 for the local development server. Open on **localhost** or use **HTTPS**. No login, tracking, analytics, remote APIs or third-party JavaScript are built in.
+Requirements: a current browser with Web Crypto and Web Locks, plus Node.js 22 or newer for tests and the local static preview. Open on **127.0.0.1** or use a separately reviewed **HTTPS** hosting configuration. No login, tracking, analytics, remote APIs or third-party JavaScript are built in.
 
 ```bash
 git clone https://github.com/GoreeCloud/vault.git
@@ -41,7 +41,9 @@ The optional zero-dependency **headless Chromium acceptance check** creates an i
 CHROME_BIN=/path/to/chromium npm run test:browser
 ```
 
-Open **http://127.0.0.1:4173** in the same computer's browser. The development command now explicitly binds only to the loopback interface, avoiding accidental LAN exposure. Python's generic file server does **not** supply all required production HTTP security headers (for example `frame-ancestors 'none'` and `X-Frame-Options: DENY`); do not use it to host Vault for others.
+Open **http://127.0.0.1:4173** on the same computer. The zero-dependency Node static preview binds only to `127.0.0.1`, rejects unexpected Host headers, and serves **only** explicitly listed web assets (not `.git`, documents, tests, or package metadata). Its responses include a deny-by-default CSP with `frame-ancestors 'none'`, anti-framing, MIME-sniffing protection, no-referrer, restricted permissions, same-origin resource/opener restrictions, and `Cache-Control: no-store`.
+
+**This remains a localhost-only preview, not production hosting or a sync API.** Response headers mitigate some browser risks but do not remove the danger of compromised devices, browser extensions, malicious code delivery or unreviewed cryptography. Do not publish the preview or use real passwords.
 
 1. Create a passphrase of at least 12 characters and confirm it before saving the new vault. **There is no password reset or recovery service.**
 2. Create a few *noncritical test credentials*. The encrypted envelope is stored in that browser profile's localStorage; no plaintext vault records are persisted intentionally.
