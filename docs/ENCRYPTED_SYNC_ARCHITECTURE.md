@@ -4,7 +4,7 @@
 **Owner:** GoreeCloud founder
 **Date:** 2026-11-03
 **Scope:** Self-hosted ciphertext synchronization, device authorization, recovery, and cross-product integration.
-**Baseline:** \`GoreeCloud/vault\` currently provides an **unreviewed, browser-local, single-device prototype** using PBKDF2-SHA256 and AES-256-GCM. It has **no authenticated sync API**. This document must not be interpreted as evidence of a deployed server or audited cryptography.
+**Baseline:** `GoreeCloud/vault` currently provides an **unreviewed, browser-local, single-device prototype** using PBKDF2-SHA256 and AES-256-GCM. It has **no authenticated sync API**. This document must not be interpreted as evidence of a deployed server or audited cryptography.
 
 ## 1. Goals and non-goals
 
@@ -62,7 +62,7 @@ These are intended contracts, **not verified runtime interoperability**. No cros
 
 ### Example conceptual envelope (NOT a frozen API or production format)
 
-\`\`\`json
+```json
 {
   "protocol": "goreecloud.vault.sync.proposed",
   "vaultId": "opaque-vault-id",
@@ -74,9 +74,9 @@ These are intended contracts, **not verified runtime interoperability**. No cros
   "authorDeviceId": "opaque-authorized-device-id",
   "deviceSignature": "<signature-over-canonical-envelope>"
 }
-\`\`\`
+```
 
-Every field name and signature representation above is illustrative; values, canonical serialization, byte limits and parsing rules require review. Do not reuse the browser-local \`goreecloud.vault.local.v1\` document format unchanged as a network security protocol.
+Every field name and signature representation above is illustrative; values, canonical serialization, byte limits and parsing rules require review. Do not reuse the browser-local `goreecloud.vault.local.v1` document format unchanged as a network security protocol.
 
 ## 5. Authentication, authorization and device enrollment
 
@@ -103,13 +103,13 @@ Proposed relational entities (not migrations or deployed schema):
 
 ### Proposed HTTP contract (design, not available endpoints)
 
-- \`GET /v1/vaults/{vaultId}/changes?after={cursor}\`: authenticated, bounded, paginated ciphertext/tombstone retrieval scoped to vault/device.
-- \`PUT /v1/vaults/{vaultId}/items/{itemId}\`: authenticated encrypted update with explicit \`If-Match\` current revision or conditional create, client operation ID and verified device proof.
-- \`DELETE /v1/vaults/{vaultId}/items/{itemId}\`: append a signed, authenticated deletion tombstone; do not immediately erase history needed for recovery and device consistency.
-- \`POST /v1/devices/enrollment-requests\` / authorized approval endpoint: pairing challenge and public-key certification, never the plaintext VDEK.
-- \`GET /v1/vaults/{vaultId}/checkpoints\`: verified revision continuity/receipt data so clients can compare observed histories.
+- `GET /v1/vaults/{vaultId}/changes?after={cursor}`: authenticated, bounded, paginated ciphertext/tombstone retrieval scoped to vault/device.
+- `PUT /v1/vaults/{vaultId}/items/{itemId}`: authenticated encrypted update with explicit `If-Match` current revision or conditional create, client operation ID and verified device proof.
+- `DELETE /v1/vaults/{vaultId}/items/{itemId}`: append a signed, authenticated deletion tombstone; do not immediately erase history needed for recovery and device consistency.
+- `POST /v1/devices/enrollment-requests` / authorized approval endpoint: pairing challenge and public-key certification, never the plaintext VDEK.
+- `GET /v1/vaults/{vaultId}/checkpoints`: verified revision continuity/receipt data so clients can compare observed histories.
 
-Response requirements: \`401\` invalid account auth, \`403\` insufficient tenant/vault/device authority, \`409\` or \`412\` stale revision, \`413\` bounded payload rejection, \`429\` abuse throttling. Do not automatically retry a failed unsafe write under a new revision or silently merge concurrent passwords.
+Response requirements: `401` invalid account auth, `403` insufficient tenant/vault/device authority, `409` or `412` stale revision, `413` bounded payload rejection, `429` abuse throttling. Do not automatically retry a failed unsafe write under a new revision or silently merge concurrent passwords.
 
 ### Conflict workflow
 
