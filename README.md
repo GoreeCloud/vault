@@ -11,7 +11,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - AES-256-GCM encrypted local vault document with a random 96-bit nonce for each save.
 - PBKDF2-HMAC-SHA256 passphrase-based key derivation (600,000 iterations, 128-bit random salt).
 - Browser-native Web Crypto key handling, with nonextractable AES keys.
-- Create, unlock, lock, and rotate passphrases with **current-passphrase verification** and a fresh random salt; disable cancellation and duplicate submissions once re-encryption starts, and automatically lock after five minutes of inactivity.
+- Create, unlock, lock, and rotate passphrases with **serialized creation/unlock attempts** and **current-passphrase verification** and a fresh random salt; disable cancellation and duplicate submissions once re-encryption starts, and automatically lock after five minutes of inactivity.
 - Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items. Closing the editor scrubs hidden form fields and duplicate submissions are blocked while encrypted saves are pending.
 - Configurable cryptographically random password generator (12–128 characters, independently selected lowercase, uppercase, digits and symbols) with enabled-character-class coverage. Generated passwords remain **masked by default** and are revealed only by an explicit control with an accessible pressed state.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options), with validation of authenticator secrets before saving them in the encrypted vault.

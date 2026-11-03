@@ -106,7 +106,8 @@ try {
   await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('create-confirm').value='mismatched-only-test-passphrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('auth-message').textContent.includes('do not match')", "first run mismatch rejection");
   assert.equal(await script("document.getElementById('app-screen').hidden"), true);
-  await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('create-confirm').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  const duplicateCreate = await script("(() => { document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('create-confirm').value='test-only secure browser phrase'; const form=document.getElementById('auth-form'); form.requestSubmit(); const busy=document.getElementById('auth-action').disabled; form.requestSubmit(); return busy; })()");
+  assert.equal(duplicateCreate, true, "create vault serializes repeated submit requests");
   await until("document.getElementById('app-screen').hidden === false", "create new vault");
   assert.equal(await script("document.getElementById('item-list').children.length"), 1);
   await screenshot("02-empty-workspace");
@@ -439,7 +440,7 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
+    "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
