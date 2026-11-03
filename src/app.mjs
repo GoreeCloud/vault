@@ -14,6 +14,7 @@ let encryptionKey = null;
 let cryptoParameters = null;
 let selection = null;
 let editingId = null;
+let editorSaving = false;
 let activeFilter = "all";
 let lastActivity = Date.now();
 let operations = Promise.resolve();
@@ -372,6 +373,18 @@ function closeSecurityCheck() {
   byId("health-findings").replaceChildren();
 }
 
+function scrubEditor() {
+  byId("editor-form").reset();
+  for (const id of [
+    "edit-title", "edit-username", "edit-password", "edit-website",
+    "edit-totp", "edit-notes", "edit-tags"
+  ]) byId(id).value = "";
+  byId("edit-password").type = "password";
+  byId("edit-totp").type = "password";
+  editingId = null;
+  message("editor-message", "");
+}
+
 function openEditor(id = null) {
   const item = id && documentData.items.find(entry => entry.id === id);
   editingId = item?.id ?? null;
@@ -392,13 +405,15 @@ function openEditor(id = null) {
 }
 async function saveEditor(event) {
   event.preventDefault();
+  if (editorSaving) return;
   const title = byId("edit-title").value.trim();
   if (!title) { message("editor-message", "A title is required."); return; }
   const rawWebsite = byId("edit-website").value.trim();
   const website = rawWebsite ? normalizeWebsite(rawWebsite) : "";
   if (rawWebsite && !website) { message("editor-message", "Use a valid HTTP or HTTPS website URL."); return; }
+  const targetId = editingId;
   const entry = {
-    id: editingId || crypto.randomUUID(), type: byId("edit-type").value,
+    id: targetId || crypto.randomUUID(), type: byId("edit-type").value,
     title, favorite: byId("edit-favorite").checked,
     username: byId("edit-username").value,
     password: byId("edit-password").value,
@@ -406,15 +421,24 @@ async function saveEditor(event) {
     tags: byId("edit-tags").value,
     totpSecret: byId("edit-totp").value.trim()
   };
-  const saved = await commitDraft(draft => {
-    if (editingId) {
-      const index = draft.items.findIndex(item => item.id === editingId);
-      if (index < 0) throw new Error("The edited item is no longer available.");
-      draft.items[index] = entry;
-    } else draft.items.push(entry);
-  }, "Encrypted item saved.", () => { selection = entry.id; });
-  if (saved) byId("editor-dialog").close();
+  const controls = [...byId("editor-form").elements];
+  editorSaving = true;
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    const saved = await commitDraft(draft => {
+      if (targetId) {
+        const index = draft.items.findIndex(item => item.id === targetId);
+        if (index < 0) throw new Error("The edited item is no longer available.");
+        draft.items[index] = entry;
+      } else draft.items.push(entry);
+    }, "Encrypted item saved.", () => { selection = entry.id; });
+    if (saved && byId("editor-dialog").open) byId("editor-dialog").close();
+  } finally {
+    controls.forEach(control => { control.disabled = false; });
+    editorSaving = false;
+  }
 }
+
 async function unlockOrCreate(event) {
   event.preventDefault();
   const passphraseInput = byId("passphrase");
@@ -627,6 +651,10 @@ function setup() {
     byId("health-findings").replaceChildren();
   });
   byId("editor-form").addEventListener("submit", saveEditor);
+  byId("editor-dialog").addEventListener("cancel", event => {
+    if (editorSaving) event.preventDefault();
+  });
+  byId("editor-dialog").addEventListener("close", scrubEditor);
   byId("cancel-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("discard-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("generate-password").addEventListener("click", () => {

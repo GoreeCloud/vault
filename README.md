@@ -12,7 +12,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - PBKDF2-HMAC-SHA256 passphrase-based key derivation (600,000 iterations, 128-bit random salt).
 - Browser-native Web Crypto key handling, with nonextractable AES keys.
 - Create, unlock, lock, and rotate passphrases with **current-passphrase verification** and a fresh random salt; automatically lock after five minutes of inactivity.
-- Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items.
+- Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items. Closing the editor scrubs hidden form fields and duplicate submissions are blocked while encrypted saves are pending.
 - Cryptographically random password generator with enabled-character-class coverage.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options).
 - A local Security Check dialog that flags reused, short and a small set of common passwords, plus HTTP login URLs; no external requests or plaintext password report output.
