@@ -109,7 +109,7 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
 .detail-value span:first-child { flex: 1; }
 .detail-value a { flex: 1; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 9px; padding-top: 23px; border-top: 1px solid var(--gc-outline); margin-top: 30px; }
-.tiny-action { margin-left: auto; border: 1px solid #50617e; background: #293752; color: var(--gc-text); padding: 7px 11px; border-radius: 9px; font-size: 12px; }
+.tiny-action { margin-left: auto; min-height: 44px; border: 1px solid #50617e; background: #293752; color: var(--gc-text); padding: 7px 11px; border-radius: 9px; font-size: 12px; }
 .tiny-action:hover { background: #405274; }
 .otp-code { letter-spacing: .16em; color: #ded2ff; font-size: 22px; }
 .workspace-footer { display: flex; gap: 8px; justify-content: space-between; padding: 0 clamp(20px, 4vw, 54px) 23px; color: #8696b2; font-size: 11px; }
@@ -117,7 +117,7 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
 .gc-dialog::backdrop { background: rgba(3, 8, 20, .78); backdrop-filter: blur(6px); }
 .gc-dialog h2 { margin: 6px 0 20px; font-size: 24px; }
 .dialog-top { display: flex; align-items: start; justify-content: space-between; }
-.gc-icon-button { height: 40px; width: 40px; border-radius: 12px; background: #283a55; border: 0; color: var(--gc-text); font-size: 26px; }
+.gc-icon-button { min-height: 44px; min-width: 44px; height: 44px; width: 44px; border-radius: 12px; background: #283a55; border: 0; color: var(--gc-text); font-size: 26px; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 25px; }
 .inline-field { display: flex; gap: 7px; }
 .inline-field input { min-width: 0; flex: 1; }
@@ -352,7 +352,7 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
 [data-theme="light"] .theme-button { border-color: #c4c8de; color: #4b3a8e; background: #e9e7fa; }
 [data-theme="light"] .theme-button:hover { background: #dedaf5; }
 .auth-topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 18px; width: min(100%, 505px); }
-.auth-topbar .theme-button { font-size: 12px; min-height: 40px; color: #d8caff; background: rgba(48, 56, 89, .78); border-color: #5a618d; }
+.auth-topbar .theme-button { font-size: 12px; min-height: 44px; color: #d8caff; background: rgba(48, 56, 89, .78); border-color: #5a618d; }
 .theme-button { white-space: nowrap; }
 .item-list { list-style: none; margin-top: 0; margin-bottom: 0; padding-left: 0; }
 .item-list > li { list-style: none; }
