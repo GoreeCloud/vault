@@ -265,7 +265,19 @@ try {
   await until("document.getElementById('restore-message').textContent.includes('Backup not imported')", "wrong password rejected");
   assert.equal(await script("document.getElementById('restore-dialog').open"), true);
   await script("document.getElementById('restore-passphrase').value='test-only secure browser phrase'; document.getElementById('restore-form').requestSubmit()");
-  await until("document.getElementById('restore-dialog').open===false && document.getElementById('auth-message').textContent.includes('verified and restored')", "verified backup replaced local storage");
+  // Authenticated backup validation runs 600,000 PBKDF2 iterations and a
+  // user-confirmation dialog; shared CI runners can be considerably slower
+  // than the interactive test machine. Give this crypto step a separate
+  // bounded deadline rather than treating 8 seconds as a correctness limit.
+  try {
+    await until("document.getElementById('restore-dialog').open===false && document.getElementById('auth-message').textContent.includes('verified and restored')",
+      "verified backup replaced local storage", 30000);
+  } catch (error) {
+    // Only expose fixed UI states; never include backup contents, input values,
+    // passphrases, encrypted payloads, or item records in CI logs.
+    const state = await script("({dialogOpen:document.getElementById('restore-dialog').open,authVisible:!document.getElementById('auth-screen').hidden,verifying:document.getElementById('restore-message').textContent.includes('Authenticating and validating'),restoreError:document.getElementById('restore-message').textContent.includes('Backup not imported'),restoreCancelled:document.getElementById('restore-message').textContent.includes('Import cancelled'),restored:document.getElementById('auth-message').textContent.includes('verified and restored')})");
+    throw Error(error.message + " (sanitized restore state: " + JSON.stringify(state) + ")");
+  }
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), encryptedOriginal);
   await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('app-screen').hidden === false && document.getElementById('item-count').textContent.startsWith('1 of')", "restored one-item backup");
