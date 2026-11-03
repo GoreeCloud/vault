@@ -230,6 +230,20 @@ try {
   assert.equal(await script("parseFloat(getComputedStyle(document.querySelector('.gc-button')).transitionDuration) <= 0.01"), true);
   await send("Emulation.setEmulatedMedia", { features: [] });
 
+  // Simulate expiration against the application's real periodic idle-check
+  // while a secret editor is open. No production clocks or credentials change.
+  await script("document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click(); document.getElementById('edit-password').value='unsaved-synthetic-secret'; document.getElementById('edit-totp').value='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'");
+  assert.equal(await script("document.getElementById('editor-dialog').open"), true);
+  await script("(() => { const real=Date.now; window.__gcTestDateNow=real; Date.now=()=>real()+6*60*1000; })()");
+  await until("document.getElementById('auth-screen').hidden===false && document.getElementById('editor-dialog').open===false", "idle timeout locks an open editor");
+  assert.equal(await script("document.getElementById('edit-password').value"), "", "idle lock scrubs unsaved password");
+  assert.equal(await script("document.getElementById('edit-totp').value"), "", "idle lock scrubs unsaved authenticator secret");
+  assert.equal(await script("document.getElementById('item-detail').children.length"), 0, "idle lock removes decrypted item details");
+  assert.equal(await script("document.getElementById('item-list').children.length"), 0, "idle lock removes decrypted item list");
+  await script("Date.now=window.__gcTestDateNow; delete window.__gcTestDateNow");
+  await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until("document.getElementById('app-screen').hidden===false && document.getElementById('item-count').textContent.startsWith('1 of')", "unlock after simulated inactivity");
+
   // Simultaneous editing in two real Chromium tabs with shared origin and
   // browser profile. One save must win; the stale tab must lock/fail closed.
   const secondTarget = await send("Target.createTarget", { url: "http://127.0.0.1:" + port + "/" });
@@ -296,7 +310,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
