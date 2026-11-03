@@ -123,6 +123,22 @@ try {
   await until("document.getElementById('app-screen').hidden === false", "create new vault");
   assert.equal(await script("document.getElementById('item-list').children.length"), 1);
   await screenshot("02-empty-workspace");
+  await script("document.getElementById('new-item').click(); document.getElementById('generator-length').value='32'; document.getElementById('generator-uppercase').checked=false; document.getElementById('generator-symbols').checked=false; document.getElementById('generate-password').click()");
+  const generatedPassword = await script("document.getElementById('edit-password').value");
+  assert.equal(generatedPassword.length, 32, "generator honors chosen length");
+  assert.match(generatedPassword, /^[abcdefghjkmnpqrstuvwxyz23456789]+$/, "generator only uses enabled character groups");
+  assert.match(generatedPassword, /[abcdefghjkmnpqrstuvwxyz]/, "generator includes lowercase");
+  assert.match(generatedPassword, /[23456789]/, "generator includes digits");
+  assert.equal(await script("document.getElementById('edit-password').type"), "password", "generated secret stays masked");
+  assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "false");
+  await screenshot("09-generator-options");
+  await script("document.getElementById('reveal-editor-password').click()");
+  assert.equal(await script("document.getElementById('edit-password').type"), "text");
+  assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "true");
+  await script("document.getElementById('generator-lowercase').checked=false;document.getElementById('generator-digits').checked=false;document.getElementById('generate-password').click()");
+  await until("document.getElementById('editor-message').textContent.includes('Select at least one character group')", "reject generator with no selected character groups");
+  await script("document.getElementById('cancel-editor').click()");
+  await until("document.getElementById('edit-password').value === ''", "generator secret scrub on cancel");
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Browser fixture login'; document.getElementById('edit-username').value='fixture-user'; document.getElementById('edit-password').value='dummy-only-do-not-use'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
@@ -341,10 +357,10 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "configurable masked random password generation"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
-    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
+    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
   ].map(name => join(workspace, name)) }, null, 2));
 } finally {
   ws2?.close();
