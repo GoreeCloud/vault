@@ -419,3 +419,53 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
   .health-summary { grid-template-columns: 1fr; }
   #security-check { max-width: 123px; padding-left: 8px; padding-right: 8px; }
 }
+
+
+/* Accessible configurable password generator, using existing GC UI tokens */
+.generator-options {
+  margin: 12px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--gc-outline);
+  border-radius: 14px;
+  background: var(--gc-surface-tonal);
+}
+.generator-options legend {
+  padding: 0 7px;
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--gc-text);
+}
+.generator-length {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.generator-length label { font-size: 13px; }
+.generator-length input { width: 106px; min-height: 44px; }
+.generator-classes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 12px;
+}
+.generator-classes label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.generator-classes input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gc-brand);
+}
+#generator-help {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  font-size: 12px;
+}
+@media (max-width: 360px) {
+  .generator-classes { grid-template-columns: minmax(0, 1fr); }
+}
