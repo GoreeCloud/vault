@@ -20,7 +20,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - Responsive desktop/mobile web interface, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
 - Node built-in unit tests, no installed runtime third-party dependencies, GitHub Actions checks.
 
-**Not implemented:** server, cloud synchronization, secure sharing, browser autofill extensions, native Android/iOS/Linux apps, passkey provider, hardware-backed biometrics, Argon2id, attachments, encrypted per-item search index, enterprise RBAC/SSO/SCIM, automated security monitoring, email aliases and emergency recovery. These appear in [the feature roadmap](docs/FEATURES.md), **not as released capabilities**.
+**Not implemented:** server, cloud synchronization, secure sharing, browser autofill extensions, native Android/iOS/Linux apps, passkey provider, hardware-backed biometrics, Argon2id, attachments, encrypted per-item search index, enterprise RBAC/SSO/SCIM, automated security monitoring, email aliases and emergency recovery. These are captured in the [full product specification](docs/PRODUCT_SPEC.md) and tracked in [the feature roadmap](docs/FEATURES.md), **not as released capabilities**.
 
 ## Try it locally
 
