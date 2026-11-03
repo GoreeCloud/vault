@@ -222,6 +222,25 @@ try {
   await pause(1250);
   assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
     "periodic refresh must not re-expose a hidden TOTP code");
+  await script("document.querySelector('#item-detail [data-secret-reveal=\"password\"]').click(); document.getElementById('reveal-otp-code').click()");
+  await until("document.getElementById('otp-code')?.textContent.match(/^\\d{6}$/)",
+    "password and TOTP explicitly visible before backgrounding");
+  assert.equal(await script("document.querySelector('#item-detail [data-secret-reveal=\"password\"]').getAttribute('aria-pressed')"), "true");
+  await script("Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));delete document.visibilityState;");
+  assert.equal(await script("document.querySelector('#item-detail [data-secret-reveal=\"password\"]').getAttribute('aria-pressed')"), "false",
+    "backgrounded document must hide a revealed password");
+  assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
+    "backgrounded document must mask a revealed authenticator code");
+  await script("document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click(); document.getElementById('reveal-editor-password').click()");
+  assert.equal(await script("document.getElementById('edit-password').type"), "text");
+  await script("Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));delete document.visibilityState;");
+  assert.equal(await script("document.getElementById('edit-password').type"), "password",
+    "open editor secret becomes masked after backgrounding");
+  assert.equal(await script("document.getElementById('editor-dialog').open"), true,
+    "backgrounding does not discard unsaved editor state");
+  await script("document.getElementById('cancel-editor').click()");
+  await until("document.getElementById('edit-password').value === ''", "editor secret scrub after background test");
+
   // Deliberately pause HMAC signing while the user clicks Copy code, lock
   // before signing resolves, then confirm the revoked session never copies.
   const copyDelayPatched = await script("(() => { const subtle=crypto.subtle; window.__gcOriginalSign=subtle.sign;window.__gcOriginalClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard'); window.__gcWrites=0;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{window.__gcWrites++}}});subtle.sign=function(...args){return new Promise((resolve,reject)=>{window.__gcReleaseSign=()=>window.__gcOriginalSign.apply(this,args).then(resolve,reject);});};const copy=[...document.querySelectorAll('#item-detail button')].find(b=>b.textContent==='Copy code');copy.click();return subtle.sign!==window.__gcOriginalSign;})()");
@@ -515,7 +534,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "newest backup file selection wins over delayed older read", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "stale dialog close cannot invalidate an in-flight newer backup file read", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection", "cross-tab localStorage.clear locks decrypted workspace",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "revoked sessions cannot copy delayed authenticator codes", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "backgrounding remasks revealed passwords and TOTP codes", "revoked sessions cannot copy delayed authenticator codes", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
