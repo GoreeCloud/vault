@@ -153,3 +153,95 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 @media (prefers-contrast: more) { :root { --gc-outline: #9daecc; --gc-text-soft: #d5def0; } .gc-lens { backdrop-filter: none; } }
 @media (prefers-reduced-transparency: reduce) { .gc-lens { backdrop-filter: none; background: #141e33; } }
+
+
+/* Browser-verified GC UI mobile refinement.
+ * Reachable, persistent five-destination dock rather than a clipped nav strip. */
+#import-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.file-label:has(+ #import-file:focus-visible) {
+  outline: 3px solid var(--gc-brand);
+  outline-offset: 3px;
+}
+@media (max-width: 690px) {
+  .sidebar.gc-lens {
+    backdrop-filter: none;
+    background: #121b2e;
+    padding: 11px 14px;
+  }
+  .sidebar-brand { max-width: calc(100% - 115px); }
+  .sidebar .nav-stack {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+    overflow: visible;
+    margin: 0;
+    padding: 7px 7px max(8px, env(safe-area-inset-bottom));
+    background: #1d2941;
+    border-top: 1px solid #4a5777;
+    box-shadow: 0 -12px 35px rgba(0, 0, 0, .35);
+  }
+  .sidebar .nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 62px;
+    padding: 7px 2px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.12;
+    white-space: normal;
+  }
+  .sidebar .nav-link span {
+    display: inline-block;
+    width: auto;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .sidebar .nav-link.active {
+    background: #39335e;
+    box-shadow: inset 0 3px 0 var(--gc-brand);
+  }
+  .main-area { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .top-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .top-actions .gc-button {
+    min-width: 0;
+    width: 100%;
+    min-height: 48px;
+    padding: 8px 5px;
+    line-height: 1.25;
+    font-size: 11px;
+    text-align: center;
+  }
+  .gc-toast {
+    left: 12px;
+    right: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    max-width: none;
+    text-align: center;
+  }
+}
