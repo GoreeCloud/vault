@@ -1,5 +1,6 @@
 import { createVault, openVault, sealVault, validateEnvelope } from "./crypto.mjs";
 import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs";
+import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
 
 const STORAGE_KEY = "goreecloud.vault.encrypted.v1";
 const IDLE_MS = 5 * 60 * 1000;
@@ -11,7 +12,9 @@ let selection = null;
 let editingId = null;
 let activeFilter = "all";
 let lastActivity = Date.now();
-let saving = Promise.resolve();
+let operations = Promise.resolve();
+let sessionId = 0;
+let lastSerialized = null;
 let noticeTimer;
 
 function announce(message, error = false) {
@@ -45,30 +48,78 @@ function showWorkspace() {
   render();
 }
 function lockVault(reason = "") {
-  if (!documentData) return;
+  // Invalidate all delayed writes and unlocks before clearing the session.
+  sessionId += 1;
   documentData = null;
   encryptionKey = null;
   cryptoParameters = null;
+  lastSerialized = null;
   selection = null;
   editingId = null;
-  byId("editor-dialog").close();
-  byId("passphrase-dialog").close();
+  byId("editor-form").reset();
+  byId("passphrase-form").reset();
+  if (byId("editor-dialog").open) byId("editor-dialog").close();
+  if (byId("passphrase-dialog").open) byId("passphrase-dialog").close();
   byId("item-list").replaceChildren();
   byId("item-detail").replaceChildren();
   showAuth(reason || "Vault locked. Unlock again to continue.");
 }
-async function persist() {
-  if (!documentData || !encryptionKey) throw new Error("Unlock the vault before saving.");
-  // Queue snapshots in mutation order to avoid delayed encryption overwriting newer changes.
-  const snapshot = structuredClone(documentData);
-  const key = encryptionKey;
-  const parameters = cryptoParameters;
-  saving = saving.catch(() => {}).then(async () => {
-    const envelope = await sealVault(snapshot, key, parameters);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+
+async function writeEnvelope(envelope, epoch) {
+  const serialized = JSON.stringify(envelope);
+  await guardedWrite(localStorage, {
+    key: STORAGE_KEY,
+    expected: lastSerialized,
+    next: serialized,
+    locks: navigator.locks,
+    isCurrent: () => sessionId === epoch
   });
-  await saving;
+  lastSerialized = serialized;
 }
+
+function scheduleOperation(task) {
+  const epoch = sessionId;
+  const operation = operations.catch(() => {}).then(async () => {
+    if (!documentData || epoch !== sessionId) {
+      throw new VaultWriteConflict("The vault is locked or the session expired.");
+    }
+    return task(epoch);
+  });
+  operations = operation;
+  return operation;
+}
+
+async function persistDraft(draft, epoch) {
+  if (!encryptionKey || epoch !== sessionId) {
+    throw new VaultWriteConflict("The vault session expired.");
+  }
+  const envelope = await sealVault(draft, encryptionKey, cryptoParameters);
+  await writeEnvelope(envelope, epoch);
+}
+
+async function commitDraft(change, success, afterCommit = () => {}) {
+  try {
+    await scheduleOperation(async epoch => {
+      const draft = structuredClone(documentData);
+      change(draft);
+      await persistDraft(draft, epoch);
+      if (epoch !== sessionId) return;
+      documentData = draft;
+      afterCommit();
+      render();
+      announce(success);
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof VaultWriteConflict) {
+      lockVault("Another tab changed the vault, or this session expired. Unlock to load the latest encrypted data.");
+    } else {
+      announce("Encrypted save failed: " + error.message + ". Existing saved data was preserved.", true);
+    }
+    return false;
+  }
+}
+
 function itemNode(record) {
   const button = document.createElement("button");
   button.type = "button";
@@ -210,17 +261,20 @@ function renderDetail() {
   edit.addEventListener("click", () => openEditor(record.id));
   const favorite = createText("button", record.favorite ? "★ Favorited" : "☆ Favorite", "gc-button secondary");
   favorite.type = "button";
-  favorite.addEventListener("click", async () => {
-    record.favorite = !record.favorite;
-    await applyMutation("Favorite updated.");
+  favorite.addEventListener("click", () => {
+    void commitDraft(draft => {
+      const item = draft.items.find(entry => entry.id === record.id);
+      if (!item) throw new Error("The selected item no longer exists.");
+      item.favorite = !item.favorite;
+    }, "Favorite updated.");
   });
   const remove = createText("button", "Delete", "gc-button danger");
   remove.type = "button";
   remove.addEventListener("click", async () => {
     if (!confirm('Delete "' + record.title + '" from this local vault? Export a backup first if needed.')) return;
-    documentData.items = documentData.items.filter(item => item.id !== record.id);
-    selection = null;
-    await applyMutation("Item deleted.");
+    await commitDraft(draft => {
+      draft.items = draft.items.filter(item => item.id !== record.id);
+    }, "Item deleted.", () => { selection = null; });
   });
   actions.append(edit, favorite, remove);
   panel.append(actions);
@@ -239,10 +293,6 @@ async function refreshTotp() {
   } catch { if (byId("otp-code") === target) target.textContent = "Invalid secret"; }
 }
 function render() { if (documentData) { renderList(); renderDetail(); } }
-async function applyMutation(success) {
-  try { await persist(); render(); announce(success); }
-  catch (error) { announce("Could not save: " + error.message + ". Export a backup and retry.", true); }
-}
 function openEditor(id = null) {
   const item = id && documentData.items.find(entry => entry.id === id);
   editingId = item?.id ?? null;
@@ -277,20 +327,14 @@ async function saveEditor(event) {
     tags: byId("edit-tags").value,
     totpSecret: byId("edit-totp").value.trim()
   };
-  if (editingId) {
-    const index = documentData.items.findIndex(item => item.id === editingId);
-    if (index < 0) return;
-    documentData.items[index] = entry;
-  } else documentData.items.push(entry);
-  selection = entry.id;
-  try {
-    await persist();
-    byId("editor-dialog").close();
-    render();
-    announce("Encrypted item saved.");
-  } catch (error) {
-    message("editor-message", "Failed to save: " + error.message);
-  }
+  const saved = await commitDraft(draft => {
+    if (editingId) {
+      const index = draft.items.findIndex(item => item.id === editingId);
+      if (index < 0) throw new Error("The edited item is no longer available.");
+      draft.items[index] = entry;
+    } else draft.items.push(entry);
+  }, "Encrypted item saved.", () => { selection = entry.id; });
+  if (saved) byId("editor-dialog").close();
 }
 async function unlockOrCreate(event) {
   event.preventDefault();
@@ -299,16 +343,32 @@ async function unlockOrCreate(event) {
   const button = byId("auth-action");
   button.disabled = true;
   message("auth-message", "Deriving your encryption key…");
+  const epoch = ++sessionId;
   try {
-    const saved = storedEnvelope();
-    if (saved) {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw !== null) {
+      const saved = JSON.parse(raw);
       const opened = await openVault(saved, passphrase);
+      // A concurrent import or another tab changing the ciphertext must
+      // invalidate the unlock, including while key derivation is in progress.
+      if (epoch !== sessionId || localStorage.getItem(STORAGE_KEY) !== raw) {
+        throw new VaultWriteConflict("Vault changed while unlocking. Try again.");
+      }
       encryptionKey = opened.key;
       documentData = opened.document;
       cryptoParameters = { salt: saved.salt };
+      lastSerialized = raw;
     } else {
       const created = await createVault(passphrase);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(created.envelope));
+      const serialized = JSON.stringify(created.envelope);
+      await guardedWrite(localStorage, {
+        key: STORAGE_KEY,
+        expected: null,
+        next: serialized,
+        locks: navigator.locks,
+        isCurrent: () => epoch === sessionId
+      });
+      lastSerialized = serialized;
       encryptionKey = created.key;
       documentData = { version: 1, items: [] };
       cryptoParameters = { salt: created.envelope.salt };
@@ -323,9 +383,10 @@ async function unlockOrCreate(event) {
     button.disabled = false;
   }
 }
+
 async function exportBackup() {
   try {
-    await saving;
+    await operations;
     const envelope = storedEnvelope();
     validateEnvelope(envelope);
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
@@ -342,15 +403,26 @@ async function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
+    if (documentData) throw new Error("Lock the vault before importing.");
     if (file.size > 7 * 1024 * 1024) throw new Error("Backup exceeds the import size limit.");
     const backup = JSON.parse(await file.text());
     validateEnvelope(backup);
     if (!confirm("Replace the local vault on this device? This does not merge items. Export your current vault first.")) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(backup));
+    const expected = localStorage.getItem(STORAGE_KEY);
+    const epoch = ++sessionId;
+    await guardedWrite(localStorage, {
+      key: STORAGE_KEY,
+      expected,
+      next: JSON.stringify(backup),
+      locks: navigator.locks,
+      isCurrent: () => sessionId === epoch
+    });
+    lastSerialized = null;
     showAuth("Encrypted backup imported. Enter its original passphrase.");
   } catch (error) { message("auth-message", "Import failed: " + error.message); }
   finally { event.target.value = ""; }
 }
+
 async function changePassphrase(event) {
   event.preventDefault();
   const first = byId("next-passphrase").value;
@@ -362,21 +434,27 @@ async function changePassphrase(event) {
   }
   byId("submit-passphrase").disabled = true;
   try {
-    await saving;
-    const next = await createVault(first, structuredClone(documentData));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next.envelope));
-    encryptionKey = next.key;
-    cryptoParameters = { salt: next.envelope.salt };
-    byId("passphrase-dialog").close();
-    byId("passphrase-form").reset();
-    announce("Passphrase changed. Export a new encrypted backup.");
-  } catch (error) { message("passphrase-message", error.message); }
+    await scheduleOperation(async epoch => {
+      const next = await createVault(first, structuredClone(documentData));
+      await writeEnvelope(next.envelope, epoch);
+      if (epoch !== sessionId) return;
+      encryptionKey = next.key;
+      cryptoParameters = { salt: next.envelope.salt };
+      byId("passphrase-dialog").close();
+      byId("passphrase-form").reset();
+      announce("Passphrase changed. Export a new encrypted backup.");
+    });
+  } catch (error) {
+    if (error instanceof VaultWriteConflict) {
+      lockVault("The vault changed during passphrase rotation. Unlock again.");
+    } else message("passphrase-message", error.message);
+  }
   finally { byId("submit-passphrase").disabled = false; }
 }
 
 function setup() {
-  if (!crypto?.subtle || !window.isSecureContext) {
-    message("auth-message", "This application requires Web Crypto over HTTPS or localhost.");
+  if (!crypto?.subtle || !window.isSecureContext || !navigator.locks?.request) {
+    message("auth-message", "This application requires Web Crypto, Web Locks, and HTTPS or localhost.");
     byId("auth-action").disabled = true;
     return;
   }
@@ -414,9 +492,9 @@ function setup() {
     document.addEventListener(name, () => { if (documentData) lastActivity = Date.now(); }, { passive: true })
   );
   window.addEventListener("storage", event => {
-    if (event.key === STORAGE_KEY && documentData) {
-      lockVault("Vault changed in another tab. Reopen to prevent conflicting edits.");
-    } else if (event.key === STORAGE_KEY) showAuth("Local vault state changed. Unlock to continue.");
+    if (event.key === STORAGE_KEY) {
+      lockVault("Vault changed in another tab. Unlock again to load the latest encrypted data.");
+    }
   });
   window.addEventListener("pagehide", () => lockVault());
   document.addEventListener("visibilitychange", () => {
