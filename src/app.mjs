@@ -3,6 +3,7 @@ import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs
 import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
 import { verifyEncryptedBackup } from "./recovery.mjs";
 import { installTheme } from "./theme.mjs";
+import { auditVaultLogins } from "./health.mjs";
 
 const STORAGE_KEY = "goreecloud.vault.encrypted.v1";
 const IDLE_MS = 5 * 60 * 1000;
@@ -69,6 +70,9 @@ function lockVault(reason = "") {
   byId("editor-form").reset();
   byId("passphrase-form").reset();
   byId("restore-form").reset();
+  byId("health-summary").replaceChildren();
+  byId("health-findings").replaceChildren();
+  if (byId("health-dialog").open) byId("health-dialog").close();
   if (byId("editor-dialog").open) byId("editor-dialog").close();
   if (byId("passphrase-dialog").open) byId("passphrase-dialog").close();
   if (byId("restore-dialog").open) byId("restore-dialog").close();
@@ -310,6 +314,45 @@ async function refreshTotp() {
   } catch { if (byId("otp-code") === target) target.textContent = "Invalid secret"; }
 }
 function render() { if (documentData) { renderList(); renderDetail(); } }
+function openSecurityCheck() {
+  if (!documentData) return;
+  const report = auditVaultLogins(documentData.items);
+  const totals = byId("health-summary");
+  totals.replaceChildren();
+  for (const [name, value] of [
+    ["Logins reviewed", report.loginsReviewed],
+    ["Reused passwords", report.reusedCount],
+    ["Short passwords", report.shortCount],
+    ["Common passwords", report.commonCount],
+    ["HTTP login URLs", report.httpCount]
+  ]) {
+    const card = createText("div", "", "health-stat");
+    card.append(createText("strong", String(value)), createText("span", name));
+    totals.append(card);
+  }
+  const findings = byId("health-findings");
+  findings.replaceChildren();
+  if (!report.findings.length) {
+    findings.append(createText("li", report.loginsReviewed
+      ? "No issues detected by these basic local checks."
+      : "Add login records to run local checks.", "health-empty"));
+  } else {
+    for (const issue of report.findings) {
+      const entry = createText("li", "", "health-finding");
+      entry.append(createText("strong", issue.title));
+      entry.append(createText("p", issue.reasons.join(" · "), "muted"));
+      findings.append(entry);
+    }
+  }
+  byId("health-dialog").showModal();
+}
+
+function closeSecurityCheck() {
+  if (byId("health-dialog").open) byId("health-dialog").close();
+  byId("health-summary").replaceChildren();
+  byId("health-findings").replaceChildren();
+}
+
 function openEditor(id = null) {
   const item = id && documentData.items.find(entry => entry.id === id);
   editingId = item?.id ?? null;
@@ -545,6 +588,13 @@ function setup() {
     byId("restore-form").reset();
   });
   byId("new-item").addEventListener("click", () => openEditor());
+  byId("security-check").addEventListener("click", openSecurityCheck);
+  byId("close-health").addEventListener("click", closeSecurityCheck);
+  byId("close-health-icon").addEventListener("click", closeSecurityCheck);
+  byId("health-dialog").addEventListener("close", () => {
+    byId("health-summary").replaceChildren();
+    byId("health-findings").replaceChildren();
+  });
   byId("editor-form").addEventListener("submit", saveEditor);
   byId("cancel-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("discard-editor").addEventListener("click", () => byId("editor-dialog").close());

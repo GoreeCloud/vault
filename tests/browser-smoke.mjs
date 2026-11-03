@@ -126,6 +126,16 @@ try {
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
   await screenshot("03-item-details");
+  await script("document.getElementById('security-check').click()");
+  await until("document.getElementById('health-dialog').open", "local security check opens");
+  assert.equal(await script("document.getElementById('health-summary').textContent.includes('Logins reviewed')"), true);
+  assert.equal(await script("document.getElementById('health-summary').textContent.includes('1')"), true);
+  assert.equal(await script("document.getElementById('health-findings').textContent.includes('dummy-only-do-not-use')"), false);
+  await screenshot("08-health-check");
+  await script("document.getElementById('close-health').click()");
+  assert.equal(await script("document.getElementById('health-findings').children.length"), 0);
+  await script("document.getElementById('security-check').click()");
+  await script("document.getElementById('close-health-icon').click()");
   assert.equal(await script("document.querySelector('#item-list').tagName"), "UL");
   assert.equal(await script("document.querySelector('#item-list > li > button').getAttribute('aria-pressed')"), "true");
   await screenshot("06-light-workspace");
@@ -233,10 +243,10 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
-    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png"
+    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
   ].map(name => join(workspace, name)) }, null, 2));
 } finally {
   ws2?.close();

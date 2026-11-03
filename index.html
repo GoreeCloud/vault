@@ -61,7 +61,7 @@
       </header>
       <main class="content-area">
         <section class="list-section gc-panel" aria-labelledby="item-heading">
-          <div class="section-top"><div><h2 id="item-heading">My items</h2><p id="item-count" class="muted">Loading</p></div><span class="secure-pill">◆&nbsp; Secured</span></div>
+          <div class="section-top"><div><h2 id="item-heading">My items</h2><p id="item-count" class="muted">Loading</p></div><button type="button" id="security-check" class="secure-pill gc-button" aria-haspopup="dialog">◇ Security check</button></div>
           <label for="search-items" class="sr-only">Search vault</label>
           <input id="search-items" type="search" class="gc-input search" placeholder="⌕  Search your vault" autocomplete="off" spellcheck="false">
           <ul id="item-list" class="item-list"></ul>
@@ -92,6 +92,17 @@
       <p class="form-message" id="editor-message" aria-live="polite"></p>
       <div class="dialog-actions"><button type="button" id="discard-editor" class="gc-button secondary">Cancel</button><button type="submit" id="save-editor" class="gc-button primary">Save encrypted item</button></div>
     </form>
+  </dialog>
+  <dialog id="health-dialog" class="gc-dialog compact-dialog" aria-labelledby="health-heading">
+    <div class="dialog-top">
+      <div><div class="eyebrow">ON-DEVICE PASSWORD REVIEW</div><h2 id="health-heading">Security check</h2></div>
+      <button type="button" id="close-health-icon" class="gc-icon-button" aria-label="Close security check">×</button>
+    </div>
+    <p class="muted health-context">This review runs entirely in your unlocked browser. It flags reused, short, or common passwords and unencrypted HTTP login URLs. It cannot detect breaches or verify external MFA.</p>
+    <div id="health-summary" class="health-summary" aria-label="Security check totals"></div>
+    <h3 class="health-subheading">Items to review</h3>
+    <ul id="health-findings" class="health-findings"></ul>
+    <div class="dialog-actions"><button id="close-health" type="button" class="gc-button primary">Done</button></div>
   </dialog>
   <dialog id="restore-dialog" class="gc-dialog compact-dialog" aria-labelledby="restore-heading">
     <form id="restore-form">
