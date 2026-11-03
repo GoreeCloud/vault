@@ -27,6 +27,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 ## Present controls
 
 - Static Content Security Policy with no remote scripts, connections or external image resources.
+- Local development HTTP serving is explicitly bound to 127.0.0.1. Python's basic static server does not add response-header frame protections; never expose this pre-alpha server to a public network.
 - Browser Web Crypto; OS random source; no Math.random for credential generation.
 - Optional TOTP secret input is checked with the browser HMAC implementation before encrypted item storage; invalid Base32 enrollment secrets are rejected rather than failing only at code-display time.
 - Basic login hygiene analysis runs only against unlocked in-memory vault entries, does not submit credentials to a remote service, and never includes plaintext passwords in its report.
