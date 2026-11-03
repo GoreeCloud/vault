@@ -65,4 +65,5 @@ Do **not** expose this prototype on a public domain, import real user credential
 - Unit tests in `tests/storage.test.mjs` exercise cooperating-tab conflicts, stale writes, session revocation, storage failures and browsers missing Web Locks.
 - Unit tests in `tests/recovery.test.mjs` check authenticated backup verification, incorrect passphrases, tamper rejection and oversized format rejection; full interactive recovery remains unverified.
 - GitHub Actions runs syntax checks and unit tests when the workflow is enabled on a branch or pull request.
-- Passing these checks **cannot** prove production security, browser UX correctness or independent cryptographic review.
+- `tests/browser-smoke.mjs` (optional, requires an installed Chromium binary) performs an isolated loopback browser smoke test of first-run confirmation, encrypted item creation, local ciphertext, manual lock/unlock, incorrect backup passphrase rejection, authenticated restore and mobile viewport/nav geometry. It also captures nonsecret screenshots for manual inspection; these are temporary evidence, not a full visual accessibility certification.
+- Passing these checks **cannot** prove production security, full browser UX/accessibility correctness or independent cryptographic review.
