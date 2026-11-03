@@ -69,8 +69,15 @@ export function validateEnvelope(envelope) {
   }
   base64ToBytes(envelope.salt, SALT_LENGTH);
   base64ToBytes(envelope.iv, NONCE_LENGTH);
-  if (base64ToBytes(envelope.ciphertext).length < 17) {
-    throw new Error("Corrupt encrypted vault.");
+  const maxCiphertext = MAX_DOCUMENT_BYTES + 16;
+  // Reject oversized ciphertext before allocating or attempting to decrypt.
+  if (typeof envelope.ciphertext !== "string" ||
+      envelope.ciphertext.length > Math.ceil(maxCiphertext / 3) * 4) {
+    throw new Error("Encrypted vault exceeds its format size limit.");
+  }
+  const ciphertext = base64ToBytes(envelope.ciphertext);
+  if (ciphertext.length < 17 || ciphertext.length > maxCiphertext) {
+    throw new Error("Corrupt or oversized encrypted vault.");
   }
   return envelope;
 }
