@@ -49,6 +49,12 @@ Open **http://localhost:4173** in the same computer's browser.
 
 **Do not migrate your real password vault, use as your only copy of secrets, or publish this instance on the internet.** A green automated test suite does not establish readiness for real credentials.
 
+## Appearance and accessible navigation
+
+The web prototype now uses the GC UI Iris palette in **dark and light appearance**, follows the operating system by default and offers a three-way System → Light → Dark switch on both locked and unlocked screens. The preference is a nonsecret local display setting; it is **not** stored as vault plaintext or transmitted remotely.
+
+The item collection uses semantic list elements and labeled, selectable buttons; secret reveal controls expose an explicit pressed state to assistive technology. Mobile navigation remains within a reachable bottom dock. The optional Chromium smoke runner checks both appearances, core contrast, mobile overflow and selected high-contrast/reduced-motion rules, but it does **not** replace a full human-assisted screen-reader or accessibility review.
+
 ## Local data integrity hardening
 
 - All item mutations update a fresh in-memory draft and display it only **after** the encrypted write succeeds. Storage/quota failures leave the prior saved document intact.

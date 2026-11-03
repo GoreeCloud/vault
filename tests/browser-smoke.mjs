@@ -103,6 +103,18 @@ try {
   await until("document.readyState==='complete' && document.getElementById('auth-action')!==null", "initial auth screen");
   assert.equal(await script("document.getElementById('create-confirm-group').hidden"), false);
   await screenshot("01-create-vault");
+  assert.equal(await script("document.documentElement.dataset.theme === (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')"), true,
+    "default appearance follows operating system");
+  await script("document.querySelector('#auth-screen [data-theme-toggle]').click()");
+  assert.equal(await script("document.documentElement.dataset.theme"), "light");
+  await screenshot("05-light-auth");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.appearance.v1')"), "light");
+  await script("document.querySelector('#auth-screen [data-theme-toggle]').click()");
+  assert.equal(await script("document.documentElement.dataset.theme"), "dark");
+  await script("document.querySelector('#auth-screen [data-theme-toggle]').click()");
+  assert.equal(await script("document.querySelector('#auth-screen [data-theme-toggle]').dataset.mode"), "system");
+  await script("document.querySelector('#auth-screen [data-theme-toggle]').click()");
+  assert.equal(await script("document.documentElement.dataset.theme"), "light");
   await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('create-confirm').value='mismatched-only-test-passphrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('auth-message').textContent.includes('do not match')", "first run mismatch rejection");
   assert.equal(await script("document.getElementById('app-screen').hidden"), true);
@@ -114,6 +126,11 @@ try {
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
   await screenshot("03-item-details");
+  assert.equal(await script("document.querySelector('#item-list').tagName"), "UL");
+  assert.equal(await script("document.querySelector('#item-list > li > button').getAttribute('aria-pressed')"), "true");
+  await screenshot("06-light-workspace");
+  assert.equal(await script("(() => { const e=document.querySelector('.gc-button.primary');const s=getComputedStyle(e);const c=x=>x.match(/[\\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255; return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});const a=c(s.color),b=c(s.backgroundColor);const l=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];return (Math.max(l(a),l(b))+.05)/(Math.min(l(a),l(b))+.05)>=4.5;})()"), true,
+    "primary action text passes 4.5:1 contrast in light appearance");
   const encryptedOriginal = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
   const backupPath = join(workspace, "validated-test-backup.json");
   await writeFile(backupPath, encryptedOriginal, "utf8");
@@ -140,6 +157,16 @@ try {
   assert.equal(await script("document.documentElement.scrollWidth <= window.innerWidth"), true, "mobile layout must not scroll sideways");
   assert.equal(await script("Math.abs(document.querySelector('.sidebar .nav-stack').getBoundingClientRect().bottom - window.innerHeight) <= 2"), true, "mobile nav stays at bottom of viewport");
   await screenshot("04-mobile-workspace");
+  await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 720, deviceScaleFactor: 1, mobile: true });
+  assert.equal(await script("document.documentElement.scrollWidth <= window.innerWidth"), true, "320px mobile must not scroll sideways");
+  await screenshot("07-narrow-mobile");
+  await send("Emulation.setEmulatedMedia", { features: [
+    { name: "prefers-contrast", value: "more" },
+    { name: "prefers-reduced-motion", value: "reduce" }
+  ]});
+  assert.equal(await script("getComputedStyle(document.documentElement).getPropertyValue('--gc-outline').trim()"), "#56647d");
+  assert.equal(await script("parseFloat(getComputedStyle(document.querySelector('.gc-button')).transitionDuration) <= 0.01"), true);
+  await send("Emulation.setEmulatedMedia", { features: [] });
 
   // Simultaneous editing in two real Chromium tabs with shared origin and
   // browser profile. One save must win; the stale tab must lock/fail closed.
@@ -205,9 +232,11 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection"
+    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences"
   ], screenshotPaths: [
-    "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png"
+    "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
+    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png"
   ].map(name => join(workspace, name)) }, null, 2));
 } finally {
   ws2?.close();

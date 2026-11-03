@@ -8,7 +8,7 @@
   "scripts": {
     "test": "node --test",
     "test:browser": "node tests/browser-smoke.mjs",
-    "check": "node --check src/crypto.mjs && node --check src/security.mjs && node --check src/storage.mjs && node --check src/recovery.mjs && node --check src/app.mjs && node --check tests/browser-smoke.mjs",
+    "check": "node --check src/crypto.mjs && node --check src/security.mjs && node --check src/storage.mjs && node --check src/recovery.mjs && node --check src/theme.mjs && node --check src/app.mjs && node --check tests/browser-smoke.mjs",
     "serve": "python3 -m http.server 4173"
   }
 }
