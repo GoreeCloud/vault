@@ -31,8 +31,9 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - URL scheme validation (HTTP/HTTPS only) and DOM text nodes instead of injecting stored item fields as HTML.
 - PBKDF2 parameter and encrypted envelope validation; rejection of failed AES-GCM authentication.
 - Passphrase length floor on creation and rekey.
-- Finite document/item length limits before encryption and after decryption.
-- Explicit confirmation before replacing the local encrypted vault with an import.
+- Finite document/item length limits before encryption and after decryption. Imported ciphertext lengths are bounded before base64 decoding.
+- Imported encrypted backups are decrypted and authenticated against the supplied backup passphrase and validated for supported document structure **before** asking to replace local data. User confirmation and same-origin guarded write are required.
+- New vault creation requires passphrase confirmation.
 - Fresh IV on every save; fresh salt on passphrase change.
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
@@ -62,5 +63,6 @@ Do **not** expose this prototype on a public domain, import real user credential
 
 - Unit tests in `tests/crypto.test.mjs` cover encrypt/decrypt, fresh IVs, wrong passphrases, ciphertext tampering, document validation, password character-class requirements, URL validation and published RFC TOTP vectors.
 - Unit tests in `tests/storage.test.mjs` exercise cooperating-tab conflicts, stale writes, session revocation, storage failures and browsers missing Web Locks.
+- Unit tests in `tests/recovery.test.mjs` check authenticated backup verification, incorrect passphrases, tamper rejection and oversized format rejection; full interactive recovery remains unverified.
 - GitHub Actions runs syntax checks and unit tests when the workflow is enabled on a branch or pull request.
 - Passing these checks **cannot** prove production security, browser UX correctness or independent cryptographic review.
