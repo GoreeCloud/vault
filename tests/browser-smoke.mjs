@@ -123,6 +123,22 @@ try {
   await until("document.getElementById('app-screen').hidden === false", "create new vault");
   assert.equal(await script("document.getElementById('item-list').children.length"), 1);
   await screenshot("02-empty-workspace");
+  await script("document.getElementById('new-item').click(); document.getElementById('generate-password').click()");
+  const randomFixture = await script("document.getElementById('edit-password').value");
+  assert.equal(randomFixture.length, 24, "generator uses the 24-character default");
+  assert.match(randomFixture, /[a-z]/, "generated password contains lowercase");
+  assert.match(randomFixture, /[A-Z]/, "generated password contains uppercase");
+  assert.match(randomFixture, /[0-9]/, "generated password contains digits");
+  assert.match(randomFixture, /[^a-zA-Z0-9]/, "generated password contains symbols");
+  assert.equal(await script("document.getElementById('edit-password').type"), "password", "generated secret must remain hidden");
+  assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "false");
+  await script("document.getElementById('reveal-editor-password').click()");
+  assert.equal(await script("document.getElementById('edit-password').type"), "text");
+  assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "true");
+  await script("document.getElementById('reveal-editor-password').click()");
+  assert.equal(await script("document.getElementById('edit-password').type"), "password");
+  await script("document.getElementById('cancel-editor').click()");
+  await until("document.getElementById('edit-password').value === ''", "generated secret erased when editor closes");
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Browser fixture login'; document.getElementById('edit-username').value='fixture-user'; document.getElementById('edit-password').value='dummy-only-do-not-use'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
@@ -341,7 +357,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
