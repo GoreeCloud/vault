@@ -28,6 +28,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 
 - Static Content Security Policy with no remote scripts, connections or external image resources.
 - Browser Web Crypto; OS random source; no Math.random for credential generation.
+- Basic login hygiene analysis runs only against unlocked in-memory vault entries, does not submit credentials to a remote service, and never includes plaintext passwords in its report.
 - URL scheme validation (HTTP/HTTPS only) and DOM text nodes instead of injecting stored item fields as HTML.
 - PBKDF2 parameter and encrypted envelope validation; rejection of failed AES-GCM authentication.
 - Passphrase length floor on creation and rekey.
@@ -64,6 +65,7 @@ Do **not** expose this prototype on a public domain, import real user credential
 - Unit tests in `tests/crypto.test.mjs` cover encrypt/decrypt, fresh IVs, wrong passphrases, ciphertext tampering, document validation, password character-class requirements, URL validation and published RFC TOTP vectors.
 - Unit tests in `tests/storage.test.mjs` exercise cooperating-tab conflicts, stale writes, session revocation, storage failures and browsers missing Web Locks.
 - Unit tests in `tests/recovery.test.mjs` check authenticated backup verification, incorrect passphrases, tamper rejection and oversized format rejection; full interactive recovery remains unverified.
+- Unit tests in `tests/health.test.mjs` verify scoped local hygiene counts and that passwords are absent from returned findings; this is not a comprehensive security analysis.
 - GitHub Actions runs syntax checks and unit tests when the workflow is enabled on a branch or pull request.
 - `tests/browser-smoke.mjs` (optional, requires an installed Chromium binary) performs an isolated loopback browser smoke test of first-run confirmation, encrypted item creation, local ciphertext, manual lock/unlock, incorrect backup passphrase rejection, authenticated restore, real two-tab stale-write races, appearance switching, light-theme action contrast, and mobile viewport/nav geometry. It also captures nonsecret screenshots for manual inspection; these are temporary evidence, not a full visual accessibility certification.
 - Passing these checks **cannot** prove production security, full browser UX/accessibility correctness or independent cryptographic review.

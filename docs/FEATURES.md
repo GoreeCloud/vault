@@ -18,6 +18,7 @@ The full requested product draws on the capabilities of Bitwarden, Vaultwarden, 
 - [x] Local encrypted vault create, open, save, lock and rekey
 - [x] Login, secure note and generic secret CRUD; searching, favorites and filters
 - [x] Cryptographic password generator and browser TOTP code generation
+- [x] Basic, local-only login hygiene report: repeated/short/common passwords and HTTP URLs; no breach or MFA assertions
 - [x] Encrypted local backup export and destructive import
 - [x] Responsive GC UI-inspired web frontend with basic keyboard and accessible labeling
 - [x] Unit tests and syntax-test workflow definitions

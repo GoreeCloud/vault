@@ -15,6 +15,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items.
 - Cryptographically random password generator with enabled-character-class coverage.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options).
+- A local Security Check dialog that flags reused, short and a small set of common passwords, plus HTTP login URLs; no external requests or plaintext password report output.
 - Encrypted JSON backup export and **passphrase-authenticated restore**: decrypt and validate an imported backup before any replacement, then require explicit confirmation.
 - Web Locks-controlled writes compare the exact previously loaded ciphertext, reject stale-tab overwrites, and automatically lock other tabs when ciphertext changes. Unsupported Web Locks browsers cannot write.
 - Responsive desktop/mobile web interface with a reachable mobile bottom navigation dock, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
@@ -48,6 +49,10 @@ Open **http://localhost:4173** in the same computer's browser.
 4. Lock the vault and unlock again. Your keys are only retained in active JavaScript memory while unlocked.
 
 **Do not migrate your real password vault, use as your only copy of secrets, or publish this instance on the internet.** A green automated test suite does not establish readiness for real credentials.
+
+## Local Security Check limitations
+
+The **Security Check** is an on-device hygiene aid. It examines only unlocked **login** items in memory and returns record titles with basic reuse/short/common-password/HTTP URL concerns. It does not check public breach databases, estimate comprehensive password entropy, prove MFA is absent, scan other user accounts or provide a security guarantee. Audit results are not saved or sent to a service.
 
 ## Appearance and accessible navigation
 
