@@ -233,6 +233,7 @@ function field(label, value, options = {}) {
     reveal.type = "button";
     reveal.setAttribute("aria-label", "Show " + label.toLowerCase());
     reveal.setAttribute("aria-pressed", "false");
+    reveal.dataset.secretReveal = "password";
     reveal.addEventListener("click", () => {
       const isHidden = text.textContent !== value;
       text.textContent = isHidden ? value : "••••••••••••";
@@ -427,6 +428,16 @@ function closeSecurityCheck() {
   if (byId("health-dialog").open) byId("health-dialog").close();
   byId("health-summary").replaceChildren();
   byId("health-findings").replaceChildren();
+}
+
+function maskVisibleSecrets() {
+  // Backgrounding should never leave an explicitly revealed password/TOTP
+  // code in the rendered DOM if the user switches back to the tab.
+  const password = byId("item-detail").querySelector('[data-secret-reveal="password"]');
+  if (password?.getAttribute("aria-pressed") === "true") password.click();
+  const otp = byId("reveal-otp-code");
+  if (otp?.getAttribute("aria-pressed") === "true") otp.click();
+  if (byId("editor-dialog").open) setEditorPasswordVisibility(false);
 }
 
 function setEditorPasswordVisibility(revealed) {
@@ -834,8 +845,12 @@ function setup() {
   });
   window.addEventListener("pagehide", () => lockVault());
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && documentData &&
-        Date.now() - lastActivity > IDLE_MS) lockVault("Vault automatically locked after inactivity.");
+    if (document.visibilityState === "hidden" && documentData) {
+      maskVisibleSecrets();
+    } else if (document.visibilityState === "visible" && documentData &&
+        Date.now() - lastActivity > IDLE_MS) {
+      lockVault("Vault automatically locked after inactivity.");
+    }
   });
   document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && documentData) {
