@@ -41,6 +41,10 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Draft-based encrypted mutations only update the visible document after storage succeeds.
 - No actual production keys, provider credentials, analytics IDs or remote vault URLs in the repository.
 
+## Proposed encrypted sync architecture
+
+A candidate [encrypted multi-device synchronization and recovery design](ENCRYPTED_SYNC_ARCHITECTURE.md) now records intended separation of client encryption from SSO, strict device authorization, revision/concurrency controls, encrypted backups, rollback limits, integration boundaries and acceptance gates. This is **not** an implemented server, security review or production-ready protocol. The current browser-local format is unchanged.
+
 ## Known gaps and security-critical work
 
 1. Independent application, cryptographic and threat-model review; fix identified vulnerabilities.
