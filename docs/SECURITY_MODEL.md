@@ -42,7 +42,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Closed secret-editor fields are explicitly cleared, and concurrent/duplicate editor saves are blocked until encryption and guarded storage commit finish. This reduces residual DOM exposure but not in-memory plaintext exposure while the vault is unlocked.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
 - Draft-based encrypted mutations only update the visible document after storage succeeds. A failed save does not block backup export of the last committed ciphertext; export verifies the active session and exact saved revision before generating a file.
-- Keyboard focus restoration for item-selection/detail updates does not persist sensitive item content or introduce network requests.
+- Keyboard focus restoration for item-selection/detail updates does not persist sensitive item content or introduce network requests. Named native modal dialogs and keyboard Escape regression tests verify closed editors clear synthetic secret fields.
 - No actual production keys, provider credentials, analytics IDs or remote vault URLs in the repository.
 
 ## Proposed encrypted sync architecture

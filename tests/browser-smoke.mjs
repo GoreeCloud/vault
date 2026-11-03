@@ -138,8 +138,12 @@ try {
   assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "true");
   await script("document.getElementById('reveal-editor-password').click()");
   assert.equal(await script("document.getElementById('edit-password').type"), "password");
-  await script("document.getElementById('cancel-editor').click()");
-  await until("document.getElementById('edit-password').value === ''", "generated secret erased when editor closes");
+  assert.equal(await script("document.getElementById('editor-dialog').getAttribute('aria-labelledby')"), "editor-heading", "editor dialog has accessible title");
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await until("document.getElementById('editor-dialog').open===false", "keyboard Escape closes editor");
+  await until("document.getElementById('edit-password').value === ''", "generated secret erased after Escape");
+  assert.equal(await script("document.getElementById('edit-totp').value"), "", "unsaved authenticator secret cleared on Escape");
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Browser fixture login'; document.getElementById('edit-username').value='fixture-user'; document.getElementById('edit-password').value='dummy-only-do-not-use'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
@@ -221,7 +225,9 @@ try {
   await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('app-screen').hidden===false && document.getElementById('item-count').textContent.startsWith('2 of')", "unlock retained items");
   const beforeRotation = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
-  await script("document.getElementById('change-passphrase').click(); document.getElementById('current-passphrase').value='wrong-current-test-phrase'; document.getElementById('next-passphrase').value='test-only rotated browser phrase'; document.getElementById('confirm-passphrase').value='test-only rotated browser phrase'; document.getElementById('passphrase-form').requestSubmit()");
+  await script("document.getElementById('change-passphrase').click()");
+  assert.equal(await script("document.getElementById('passphrase-dialog').getAttribute('aria-labelledby')"), "change-passphrase-heading");
+  await script("document.getElementById('current-passphrase').value='wrong-current-test-phrase'; document.getElementById('next-passphrase').value='test-only rotated browser phrase'; document.getElementById('confirm-passphrase').value='test-only rotated browser phrase'; document.getElementById('passphrase-form').requestSubmit()");
   await until("document.getElementById('passphrase-message').textContent.includes('Passphrase unchanged:')", "reject wrong current passphrase");
   assert.equal(await script("document.getElementById('passphrase-dialog').open"), true);
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), beforeRotation);
@@ -358,7 +364,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "hardened loopback-only preview browser acceptance"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
