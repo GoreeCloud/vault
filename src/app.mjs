@@ -25,6 +25,7 @@ let sessionId = 0;
 let lastSerialized = null;
 let pendingBackup = null;
 let pendingExpectedStorage = null;
+let backupSelectionId = 0;
 let noticeTimer;
 
 function announce(message, error = false) {
@@ -73,6 +74,7 @@ function lockVault(reason = "") {
   lastSerialized = null;
   pendingBackup = null;
   pendingExpectedStorage = null;
+  backupSelectionId += 1;
   selection = null;
   editingId = null;
   byId("editor-form").reset();
@@ -577,11 +579,18 @@ async function exportBackup() {
 async function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  // File.text() is async. A previous, slower selection must not replace a
+  // newer one or resurrect a cancelled restore dialog when its read ends.
+  const requestId = ++backupSelectionId;
   const epoch = sessionId;
   try {
     if (documentData) throw new Error("Lock the vault before importing.");
+    if (restoringBackup || byId("restore-dialog").open) {
+      throw new Error("Finish or cancel the current backup verification first.");
+    }
     if (file.size > 7 * 1024 * 1024) throw new Error("Backup exceeds the import size limit.");
     const backup = JSON.parse(await file.text());
+    if (requestId !== backupSelectionId) return;
     validateEnvelope(backup);
     if (epoch !== sessionId || documentData) {
       throw new VaultWriteConflict("Vault state changed while reading the backup.");
@@ -593,9 +602,12 @@ async function importBackup(event) {
     byId("restore-dialog").showModal();
     byId("restore-passphrase").focus();
   } catch (error) {
-    message("auth-message", "Import preparation failed: " + error.message);
+    if (requestId === backupSelectionId) {
+      message("auth-message", "Import preparation failed: " + error.message);
+    }
   } finally {
-    event.target.value = "";
+    // An older handler must not clear the input state of a newer selection.
+    if (requestId === backupSelectionId) event.target.value = "";
   }
 }
 
@@ -650,6 +662,7 @@ async function verifyAndRestore(event) {
 
 function cancelRestore() {
   if (restoringBackup) return;
+  backupSelectionId += 1;
   pendingBackup = null;
   pendingExpectedStorage = null;
   byId("restore-form").reset();
@@ -722,6 +735,7 @@ function setup() {
     // different encrypted backup has already opened this same <dialog>.
     // Never clear that newer import's pending ciphertext or form state.
     if (byId("restore-dialog").open) return;
+    backupSelectionId += 1;
     pendingBackup = null;
     pendingExpectedStorage = null;
     byId("restore-form").reset();
