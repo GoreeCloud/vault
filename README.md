@@ -17,7 +17,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options).
 - Encrypted JSON backup export and **passphrase-authenticated restore**: decrypt and validate an imported backup before any replacement, then require explicit confirmation.
 - Web Locks-controlled writes compare the exact previously loaded ciphertext, reject stale-tab overwrites, and automatically lock other tabs when ciphertext changes. Unsupported Web Locks browsers cannot write.
-- Responsive desktop/mobile web interface, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
+- Responsive desktop/mobile web interface with a reachable mobile bottom navigation dock, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
 - Node built-in unit tests, no installed runtime third-party dependencies, GitHub Actions checks.
 
 **Not implemented:** server, cloud synchronization, secure sharing, browser autofill extensions, native Android/iOS/Linux apps, passkey provider, hardware-backed biometrics, Argon2id, attachments, encrypted per-item search index, enterprise RBAC/SSO/SCIM, automated security monitoring, email aliases and emergency recovery. These are captured in the [full product specification](docs/PRODUCT_SPEC.md) and tracked in [the feature roadmap](docs/FEATURES.md), **not as released capabilities**.
@@ -32,6 +32,12 @@ cd vault
 npm test
 npm run check
 npm run serve
+```
+
+The optional zero-dependency **headless Chromium acceptance check** creates an isolated temporary browser profile, serves only on loopback, exercises test-only vault and encrypted-restore flows, and writes screenshots to its private temporary directory. It requires an already installed compatible Chromium binary:
+
+```bash
+CHROME_BIN=/path/to/chromium npm run test:browser
 ```
 
 Open **http://localhost:4173** in the same computer's browser.
@@ -66,7 +72,7 @@ The local prototype deliberately has **no backend**. For the planned multi-user 
 
 ## Quality and development
 
-Run `npm test` and `npm run check` after changes. The current code has not undergone third-party penetration testing, a cryptographic review, a browser-based automated accessibility audit or screenshot-led design acceptance; release gates remain open. Avoid storing real secrets in development test fixtures or in source control.
+Run `npm test` and `npm run check` after changes. The current code has not undergone third-party penetration testing, an independent cryptographic review, a full browser-based accessibility audit or final screenshot-led design acceptance; manual browser smoke screenshots have been reviewed for desktop/mobile workflow layout, but not all screen sizes/states; release gates remain open. Avoid storing real secrets in development test fixtures or in source control.
 
 The repository does not yet declare a redistribution license; public visibility **does not** itself grant an open-source license. The project's license needs a founder decision before external reuse or derivative distribution.
 
