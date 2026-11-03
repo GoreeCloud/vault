@@ -37,6 +37,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - New vault creation requires passphrase confirmation.
 - Fresh IV on every save; fresh salt on passphrase change. Current passphrase is verified by decrypting the latest stored envelope before a rekey can commit; the operation is guarded against stale cross-tab writes.
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
+- Closed secret-editor fields are explicitly cleared, and concurrent/duplicate editor saves are blocked until encryption and guarded storage commit finish. This reduces residual DOM exposure but not in-memory plaintext exposure while the vault is unlocked.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
 - Draft-based encrypted mutations only update the visible document after storage succeeds.
 - Keyboard focus restoration for item-selection/detail updates does not persist sensitive item content or introduce network requests.
