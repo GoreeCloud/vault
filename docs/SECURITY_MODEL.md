@@ -35,7 +35,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Finite document/item length limits before encryption and after decryption. Imported ciphertext lengths are bounded before base64 decoding.
 - Imported encrypted backups are decrypted and authenticated against the supplied backup passphrase and validated for supported document structure **before** asking to replace local data. User confirmation and same-origin guarded write are required.
 - New vault creation requires passphrase confirmation.
-- Fresh IV on every save; fresh salt on passphrase change.
+- Fresh IV on every save; fresh salt on passphrase change. Current passphrase is verified by decrypting the latest stored envelope before a rekey can commit; the operation is guarded against stale cross-tab writes.
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
 - Draft-based encrypted mutations only update the visible document after storage succeeds.
@@ -69,6 +69,7 @@ Do **not** expose this prototype on a public domain, import real user credential
 - Unit tests in `tests/crypto.test.mjs` cover encrypt/decrypt, fresh IVs, wrong passphrases, ciphertext tampering, document validation, password character-class requirements, URL validation and published RFC TOTP vectors.
 - Unit tests in `tests/storage.test.mjs` exercise cooperating-tab conflicts, stale writes, session revocation, storage failures and browsers missing Web Locks.
 - Unit tests in `tests/recovery.test.mjs` check authenticated backup verification, incorrect passphrases, tamper rejection and oversized format rejection; full interactive recovery remains unverified.
+- Unit tests in `tests/rekey.test.mjs` cover current passphrase verification, fresh key/salt rotation, intact document recovery, rejection of old credentials and failed-attempt nonmutation.
 - Unit tests in `tests/health.test.mjs` verify scoped local hygiene counts and that passwords are absent from returned findings; this is not a comprehensive security analysis.
 - GitHub Actions runs syntax checks and unit tests when the workflow is enabled on a branch or pull request.
 - `tests/browser-smoke.mjs` (optional, requires an installed Chromium binary) performs an isolated loopback browser smoke test of first-run confirmation, encrypted item creation, local ciphertext, manual lock/unlock, incorrect backup passphrase rejection, authenticated restore, real two-tab stale-write races, appearance switching, light-theme action contrast, and mobile viewport/nav geometry. It also captures nonsecret screenshots for manual inspection; these are temporary evidence, not a full visual accessibility certification.

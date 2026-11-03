@@ -150,6 +150,21 @@ try {
   await until("document.getElementById('auth-screen').hidden===false", "manual lock");
   await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('app-screen').hidden===false && document.getElementById('item-count').textContent.startsWith('2 of')", "unlock retained items");
+  const beforeRotation = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
+  await script("document.getElementById('change-passphrase').click(); document.getElementById('current-passphrase').value='wrong-current-test-phrase'; document.getElementById('next-passphrase').value='test-only rotated browser phrase'; document.getElementById('confirm-passphrase').value='test-only rotated browser phrase'; document.getElementById('passphrase-form').requestSubmit()");
+  await until("document.getElementById('passphrase-message').textContent.includes('Passphrase unchanged:')", "reject wrong current passphrase");
+  assert.equal(await script("document.getElementById('passphrase-dialog').open"), true);
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), beforeRotation);
+  await script("document.getElementById('current-passphrase').value='test-only secure browser phrase'; document.getElementById('next-passphrase').value='test-only rotated browser phrase'; document.getElementById('confirm-passphrase').value='test-only rotated browser phrase'; document.getElementById('passphrase-form').requestSubmit()");
+  await until("document.getElementById('passphrase-dialog').open===false && document.getElementById('notice').textContent.includes('Passphrase changed')", "rotate passphrase after current verification");
+  assert.notEqual(await script("JSON.parse(localStorage.getItem('goreecloud.vault.encrypted.v1')).salt"), JSON.parse(beforeRotation).salt);
+  await script("document.getElementById('search-items').value='fixture-sensitive-lookup'; document.getElementById('lock-vault').click()");
+  await until("document.getElementById('auth-screen').hidden===false", "lock after rekey");
+  assert.equal(await script("document.getElementById('search-items').value"), "");
+  await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until("document.getElementById('auth-message').textContent.includes('Unable to unlock')", "old passphrase rejected after rotation");
+  await script("document.getElementById('passphrase').value='test-only rotated browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until("document.getElementById('app-screen').hidden === false && document.getElementById('item-count').textContent.startsWith('2 of')", "new passphrase recovers both records");
   await script("document.getElementById('lock-vault').click()");
   const dom = await send("DOM.getDocument", { depth: 1 });
   const fileInput = await send("DOM.querySelector", { nodeId: dom.root.nodeId, selector: "#import-file" });
@@ -242,7 +257,7 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",

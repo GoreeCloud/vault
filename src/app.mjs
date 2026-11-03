@@ -2,6 +2,7 @@ import { createVault, openVault, sealVault, validateEnvelope } from "./crypto.mj
 import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs";
 import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
 import { verifyEncryptedBackup } from "./recovery.mjs";
+import { rotateVaultPassphrase } from "./rekey.mjs";
 import { installTheme } from "./theme.mjs";
 import { auditVaultLogins } from "./health.mjs";
 
@@ -78,6 +79,7 @@ function lockVault(reason = "") {
   if (byId("restore-dialog").open) byId("restore-dialog").close();
   byId("item-list").replaceChildren();
   byId("item-detail").replaceChildren();
+  byId("search-items").value = "";
   showAuth(reason || "Vault locked. Unlock again to continue.");
 }
 
@@ -543,31 +545,43 @@ function cancelRestore() {
 
 async function changePassphrase(event) {
   event.preventDefault();
+  const current = byId("current-passphrase").value;
   const first = byId("next-passphrase").value;
+  if (!current) {
+    message("passphrase-message", "Enter your current vault passphrase."); return;
+  }
   if (first !== byId("confirm-passphrase").value) {
-    message("passphrase-message", "Passphrases do not match."); return;
+    message("passphrase-message", "New passphrases do not match."); return;
   }
   if (first.length < 12) {
     message("passphrase-message", "Use at least 12 characters."); return;
   }
-  byId("submit-passphrase").disabled = true;
+  const submit = byId("submit-passphrase");
+  submit.disabled = true;
+  message("passphrase-message", "Verifying current passphrase and re-encrypting…");
   try {
     await scheduleOperation(async epoch => {
-      const next = await createVault(first, structuredClone(documentData));
+      // Verify against the latest committed ciphertext rather than relying
+      // on an unlocked session alone. Queued writes complete before this.
+      const currentEnvelope = JSON.parse(lastSerialized);
+      const next = await rotateVaultPassphrase(currentEnvelope, current, first);
       await writeEnvelope(next.envelope, epoch);
       if (epoch !== sessionId) return;
       encryptionKey = next.key;
       cryptoParameters = { salt: next.envelope.salt };
       byId("passphrase-dialog").close();
-      byId("passphrase-form").reset();
       announce("Passphrase changed. Export a new encrypted backup.");
     });
   } catch (error) {
     if (error instanceof VaultWriteConflict) {
       lockVault("The vault changed during passphrase rotation. Unlock again.");
-    } else message("passphrase-message", error.message);
+    } else {
+      message("passphrase-message", "Passphrase unchanged: " + error.message);
+    }
+  } finally {
+    byId("passphrase-form").reset();
+    submit.disabled = false;
   }
-  finally { byId("submit-passphrase").disabled = false; }
 }
 
 function setup() {
