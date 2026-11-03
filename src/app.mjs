@@ -376,13 +376,19 @@ function closeSecurityCheck() {
   byId("health-findings").replaceChildren();
 }
 
+function setEditorPasswordVisibility(revealed) {
+  byId("edit-password").type = revealed ? "text" : "password";
+  byId("reveal-editor-password").setAttribute("aria-pressed", String(revealed));
+  byId("reveal-editor-password").setAttribute("aria-label", revealed ? "Hide secret" : "Reveal secret");
+}
+
 function scrubEditor() {
   byId("editor-form").reset();
   for (const id of [
     "edit-title", "edit-username", "edit-password", "edit-website",
     "edit-totp", "edit-notes", "edit-tags"
   ]) byId(id).value = "";
-  byId("edit-password").type = "password";
+  setEditorPasswordVisibility(false);
   byId("edit-totp").type = "password";
   editingId = null;
   message("editor-message", "");
@@ -402,7 +408,7 @@ function openEditor(id = null) {
   byId("edit-tags").value = item?.tags ?? "";
   byId("edit-totp").value = item?.totpSecret ?? "";
   byId("edit-favorite").checked = item?.favorite ?? false;
-  byId("edit-password").type = "password";
+  setEditorPasswordVisibility(false);
   byId("editor-dialog").showModal();
   byId("edit-title").focus();
 }
@@ -682,11 +688,11 @@ function setup() {
   byId("discard-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("generate-password").addEventListener("click", () => {
     byId("edit-password").value = generatePassword();
-    byId("edit-password").type = "text";
-    announce("Strong password generated. Save the item to encrypt it.");
+    setEditorPasswordVisibility(false);
+    announce("Secure password generated and hidden. Reveal it only when needed.");
   });
   byId("reveal-editor-password").addEventListener("click", () => {
-    byId("edit-password").type = byId("edit-password").type === "password" ? "text" : "password";
+    setEditorPasswordVisibility(byId("edit-password").type === "password");
   });
   byId("lock-vault").addEventListener("click", () => lockVault());
   byId("export-vault").addEventListener("click", exportBackup);
