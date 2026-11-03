@@ -16,7 +16,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - Cryptographically random password generator with enabled-character-class coverage.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options).
 - Encrypted JSON backup export and explicit destructive import.
-- Cross-tab changes trigger locking rather than silently merging competing writes.
+- Web Locks-controlled writes compare the exact previously loaded ciphertext, reject stale-tab overwrites, and automatically lock other tabs when ciphertext changes. Unsupported Web Locks browsers cannot write.
 - Responsive desktop/mobile web interface, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
 - Node built-in unit tests, no installed runtime third-party dependencies, GitHub Actions checks.
 
@@ -42,6 +42,14 @@ Open **http://localhost:4173** in the same computer's browser.
 4. Lock the vault and unlock again. Your keys are only retained in active JavaScript memory while unlocked.
 
 **Do not migrate your real password vault, use as your only copy of secrets, or publish this instance on the internet.** A green automated test suite does not establish readiness for real credentials.
+
+## Local data integrity hardening
+
+- All item mutations update a fresh in-memory draft and display it only **after** the encrypted write succeeds. Storage/quota failures leave the prior saved document intact.
+- Supported browsers use the Web Locks API with a same-origin exclusive lock and exact ciphertext comparison to prevent cooperating tabs overwriting newer revisions.
+- Unlock, initial vault creation, encrypted backup import and passphrase rotation check for stale sessions or concurrent changes.
+- A session epoch invalidates delayed writes after locking. Storage changes from other tabs trigger locking; unlock again to reload.
+- This is a prototype-level mitigation, **not** a substitute for server transactions, secure sync, hardened device storage or a third-party review. Malicious scripts, outdated clients or compromised browsers may bypass cooperating locks.
 
 ## Architecture
 
