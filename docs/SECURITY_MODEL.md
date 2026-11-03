@@ -35,7 +35,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - PBKDF2 parameter and encrypted envelope validation; rejection of failed AES-GCM authentication.
 - Passphrase length floor on creation and rekey.
 - Finite document/item length limits before encryption and after decryption. Imported ciphertext lengths are bounded before base64 decoding.
-- Imported encrypted backups are decrypted and authenticated against the supplied backup passphrase and validated for supported document structure **before** asking to replace local data. User confirmation and same-origin guarded write are required.
+- Imported encrypted backups are decrypted and authenticated against the supplied backup passphrase and validated for supported document structure **before** asking to replace local data. User confirmation and same-origin guarded write are required. A queued modal-close event from a cancelled restore does not clear a newly opened backup import.
 - New vault creation requires passphrase confirmation.
 - Fresh IV on every save; fresh salt on passphrase change. Current passphrase is verified by decrypting the latest stored envelope before a rekey can commit; the operation is guarded against stale cross-tab writes.
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
