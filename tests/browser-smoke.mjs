@@ -132,7 +132,7 @@ try {
   assert.equal(await script("document.getElementById('edit-totp').value"), "");
   assert.equal(await script("document.getElementById('edit-title').value"), "");
   assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true);
-  await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Invalid authenticator'; document.getElementById('edit-totp').value='not-a-valid-base32-secret'; document.getElementById('editor-form').requestSubmit()");
+  await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Invalid authenticator'; document.getElementById('edit-totp').value='invalid-base32-0'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('editor-message').textContent.includes('Invalid authenticator secret')", "invalid authenticator enrollment rejected");
   assert.equal(await script("document.getElementById('editor-dialog').open"), true);
   assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true);
