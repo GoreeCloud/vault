@@ -68,7 +68,7 @@ The item collection uses semantic list elements and labeled, selectable buttons;
 - All item mutations update a fresh in-memory draft and display it only **after** the encrypted write succeeds. Storage/quota failures leave the prior saved document intact.
 - Supported browsers use the Web Locks API with a same-origin exclusive lock and exact ciphertext comparison to prevent cooperating tabs overwriting newer revisions.
 - Unlock, initial vault creation, encrypted backup verification/import and passphrase rotation check for stale sessions or concurrent changes. First-run passphrases must be confirmed; imports authenticate the encrypted document before overwrite.
-- A session epoch invalidates delayed writes after locking. Storage changes from other tabs trigger locking; unlock again to reload. The optional Chromium smoke test also simulates idle timeout while an editor contains synthetic, unsaved secrets and verifies cleared DOM fields.
+- A session epoch invalidates delayed writes after locking. Storage changes from other tabs, including an explicit localStorage clear, trigger locking; unlock again to reload. The optional Chromium smoke test also simulates idle timeout while an editor contains synthetic, unsaved secrets and verifies cleared DOM fields.
 - This is a prototype-level mitigation, **not** a substitute for server transactions, secure sync, hardened device storage or a third-party review. Malicious scripts, outdated clients or compromised browsers may bypass cooperating locks.
 
 ## Architecture

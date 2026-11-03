@@ -800,8 +800,15 @@ function setup() {
     document.addEventListener(name, () => { if (documentData) lastActivity = Date.now(); }, { passive: true })
   );
   window.addEventListener("storage", event => {
-    if (event.key === STORAGE_KEY) {
-      lockVault("Vault changed in another tab. Unlock again to load the latest encrypted data.");
+    if (event.storageArea !== localStorage) return;
+    // StorageEvent.key is null for another tab's localStorage.clear().
+    // Without this check a tab may keep showing stale decrypted secrets
+    // even though the authoritative encrypted document was removed.
+    const changed = event.key === STORAGE_KEY ||
+      (event.key === null && documentData &&
+        localStorage.getItem(STORAGE_KEY) !== lastSerialized);
+    if (changed) {
+      lockVault("Vault changed or was cleared in another tab. Unlock again to load the latest encrypted data.");
     }
   });
   window.addEventListener("pagehide", () => lockVault());
