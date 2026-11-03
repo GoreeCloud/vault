@@ -6,6 +6,15 @@
 export const FORMAT = "goreecloud.vault.local.v1";
 export const ITERATIONS = 600_000;
 const ENVELOPE_FIELDS = new Set(["format", "kdf", "iterations", "salt", "iv", "ciphertext"]);
+const DOCUMENT_FIELDS = new Set(["version", "items"]);
+const ITEM_FIELDS = new Set([
+  "id", "type", "title", "favorite", "username", "password",
+  "website", "notes", "tags", "totpSecret"
+]);
+function hasExactFields(value, fields) {
+  const keys = Object.keys(value);
+  return keys.length === fields.size && keys.every(key => fields.has(key));
+}
 const SALT_LENGTH = 16;
 const NONCE_LENGTH = 12;
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
@@ -45,6 +54,9 @@ export function validateDocument(document) {
       document.items.length > 10_000) {
     throw new Error("Unsupported or corrupt vault document.");
   }
+  if (!hasExactFields(document, DOCUMENT_FIELDS)) {
+    throw new Error("Unexpected vault document fields.");
+  }
   const ids = new Set();
   for (const item of document.items) {
     if (!item || typeof item !== "object" || Array.isArray(item) ||
@@ -56,6 +68,12 @@ export function validateDocument(document) {
           field => typeof item[field] !== "string" || item[field].length > 100_000
         ) || ids.has(item.id)) {
       throw new Error("Unsupported or corrupt vault item.");
+    }
+    // v1 item fields are fixed, including optional-value strings. Unknown
+    // extension data must be versioned explicitly rather than silently
+    // preserved and re-exported within authenticated ciphertext.
+    if (!hasExactFields(item, ITEM_FIELDS)) {
+      throw new Error("Unexpected vault item fields.");
     }
     ids.add(item.id);
   }
