@@ -27,7 +27,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 ## Present controls
 
 - Static Content Security Policy with no remote scripts, connections or external image resources.
-- Browser Web Crypto; OS random source; no Math.random for credential generation.
+- Browser Web Crypto; OS random source; no Math.random for credential generation. The UI exposes 12–128 character password length and selectable character groups, masks generated values by default, and uses an explicit accessible reveal state.
 - Optional TOTP secret input is checked with the browser HMAC implementation before encrypted item storage; invalid Base32 enrollment secrets are rejected rather than failing only at code-display time.
 - Basic login hygiene analysis runs only against unlocked in-memory vault entries, does not submit credentials to a remote service, and never includes plaintext passwords in its report.
 - URL scheme validation (HTTP/HTTPS only) and DOM text nodes instead of injecting stored item fields as HTML.
