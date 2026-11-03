@@ -41,7 +41,7 @@ The optional zero-dependency **headless Chromium acceptance check** creates an i
 CHROME_BIN=/path/to/chromium npm run test:browser
 ```
 
-Open **http://localhost:4173** in the same computer's browser.
+Open **http://127.0.0.1:4173** in the same computer's browser. The development command now explicitly binds only to the loopback interface, avoiding accidental LAN exposure. Python's generic file server does **not** supply all required production HTTP security headers (for example `frame-ancestors 'none'` and `X-Frame-Options: DENY`); do not use it to host Vault for others.
 
 1. Create a passphrase of at least 12 characters and confirm it before saving the new vault. **There is no password reset or recovery service.**
 2. Create a few *noncritical test credentials*. The encrypted envelope is stored in that browser profile's localStorage; no plaintext vault records are persisted intentionally.
