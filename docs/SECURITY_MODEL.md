@@ -31,7 +31,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Browser Web Crypto; OS random source; no Math.random for credential generation. The editor exposes validated length and character-class controls; invalid settings cannot overwrite the prior secret. Newly generated passwords remain masked until explicitly revealed; a labeled toggle reports its state to assistive technologies.
 - Optional TOTP secret input is checked with the browser HMAC implementation before encrypted item storage; invalid Base32 enrollment secrets are rejected rather than failing only at code-display time.
 - Basic login hygiene analysis runs only against unlocked in-memory vault entries, does not submit credentials to a remote service, and never includes plaintext passwords in its report.
-- URL scheme validation (HTTP/HTTPS only) and DOM text nodes instead of injecting stored item fields as HTML.
+- URL scheme validation (HTTP/HTTPS only) and DOM text nodes instead of injecting stored item fields as HTML. Browser acceptance covers adversarial HTML-looking title/notes, rejection of `javascript:` URLs, and `noopener noreferrer` external links.
 - PBKDF2 parameter and encrypted envelope validation; rejection of failed AES-GCM authentication.
 - Passphrase length floor on creation and rekey.
 - Finite document/item length limits before encryption and after decryption. Imported ciphertext lengths are bounded before base64 decoding.
