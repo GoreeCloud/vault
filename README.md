@@ -35,7 +35,7 @@ npm run check
 npm run serve
 ```
 
-The optional zero-dependency **headless Chromium acceptance check** creates an isolated temporary browser profile, serves only on loopback, exercises the real Export backup download, validates downloaded ciphertext against the local vault, then restores that exported backup (including tampered-ciphertext rejection and successful recovery), and writes screenshots to its private temporary directory. It requires an already installed compatible Chromium binary:
+The zero-dependency **headless Chromium acceptance check** also runs automatically in GitHub Actions on pull requests. For a local run, it creates an isolated temporary browser profile, serves only on loopback, exercises the real Export backup download, validates downloaded ciphertext against the local vault, then restores that exported backup (including tampered-ciphertext rejection and successful recovery), and writes screenshots to its private temporary directory. It requires an already installed compatible Chromium binary:
 
 ```bash
 CHROME_BIN=/path/to/chromium npm run test:browser
