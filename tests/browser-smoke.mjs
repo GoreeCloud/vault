@@ -165,6 +165,15 @@ try {
   assert.equal(await script("(() => { const e=document.querySelector('.gc-button.primary');const s=getComputedStyle(e);const c=x=>x.match(/[\\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255; return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});const a=c(s.color),b=c(s.backgroundColor);const l=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];return (Math.max(l(a),l(b))+.05)/(Math.min(l(a),l(b))+.05)>=4.5;})()"), true,
     "primary action text passes 4.5:1 contrast in light appearance");
   const encryptedOriginal = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
+  // Simulate a quota/storage failure during an attempted mutation. The
+  // previously committed ciphertext must remain exportable for recovery.
+  await script("(() => { window.__testOriginalSetItem=Storage.prototype.setItem; Storage.prototype.setItem=function(key,value){ if(key==='goreecloud.vault.encrypted.v1') throw new DOMException('quota exceeded', 'QuotaExceededError'); return window.__testOriginalSetItem.call(this,key,value); }; document.getElementById('new-item').click();document.getElementById('edit-title').value='Failed storage fixture';document.getElementById('edit-password').value='dummy-unsaved-after-quota';document.getElementById('editor-form').requestSubmit(); })()");
+  await until("document.getElementById('notice').textContent.includes('Encrypted save failed')", "storage quota failure reported");
+  await script("Storage.prototype.setItem=window.__testOriginalSetItem;delete window.__testOriginalSetItem;document.getElementById('discard-editor').click()");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), encryptedOriginal,
+    "failed save must leave previously committed ciphertext unchanged");
+  assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true,
+    "failed mutation must not appear as a saved item");
   // Exercise the actual Export backup control; do not manufacture the backup
   // by copying localStorage into a fixture file.
   await script("document.getElementById('export-vault').click()");
@@ -331,7 +340,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",

@@ -33,9 +33,12 @@ function announce(message, error = false) {
   noticeTimer = setTimeout(() => { notice.hidden = true; }, 5500);
 }
 function message(id, value) { byId(id).textContent = value; }
-function storedEnvelope() {
+function storedEnvelope(expected) {
   const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? JSON.parse(saved) : null;
+  if (!saved || saved !== expected) {
+    throw new VaultWriteConflict("The encrypted vault changed before export.");
+  }
+  return JSON.parse(saved);
 }
 function showAuth(note = "") {
   byId("auth-screen").hidden = false;
@@ -500,9 +503,15 @@ async function unlockOrCreate(event) {
 }
 
 async function exportBackup() {
+  const epoch = sessionId;
   try {
-    await operations;
-    const envelope = storedEnvelope();
+    // A previous save may have failed while preserving the last good
+    // encrypted document. Do not let a rejected promise disable recovery.
+    await operations.catch(() => {});
+    if (!documentData || epoch !== sessionId) {
+      throw new VaultWriteConflict("The vault was locked before export.");
+    }
+    const envelope = storedEnvelope(lastSerialized);
     validateEnvelope(envelope);
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -512,7 +521,13 @@ async function exportBackup() {
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     announce("Encrypted backup prepared. Store it somewhere safe.");
-  } catch (error) { announce("Backup failed: " + error.message, true); }
+  } catch (error) {
+    if (error instanceof VaultWriteConflict) {
+      lockVault("Vault changed while preparing backup. Unlock to load the latest encrypted data.");
+    } else {
+      announce("Backup failed: " + error.message, true);
+    }
+  }
 }
 async function importBackup(event) {
   const file = event.target.files?.[0];

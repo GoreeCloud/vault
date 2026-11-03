@@ -16,7 +16,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - Cryptographically random password generator with enabled-character-class coverage.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options), with validation of authenticator secrets before saving them in the encrypted vault.
 - A local Security Check dialog that flags reused, short and a small set of common passwords, plus HTTP login URLs; no external requests or plaintext password report output.
-- Encrypted JSON backup export and **passphrase-authenticated restore**: decrypt and validate an imported backup before any replacement, then require explicit confirmation.
+- Encrypted JSON backup export and **passphrase-authenticated restore**: decrypt and validate an imported backup before any replacement, then require explicit confirmation. An encrypted export of the last successful save remains available after a later storage/quota failure, provided its revision has not changed.
 - Web Locks-controlled writes compare the exact previously loaded ciphertext, reject stale-tab overwrites, and automatically lock other tabs when ciphertext changes. Unsupported Web Locks browsers cannot write.
 - Responsive desktop/mobile web interface with a reachable mobile bottom navigation dock, following verified [GC UI design guidance](https://github.com/GoreeCloud/gc-ui/blob/main/docs/DESIGN_LANGUAGE.md).
 - Node built-in unit tests, no installed runtime third-party dependencies, GitHub Actions checks.
