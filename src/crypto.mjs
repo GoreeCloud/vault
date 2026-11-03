@@ -5,6 +5,7 @@
  */
 export const FORMAT = "goreecloud.vault.local.v1";
 export const ITERATIONS = 600_000;
+const ENVELOPE_FIELDS = new Set(["format", "kdf", "iterations", "salt", "iv", "ciphertext"]);
 const SALT_LENGTH = 16;
 const NONCE_LENGTH = 12;
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
@@ -66,6 +67,15 @@ export function validateEnvelope(envelope) {
       envelope.format !== FORMAT || envelope.kdf !== "PBKDF2-SHA256" ||
       envelope.iterations !== ITERATIONS) {
     throw new Error("Unsupported vault encryption format.");
+  }
+  // v1 exposes exactly these six public cryptographic parameters. An import
+  // with additional fields may persist cleartext metadata outside AES-GCM,
+  // violating the ciphertext-only storage boundary. Extensions need a new
+  // explicitly reviewed format rather than silent passthrough.
+  const keys = Object.keys(envelope);
+  if (keys.length !== ENVELOPE_FIELDS.size ||
+      keys.some(key => !ENVELOPE_FIELDS.has(key))) {
+    throw new Error("Unexpected vault encryption envelope fields.");
   }
   base64ToBytes(envelope.salt, SALT_LENGTH);
   base64ToBytes(envelope.iv, NONCE_LENGTH);

@@ -298,6 +298,17 @@ try {
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal, "damaged encrypted data is not silently replaced");
   const dom = await send("DOM.getDocument", { depth: 1 });
   const fileInput = await send("DOM.querySelector", { nodeId: dom.root.nodeId, selector: "#import-file" });
+  // A structurally valid encrypted backup must not smuggle extra cleartext
+  // metadata into localStorage through unchecked envelope properties.
+  const envelopeWithPlaintext = { ...JSON.parse(encryptedOriginal), plaintextCredential: "synthetic-cleartext-metadata" };
+  const plaintextMetadataPath = join(workspace, "unexpected-cleartext-metadata.json");
+  await writeFile(plaintextMetadataPath, JSON.stringify(envelopeWithPlaintext), "utf8");
+  await send("DOM.setFileInputFiles", { nodeId: fileInput.nodeId, files: [plaintextMetadataPath] });
+  await until("document.getElementById('auth-message').textContent.includes('Unexpected vault encryption envelope fields')",
+    "backup with extra cleartext fields is rejected before passphrase verification");
+  assert.equal(await script("document.getElementById('restore-dialog').open"), false);
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal,
+    "unexpected cleartext metadata cannot be written to encrypted vault storage");
   const damagedBackup = JSON.parse(encryptedOriginal);
   damagedBackup.ciphertext = (damagedBackup.ciphertext[0]==="A"?"B":"A") + damagedBackup.ciphertext.slice(1);
   const damagedBackupPath = join(workspace, "tampered-test-backup.json");
@@ -440,7 +451,7 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
+    "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
