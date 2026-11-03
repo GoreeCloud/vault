@@ -132,15 +132,22 @@ try {
   assert.equal(await script("document.getElementById('edit-totp').value"), "");
   assert.equal(await script("document.getElementById('edit-title').value"), "");
   assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true);
+  await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Invalid authenticator'; document.getElementById('edit-totp').value='invalid-base32-0'; document.getElementById('editor-form').requestSubmit()");
+  await until("document.getElementById('editor-message').textContent.includes('Invalid authenticator secret')", "invalid authenticator enrollment rejected");
+  assert.equal(await script("document.getElementById('editor-dialog').open"), true);
+  assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true);
+  await script("document.getElementById('cancel-editor').click()");
+  await until("document.getElementById('edit-totp').value === ''", "invalid secret cleared after cancellation");
   await screenshot("03-item-details");
   assert.equal(await script("(() => { const b=document.querySelector('#item-list > li > button'); b.focus(); b.click(); return document.activeElement===document.querySelector('#item-list > li > button'); })()"), true, "selected list item retains keyboard focus after rendering");
   await script("(() => { const f=document.querySelector('#item-detail [data-vault-focus=\"detail:favorite\"]'); f.focus(); f.click(); })()");
   await until("document.querySelector('#item-detail [data-vault-focus=\"detail:favorite\"]')?.textContent.includes('Favorited')", "favorite saved");
   assert.equal(await script("document.activeElement?.dataset.vaultFocus"), "detail:favorite");
-  await script("(() => { document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click(); document.getElementById('edit-notes').value='Updated exactly once'; const form=document.getElementById('editor-form'); form.requestSubmit(); form.requestSubmit(); })()");
+  await script("(() => { document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click(); document.getElementById('edit-notes').value='Updated exactly once'; document.getElementById('edit-totp').value='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'; const form=document.getElementById('editor-form'); form.requestSubmit(); form.requestSubmit(); })()");
   await until("document.getElementById('editor-dialog').open === false && document.getElementById('item-detail').textContent.includes('Updated exactly once')", "edited item saved once");
   assert.equal(await script("document.getElementById('item-count').textContent.startsWith('1 of 1')"), true, "rapid duplicate submit does not create another item");
   await until("document.getElementById('edit-notes').value === ''", "editor notes scrub after save");
+  await until("document.getElementById('otp-code')?.textContent.match(/^\\d{6}$/)", "valid authenticator code generated from saved secret");
   await script("document.getElementById('security-check').click()");
   await until("document.getElementById('health-dialog').open", "local security check opens");
   assert.equal(await script("document.getElementById('health-summary').textContent.includes('Logins reviewed')"), true);
@@ -273,7 +280,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
