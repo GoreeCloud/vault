@@ -261,6 +261,11 @@ try {
   await until("document.getElementById('restore-dialog').open === false", "cancel tampered backup");
   await send("DOM.setFileInputFiles", { nodeId: fileInput.nodeId, files: [backupPath] });
   await until("document.getElementById('restore-dialog').open===true", "restore dialog opens");
+  // Reproduce a close event queued by the cancelled previous backup import:
+  // the newly opened dialog must not lose its pending authenticated backup.
+  await script("document.getElementById('restore-passphrase').value='test-only sentinel'; document.getElementById('restore-dialog').dispatchEvent(new Event('close'))");
+  assert.equal(await script("document.getElementById('restore-passphrase').value"), "test-only sentinel",
+    "delayed close from previous restore must not reset newly opened form");
   await script("document.getElementById('restore-passphrase').value='wrong-backup-passphrase'; document.getElementById('restore-form').requestSubmit()");
   await until("document.getElementById('restore-message').textContent.includes('Backup not imported')", "wrong password rejected");
   assert.equal(await script("document.getElementById('restore-dialog').open"), true);
@@ -275,7 +280,7 @@ try {
   } catch (error) {
     // Only expose fixed UI states; never include backup contents, input values,
     // passphrases, encrypted payloads, or item records in CI logs.
-    const state = await script("({dialogOpen:document.getElementById('restore-dialog').open,authVisible:!document.getElementById('auth-screen').hidden,verifying:document.getElementById('restore-message').textContent.includes('Authenticating and validating'),restoreError:document.getElementById('restore-message').textContent.includes('Backup not imported'),restoreCancelled:document.getElementById('restore-message').textContent.includes('Import cancelled'),restored:document.getElementById('auth-message').textContent.includes('verified and restored')})");
+    const state = await script("({dialogOpen:document.getElementById('restore-dialog').open,authVisible:!document.getElementById('auth-screen').hidden,verifying:document.getElementById('restore-message').textContent.includes('Authenticating and validating'),restoreError:document.getElementById('restore-message').textContent.includes('Backup not imported'),restoreCancelled:document.getElementById('restore-message').textContent.includes('Import cancelled'),missingBackup:document.getElementById('restore-message').textContent.includes('Choose an encrypted backup file first'),restored:document.getElementById('auth-message').textContent.includes('verified and restored')})");
     throw Error(error.message + " (sanitized restore state: " + JSON.stringify(state) + ")");
   }
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), encryptedOriginal);
@@ -375,7 +380,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",

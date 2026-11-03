@@ -667,6 +667,10 @@ function setup() {
   byId("restore-form").addEventListener("submit", verifyAndRestore);
   byId("cancel-restore").addEventListener("click", cancelRestore);
   byId("restore-dialog").addEventListener("close", () => {
+    // A previous dialog's queued "close" event may be delivered after a
+    // different encrypted backup has already opened this same <dialog>.
+    // Never clear that newer import's pending ciphertext or form state.
+    if (byId("restore-dialog").open) return;
     pendingBackup = null;
     pendingExpectedStorage = null;
     byId("restore-form").reset();
