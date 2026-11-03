@@ -318,7 +318,18 @@ try {
   await script("document.getElementById('restore-passphrase').value='wrong-backup-passphrase'; document.getElementById('restore-form').requestSubmit()");
   await until("document.getElementById('restore-message').textContent.includes('Backup not imported')", "wrong password rejected");
   assert.equal(await script("document.getElementById('restore-dialog').open"), true);
-  await script("document.getElementById('restore-passphrase').value='test-only secure browser phrase'; document.getElementById('restore-form').requestSubmit()");
+  const restoreGuards = await script("(() => {" +
+    " const form=document.getElementById('restore-form');" +
+    " document.getElementById('restore-passphrase').value='test-only secure browser phrase';" +
+    " form.requestSubmit();" +
+    " const busy=document.getElementById('verify-restore').disabled && document.getElementById('cancel-restore').disabled;" +
+    " const dialog=document.getElementById('restore-dialog');" +
+    " const escapeBlocked=!dialog.dispatchEvent(new Event('cancel',{cancelable:true}));" +
+    " document.getElementById('cancel-restore').click();" +
+    " form.requestSubmit();" +
+    " return {busy,escapeBlocked,stillOpen:dialog.open}; })()");
+  assert.deepEqual(restoreGuards, {busy:true,escapeBlocked:true,stillOpen:true},
+    "in-flight backup verification blocks duplicate submit and misleading cancellation");
   // Authenticated backup validation runs 600,000 PBKDF2 iterations and a
   // user-confirmation dialog; shared CI runners can be considerably slower
   // than the interactive test machine. Give this crypto step a separate
@@ -429,7 +440,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",

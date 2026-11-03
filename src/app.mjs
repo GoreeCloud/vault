@@ -16,6 +16,7 @@ let selection = null;
 let editingId = null;
 let editorSaving = false;
 let passphraseChanging = false;
+let restoringBackup = false;
 let activeFilter = "all";
 let lastActivity = Date.now();
 let operations = Promise.resolve();
@@ -563,6 +564,7 @@ async function importBackup(event) {
 
 async function verifyAndRestore(event) {
   event.preventDefault();
+  if (restoringBackup) return;
   const backup = pendingBackup;
   const expected = pendingExpectedStorage;
   const epoch = sessionId;
@@ -570,8 +572,9 @@ async function verifyAndRestore(event) {
     message("restore-message", "Choose an encrypted backup file first.");
     return;
   }
-  const button = byId("verify-restore");
-  button.disabled = true;
+  const controls = [...byId("restore-form").elements];
+  restoringBackup = true;
+  controls.forEach(control => { control.disabled = true; });
   message("restore-message", "Authenticating and validating encrypted backup…");
   try {
     // This must succeed before we offer to overwrite the current vault.
@@ -603,11 +606,13 @@ async function verifyAndRestore(event) {
       message("restore-message", "Backup not imported: " + error.message);
     }
   } finally {
-    button.disabled = false;
+    controls.forEach(control => { control.disabled = false; });
+    restoringBackup = false;
   }
 }
 
 function cancelRestore() {
+  if (restoringBackup) return;
   pendingBackup = null;
   pendingExpectedStorage = null;
   byId("restore-form").reset();
@@ -669,6 +674,11 @@ function setup() {
   byId("auth-form").addEventListener("submit", unlockOrCreate);
   byId("import-file").addEventListener("change", importBackup);
   byId("restore-form").addEventListener("submit", verifyAndRestore);
+  byId("restore-dialog").addEventListener("cancel", event => {
+    // A dismissed dialog must not imply a pending authenticated restore was
+    // cancelled while it could still commit after explicit confirmation.
+    if (restoringBackup) event.preventDefault();
+  });
   byId("cancel-restore").addEventListener("click", cancelRestore);
   byId("restore-dialog").addEventListener("close", () => {
     // A previous dialog's queued "close" event may be delivered after a
