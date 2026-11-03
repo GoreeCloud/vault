@@ -329,6 +329,18 @@ try {
   assert.equal(await script("document.getElementById('restore-dialog').open"), false);
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal,
     "unexpected cleartext metadata cannot be written to encrypted vault storage");
+  // A slow earlier file read may finish *after* a newer selection is rejected.
+  // It must not overwrite the newest request or reopen a stale backup dialog.
+  assert.equal(await script("(() => { const input=document.getElementById('import-file'); const original=File.prototype.text; window.__gcOriginalFileText=original; File.prototype.text=function(){ const result=original.call(this); if(this.name==='slow-valid-backup.json') return new Promise(resolve => {window.__gcReleaseSlowImport=()=>result.then(resolve);}); return result; }; const delayed=new DataTransfer(); delayed.items.add(new File([" + JSON.stringify(encryptedOriginal) + "], 'slow-valid-backup.json', {type:'application/json'})); input.files=delayed.files; input.dispatchEvent(new Event('change',{bubbles:true})); const latest=new DataTransfer(); latest.items.add(new File(['{}'], 'latest-invalid-backup.json', {type:'application/json'})); input.files=latest.files; input.dispatchEvent(new Event('change',{bubbles:true})); return !!window.__gcReleaseSlowImport; })()"), true,
+    "first encrypted file read is deliberately held while a later selection starts");
+  await until("document.getElementById('auth-message').textContent.includes('Unsupported vault encryption format')",
+    "newer invalid backup handled before stalled earlier file");
+  await script("window.__gcReleaseSlowImport(); File.prototype.text=window.__gcOriginalFileText; delete window.__gcReleaseSlowImport; delete window.__gcOriginalFileText;");
+  await pause(150);
+  assert.equal(await script("document.getElementById('restore-dialog').open"), false,
+    "delayed old backup must not reopen recovery after newer selection");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal,
+    "overlapping backup selections must never mutate saved ciphertext");
   const damagedBackup = JSON.parse(encryptedOriginal);
   damagedBackup.ciphertext = (damagedBackup.ciphertext[0]==="A"?"B":"A") + damagedBackup.ciphertext.slice(1);
   const damagedBackupPath = join(workspace, "tampered-test-backup.json");
@@ -471,7 +483,7 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
+    "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "newest backup file selection wins over delayed older read", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
