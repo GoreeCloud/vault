@@ -122,6 +122,8 @@
     <form id="passphrase-form">
       <h2>Change vault passphrase</h2>
       <p class="muted">This re-encrypts the complete local vault with a fresh random salt. Keep your new passphrase safe: there is no recovery service.</p>
+      <label for="current-passphrase">Current vault passphrase</label>
+      <input id="current-passphrase" class="gc-input" type="password" autocomplete="current-password" required>
       <label for="next-passphrase">New passphrase (12+ characters)</label>
       <input id="next-passphrase" class="gc-input" type="password" minlength="12" required autocomplete="new-password">
       <label for="confirm-passphrase">Confirm new passphrase</label>

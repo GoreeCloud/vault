@@ -11,7 +11,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - AES-256-GCM encrypted local vault document with a random 96-bit nonce for each save.
 - PBKDF2-HMAC-SHA256 passphrase-based key derivation (600,000 iterations, 128-bit random salt).
 - Browser-native Web Crypto key handling, with nonextractable AES keys.
-- Create, unlock, lock, change passphrase and automatically lock after five minutes of inactivity.
+- Create, unlock, lock, and rotate passphrases with **current-passphrase verification** and a fresh random salt; automatically lock after five minutes of inactivity.
 - Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items.
 - Cryptographically random password generator with enabled-character-class coverage.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options).
@@ -45,8 +45,9 @@ Open **http://localhost:4173** in the same computer's browser.
 
 1. Create a passphrase of at least 12 characters and confirm it before saving the new vault. **There is no password reset or recovery service.**
 2. Create a few *noncritical test credentials*. The encrypted envelope is stored in that browser profile's localStorage; no plaintext vault records are persisted intentionally.
-3. Export an encrypted backup and keep it separately. Importing a backup first verifies the original passphrase and ciphertext, then **replaces** the current local vault only after confirmation. A verified backup is not an automatic merge.
-4. Lock the vault and unlock again. Your keys are only retained in active JavaScript memory while unlocked.
+3. Passphrase changes require your current passphrase, and re-encrypt the latest saved document without modifying previously exported backups. Export a fresh backup after each change.
+4. Export an encrypted backup and keep it separately. Importing a backup first verifies the original passphrase and ciphertext, then **replaces** the current local vault only after confirmation. A verified backup is not an automatic merge.
+5. Lock the vault and unlock again. Your keys are only retained in active JavaScript memory while unlocked.
 
 **Do not migrate your real password vault, use as your only copy of secrets, or publish this instance on the internet.** A green automated test suite does not establish readiness for real credentials.
 
