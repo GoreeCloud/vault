@@ -39,6 +39,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
 - Draft-based encrypted mutations only update the visible document after storage succeeds.
+- Keyboard focus restoration for item-selection/detail updates does not persist sensitive item content or introduce network requests.
 - No actual production keys, provider credentials, analytics IDs or remote vault URLs in the repository.
 
 ## Proposed encrypted sync architecture

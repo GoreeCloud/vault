@@ -144,8 +144,10 @@ function itemNode(record) {
   button.type = "button";
   button.className = "item-row" + (selection === record.id ? " selected" : "");
   button.setAttribute("aria-pressed", String(selection === record.id));
+  button.dataset.vaultFocus = "item:" + record.id;
   const icon = document.createElement("span");
   icon.className = "item-icon";
+  icon.setAttribute("aria-hidden", "true");
   icon.textContent = record.type === "note" ? "▧" : record.type === "secret" ? "◇" : "⌘";
   const body = document.createElement("span");
   body.className = "item-body";
@@ -156,6 +158,7 @@ function itemNode(record) {
   body.append(title, secondary);
   const favorite = document.createElement("span");
   favorite.className = "item-favorite";
+  favorite.setAttribute("aria-hidden", "true");
   favorite.textContent = record.favorite ? "★" : "›";
   button.append(icon, body, favorite);
   button.addEventListener("click", () => { selection = record.id; render(); });
@@ -281,9 +284,11 @@ function renderDetail() {
   const actions = createText("div", "", "detail-actions");
   const edit = createText("button", "Edit item", "gc-button primary");
   edit.type = "button";
+  edit.dataset.vaultFocus = "detail:edit";
   edit.addEventListener("click", () => openEditor(record.id));
   const favorite = createText("button", record.favorite ? "★ Favorited" : "☆ Favorite", "gc-button secondary");
   favorite.type = "button";
+  favorite.dataset.vaultFocus = "detail:favorite";
   favorite.addEventListener("click", () => {
     void commitDraft(draft => {
       const item = draft.items.find(entry => entry.id === record.id);
@@ -293,6 +298,7 @@ function renderDetail() {
   });
   const remove = createText("button", "Delete", "gc-button danger");
   remove.type = "button";
+  remove.dataset.vaultFocus = "detail:delete";
   remove.addEventListener("click", async () => {
     if (!confirm('Delete "' + record.title + '" from this local vault? Export a backup first if needed.')) return;
     await commitDraft(draft => {
@@ -315,7 +321,18 @@ async function refreshTotp() {
     }
   } catch { if (byId("otp-code") === target) target.textContent = "Invalid secret"; }
 }
-function render() { if (documentData) { renderList(); renderDetail(); } }
+function render() {
+  if (!documentData) return;
+  const focusKey = document.activeElement?.dataset?.vaultFocus;
+  renderList();
+  renderDetail();
+  if (!focusKey) return;
+  const restored = [...document.querySelectorAll("[data-vault-focus]")]
+    .find(element => element.dataset.vaultFocus === focusKey);
+  // A deleted item no longer has a focus target: move to the safe
+  // always-present create action instead of losing focus to <body>.
+  (restored || byId("new-item")).focus({ preventScroll: true });
+}
 function openSecurityCheck() {
   if (!documentData) return;
   const report = auditVaultLogins(documentData.items);
