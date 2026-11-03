@@ -188,8 +188,23 @@ try {
   await script("document.getElementById('passphrase').value='test-only rotated browser phrase'; document.getElementById('auth-form').requestSubmit()");
   await until("document.getElementById('app-screen').hidden === false && document.getElementById('item-count').textContent.startsWith('2 of')", "new passphrase recovers both records");
   await script("document.getElementById('lock-vault').click()");
+  const corruptedLocal = await script("(() => { const key='goreecloud.vault.encrypted.v1'; const envelope=JSON.parse(localStorage.getItem(key)); envelope.ciphertext=(envelope.ciphertext[0]==='A'?'B':'A')+envelope.ciphertext.slice(1); const changed=JSON.stringify(envelope);localStorage.setItem(key,changed); return changed; })()");
+  await script("document.getElementById('passphrase').value='test-only rotated browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until("document.getElementById('auth-message').textContent.includes('Unable to unlock')", "tampered local vault fails authenticated unlock");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal, "damaged encrypted data is not silently replaced");
   const dom = await send("DOM.getDocument", { depth: 1 });
   const fileInput = await send("DOM.querySelector", { nodeId: dom.root.nodeId, selector: "#import-file" });
+  const damagedBackup = JSON.parse(encryptedOriginal);
+  damagedBackup.ciphertext = (damagedBackup.ciphertext[0]==="A"?"B":"A") + damagedBackup.ciphertext.slice(1);
+  const damagedBackupPath = join(workspace, "tampered-test-backup.json");
+  await writeFile(damagedBackupPath, JSON.stringify(damagedBackup), "utf8");
+  await send("DOM.setFileInputFiles", { nodeId: fileInput.nodeId, files: [damagedBackupPath] });
+  await until("document.getElementById('restore-dialog').open === true", "tampered backup restore dialog opens");
+  await script("document.getElementById('restore-passphrase').value='test-only secure browser phrase'; document.getElementById('restore-form').requestSubmit()");
+  await until("document.getElementById('restore-message').textContent.includes('Backup not imported')", "tampered encrypted backup rejected");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal, "tampered backup must not replace damaged local state");
+  await script("document.getElementById('cancel-restore').click()");
+  await until("document.getElementById('restore-dialog').open === false", "cancel tampered backup");
   await send("DOM.setFileInputFiles", { nodeId: fileInput.nodeId, files: [backupPath] });
   await until("document.getElementById('restore-dialog').open===true", "restore dialog opens");
   await script("document.getElementById('restore-passphrase').value='wrong-backup-passphrase'; document.getElementById('restore-form').requestSubmit()");
@@ -279,7 +294,8 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
