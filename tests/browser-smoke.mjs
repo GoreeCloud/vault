@@ -223,7 +223,7 @@ try {
   assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
     "periodic refresh must not re-expose a hidden TOTP code");
   await script("document.querySelector('#item-detail [data-secret-reveal=\"password\"]').click(); document.getElementById('reveal-otp-code').click()");
-  await until("document.getElementById('otp-code')?.textContent.match(/^\d{6}$/)",
+  await until("document.getElementById('otp-code')?.textContent.match(/^\\d{6}$/)",
     "password and TOTP explicitly visible before backgrounding");
   assert.equal(await script("document.querySelector('#item-detail [data-secret-reveal=\"password\"]').getAttribute('aria-pressed')"), "true");
   await script("Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));delete document.visibilityState;");
