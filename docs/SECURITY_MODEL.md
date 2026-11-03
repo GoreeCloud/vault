@@ -37,7 +37,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Finite document/item length limits before encryption and after decryption. Imported ciphertext lengths are bounded before base64 decoding.
 - Imported encrypted backups are decrypted and authenticated against the supplied backup passphrase and validated for supported document structure **before** asking to replace local data. User confirmation and same-origin guarded write are required. A queued modal-close event from a cancelled restore does not clear a newly opened backup import.
 - New vault creation requires passphrase confirmation.
-- Fresh IV on every save; fresh salt on passphrase change. Current passphrase is verified by decrypting the latest stored envelope before a rekey can commit; the operation is guarded against stale cross-tab writes.
+- Fresh IV on every save; fresh salt on passphrase change. Current passphrase is verified by decrypting the latest stored envelope before a rekey can commit; the operation is guarded against stale cross-tab writes. In-progress passphrase rotation blocks duplicate submits, Cancel and Escape so a closed dialog cannot falsely imply that a pending key change was cancelled.
 - Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
 - Closed secret-editor fields are explicitly cleared, and concurrent/duplicate editor saves are blocked until encryption and guarded storage commit finish. This reduces residual DOM exposure but not in-memory plaintext exposure while the vault is unlocked.
 - Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.

@@ -15,6 +15,7 @@ let cryptoParameters = null;
 let selection = null;
 let editingId = null;
 let editorSaving = false;
+let passphraseChanging = false;
 let activeFilter = "all";
 let lastActivity = Date.now();
 let operations = Promise.resolve();
@@ -615,6 +616,7 @@ function cancelRestore() {
 
 async function changePassphrase(event) {
   event.preventDefault();
+  if (passphraseChanging) return;
   const current = byId("current-passphrase").value;
   const first = byId("next-passphrase").value;
   if (!current) {
@@ -626,8 +628,9 @@ async function changePassphrase(event) {
   if (first.length < 12) {
     message("passphrase-message", "Use at least 12 characters."); return;
   }
-  const submit = byId("submit-passphrase");
-  submit.disabled = true;
+  const controls = [...byId("passphrase-form").elements];
+  passphraseChanging = true;
+  controls.forEach(control => { control.disabled = true; });
   message("passphrase-message", "Verifying current passphrase and re-encrypting…");
   try {
     await scheduleOperation(async epoch => {
@@ -650,7 +653,8 @@ async function changePassphrase(event) {
     }
   } finally {
     byId("passphrase-form").reset();
-    submit.disabled = false;
+    controls.forEach(control => { control.disabled = false; });
+    passphraseChanging = false;
   }
 }
 
@@ -717,7 +721,13 @@ function setup() {
     byId("passphrase-dialog").showModal();
   });
   byId("passphrase-form").addEventListener("submit", changePassphrase);
+  byId("passphrase-dialog").addEventListener("cancel", event => {
+    // Once re-encryption has begun, cancellation cannot undo a committed
+    // ciphertext revision. Do not let Escape imply that rotation stopped.
+    if (passphraseChanging) event.preventDefault();
+  });
   byId("cancel-passphrase").addEventListener("click", () => {
+    if (passphraseChanging) return;
     byId("passphrase-form").reset();
     byId("passphrase-dialog").close();
   });
