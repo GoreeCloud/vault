@@ -131,6 +131,20 @@ try {
   assert.match(randomFixture, /[0-9]/, "generated password contains digits");
   assert.match(randomFixture, /[^a-zA-Z0-9]/, "generated password contains symbols");
   assert.equal(await script("document.getElementById('edit-password').type"), "password", "generated secret must remain hidden");
+  await script("document.getElementById('generator-length').value='32'; document.getElementById('generator-uppercase').checked=false; document.getElementById('generator-symbols').checked=false; document.getElementById('generate-password').click()");
+  const configuredPassword = await script("document.getElementById('edit-password').value");
+  assert.equal(configuredPassword.length, 32, "configured generator length honored");
+  assert.match(configuredPassword, /^[abcdefghjkmnpqrstuvwxyz23456789]+$/, "only selected character groups are used");
+  assert.match(configuredPassword, /[abcdefghjkmnpqrstuvwxyz]/, "lowercase class represented");
+  assert.match(configuredPassword, /[23456789]/, "digit class represented");
+  assert.equal(await script("document.getElementById('edit-password').type"), "password", "configured output remains masked");
+  await script("document.getElementById('generator-lowercase').checked=false; document.getElementById('generator-digits').checked=false; document.getElementById('generate-password').click()");
+  await until("document.getElementById('editor-message').textContent.includes('Select at least one character group')", "generator rejects empty character groups");
+  assert.equal(await script("document.getElementById('edit-password').value"), configuredPassword, "invalid generator settings preserve the existing value");
+  await script("document.getElementById('generator-lowercase').checked=true; document.getElementById('generator-length').value='8'; document.getElementById('generate-password').click()");
+  await until("document.getElementById('editor-message').textContent.includes('Password length must be from 12 to 128')", "generator rejects unsupported lengths");
+  assert.equal(await script("document.getElementById('edit-password').value"), configuredPassword, "invalid length preserves existing value");
+  await screenshot("09-generator-options");
   assert.equal(await script("document.getElementById('reveal-editor-password').getAttribute('aria-pressed')"), "false");
   await script("document.getElementById('reveal-editor-password').click()");
   assert.equal(await script("document.getElementById('edit-password').type"), "text");
@@ -357,10 +371,10 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
-    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
+    "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
   ].map(name => join(workspace, name)) }, null, 2));
 } finally {
   ws2?.close();

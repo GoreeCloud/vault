@@ -687,9 +687,21 @@ function setup() {
   byId("cancel-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("discard-editor").addEventListener("click", () => byId("editor-dialog").close());
   byId("generate-password").addEventListener("click", () => {
-    byId("edit-password").value = generatePassword();
-    setEditorPasswordVisibility(false);
-    announce("Secure password generated and hidden. Reveal it only when needed.");
+    try {
+      const password = generatePassword({
+        length: byId("generator-length").valueAsNumber,
+        lowercase: byId("generator-lowercase").checked,
+        uppercase: byId("generator-uppercase").checked,
+        digits: byId("generator-digits").checked,
+        symbols: byId("generator-symbols").checked
+      });
+      byId("edit-password").value = password;
+      setEditorPasswordVisibility(false);
+      message("editor-message", "Secure password generated and hidden. Save to encrypt it.");
+      announce("Secure password generated and hidden. Reveal it only when needed.");
+    } catch (error) {
+      message("editor-message", error.message);
+    }
   });
   byId("reveal-editor-password").addEventListener("click", () => {
     setEditorPasswordVisibility(byId("edit-password").type === "password");

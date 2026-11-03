@@ -84,6 +84,17 @@
       <label for="edit-username">Username / account</label><input id="edit-username" class="gc-input" autocomplete="off">
       <label for="edit-password">Password / secret value</label>
       <div class="inline-field"><input id="edit-password" class="gc-input" type="password" autocomplete="new-password"><button type="button" id="generate-password" class="gc-button secondary">Generate</button><button type="button" id="reveal-editor-password" class="gc-button quiet" aria-label="Reveal secret" aria-pressed="false">◉</button></div>
+      <fieldset class="generator-options" aria-describedby="generator-help">
+        <legend>Password generation options</legend>
+        <div class="generator-length"><label for="generator-length">Length (12–128)</label><input id="generator-length" class="gc-input" type="number" min="12" max="128" step="1" value="24"></div>
+        <div class="generator-classes">
+          <label><input type="checkbox" id="generator-lowercase" checked> Lowercase</label>
+          <label><input type="checkbox" id="generator-uppercase" checked> Uppercase</label>
+          <label><input type="checkbox" id="generator-digits" checked> Numbers</label>
+          <label><input type="checkbox" id="generator-symbols" checked> Symbols</label>
+        </div>
+        <p id="generator-help" class="muted">Uses cryptographically secure randomness. The generated password stays hidden until revealed.</p>
+      </fieldset>
       <label for="edit-website">Website URL</label><input id="edit-website" class="gc-input" type="text" autocomplete="off" placeholder="https://example.com">
       <label for="edit-totp">Authenticator secret (Base32, optional)</label><input id="edit-totp" class="gc-input" type="password" autocomplete="off">
       <label for="edit-notes">Private notes</label><textarea id="edit-notes" class="gc-input" rows="4" maxlength="100000"></textarea>

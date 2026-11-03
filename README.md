@@ -13,7 +13,7 @@ This initial implementation is a **single-device, browser-only prototype**, not 
 - Browser-native Web Crypto key handling, with nonextractable AES keys.
 - Create, unlock, lock, and rotate passphrases with **current-passphrase verification** and a fresh random salt; automatically lock after five minutes of inactivity.
 - Save, edit, search, filter, favorite and delete encrypted login, note and generic secret items. Closing the editor scrubs hidden form fields and duplicate submissions are blocked while encrypted saves are pending.
-- Cryptographically random password generator with enabled-character-class coverage. Generated passwords remain **masked by default** and are revealed only by an explicit control with an accessible pressed state.
+- Configurable cryptographically random password generator (12–128 characters, independently selected lowercase, uppercase, digits and symbols) with enabled-character-class coverage. Generated passwords remain **masked by default** and are revealed only by an explicit control with an accessible pressed state.
 - TOTP code generation (Base32/HMAC-SHA1 by default; additional supported digest options), with validation of authenticator secrets before saving them in the encrypted vault.
 - A local Security Check dialog that flags reused, short and a small set of common passwords, plus HTTP login URLs; no external requests or plaintext password report output.
 - Encrypted JSON backup export and **passphrase-authenticated restore**: decrypt and validate an imported backup before any replacement, then require explicit confirmation. An encrypted export of the last successful save remains available after a later storage/quota failure, provided its revision has not changed.
