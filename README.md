@@ -41,7 +41,7 @@ The optional zero-dependency **headless Chromium acceptance check** creates an i
 CHROME_BIN=/path/to/chromium npm run test:browser
 ```
 
-Open **http://127.0.0.1:4173** on the same computer. The zero-dependency Node static preview binds only to `127.0.0.1`, rejects unexpected Host headers, and serves **only** explicitly listed web assets (not `.git`, documents, tests, or package metadata). Its responses include a deny-by-default CSP with `frame-ancestors 'none'`, anti-framing, MIME-sniffing protection, no-referrer, restricted permissions, same-origin isolation, and `Cache-Control: no-store`.
+Open **http://127.0.0.1:4173** on the same computer. The zero-dependency Node static preview binds only to `127.0.0.1`, rejects unexpected Host headers, and serves **only** explicitly listed web assets (not `.git`, documents, tests, or package metadata). Its responses include a deny-by-default CSP with `frame-ancestors 'none'`, anti-framing, MIME-sniffing protection, no-referrer, restricted permissions, same-origin resource/opener restrictions, and `Cache-Control: no-store`.
 
 **This remains a localhost-only preview, not production hosting or a sync API.** Response headers mitigate some browser risks but do not remove the danger of compromised devices, browser extensions, malicious code delivery or unreviewed cryptography. Do not publish the preview or use real passwords.
 
