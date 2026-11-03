@@ -1,6 +1,7 @@
 // GoreeCloud Vault — browser smoke audit (test-only, no real secrets)
 import { spawn } from "node:child_process";
 import { startPreviewServer } from "../scripts/preview.mjs";
+import { verifyFreshProfileRestore } from "./fresh-profile-restore.mjs";
 import { readFile, readdir, mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -255,6 +256,13 @@ try {
     "exported encrypted backup must not contain the fixture password");
   assert.equal(backupText.includes("fixture-user"), false,
     "exported encrypted backup must not contain the fixture username");
+  assert.deepEqual(
+    await verifyFreshProfileRestore({
+      chromePath, workspace, port, encryptedEnvelope: encryptedOriginal, backupPath
+    }),
+    { isolatedProfile: true, restoredItemCount: 1 },
+    "independent Chromium profile restores the exported ciphertext and unlocks"
+  );
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Temporary item'; document.getElementById('edit-password').value='test-value'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('item-count').textContent.startsWith('2 of')", "second item saved");
   await script("document.getElementById('lock-vault').click()");
@@ -452,7 +460,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
