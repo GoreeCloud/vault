@@ -126,6 +126,10 @@ try {
   await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-count').textContent.startsWith('1 of')", "first encrypted save");
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
   await screenshot("03-item-details");
+  assert.equal(await script("(() => { const b=document.querySelector('#item-list > li > button'); b.focus(); b.click(); return document.activeElement===document.querySelector('#item-list > li > button'); })()"), true, "selected list item retains keyboard focus after rendering");
+  await script("(() => { const f=document.querySelector('#item-detail [data-vault-focus=\"detail:favorite\"]'); f.focus(); f.click(); })()");
+  await until("document.querySelector('#item-detail [data-vault-focus=\"detail:favorite\"]')?.textContent.includes('Favorited')", "favorite saved");
+  assert.equal(await script("document.activeElement?.dataset.vaultFocus"), "detail:favorite");
   await script("document.getElementById('security-check').click()");
   await until("document.getElementById('health-dialog').open", "local security check opens");
   assert.equal(await script("document.getElementById('health-summary').textContent.includes('Logins reviewed')"), true);
@@ -258,7 +262,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png"
