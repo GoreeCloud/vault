@@ -746,6 +746,7 @@ function setup() {
     // A dismissed dialog must not imply a pending authenticated restore was
     // cancelled while it could still commit after explicit confirmation.
     if (restoringBackup) event.preventDefault();
+    else backupSelectionId += 1; // Cancel immediately revokes the old read.
   });
   byId("cancel-restore").addEventListener("click", cancelRestore);
   byId("restore-dialog").addEventListener("close", () => {
@@ -753,7 +754,9 @@ function setup() {
     // different encrypted backup has already opened this same <dialog>.
     // Never clear that newer import's pending ciphertext or form state.
     if (byId("restore-dialog").open) return;
-    backupSelectionId += 1;
+    // "close" is queued: a new File.text() may already be in progress by
+    // the time it runs. Cancel invalidates synchronously; close only scrubs
+    // old modal state and must not revoke a newer file-selection token.
     pendingBackup = null;
     pendingExpectedStorage = null;
     byId("restore-form").reset();
