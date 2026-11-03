@@ -267,8 +267,21 @@ try {
   await until("document.getElementById('passphrase-message').textContent.includes('Passphrase unchanged:')", "reject wrong current passphrase");
   assert.equal(await script("document.getElementById('passphrase-dialog').open"), true);
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), beforeRotation);
-  await script("document.getElementById('current-passphrase').value='test-only secure browser phrase'; document.getElementById('next-passphrase').value='test-only rotated browser phrase'; document.getElementById('confirm-passphrase').value='test-only rotated browser phrase'; document.getElementById('passphrase-form').requestSubmit()");
+  const rotationGuards = await script("(() => { const form=document.getElementById('passphrase-form');" +
+    " document.getElementById('current-passphrase').value='test-only secure browser phrase';" +
+    " document.getElementById('next-passphrase').value='test-only rotated browser phrase';" +
+    " document.getElementById('confirm-passphrase').value='test-only rotated browser phrase';" +
+    " form.requestSubmit();" +
+    " const busy=document.getElementById('submit-passphrase').disabled && document.getElementById('cancel-passphrase').disabled;" +
+    " const dialog=document.getElementById('passphrase-dialog');" +
+    " const escapeBlocked=!dialog.dispatchEvent(new Event('cancel',{cancelable:true}));" +
+    " document.getElementById('cancel-passphrase').click();" +
+    " form.requestSubmit();" +
+    " return {busy,escapeBlocked,stillOpen:dialog.open}; })()");
+  assert.deepEqual(rotationGuards, { busy: true, escapeBlocked: true, stillOpen: true },
+    "in-flight passphrase rotation blocks duplicate submits and accidental cancellation");
   await until("document.getElementById('passphrase-dialog').open===false && document.getElementById('notice').textContent.includes('Passphrase changed')", "rotate passphrase after current verification");
+  await until("document.getElementById('submit-passphrase').disabled===false", "rotation controls restored");
   assert.notEqual(await script("JSON.parse(localStorage.getItem('goreecloud.vault.encrypted.v1')).salt"), JSON.parse(beforeRotation).salt);
   await script("document.getElementById('search-items').value='fixture-sensitive-lookup'; document.getElementById('lock-vault').click()");
   await until("document.getElementById('auth-screen').hidden===false", "lock after rekey");
@@ -415,7 +428,7 @@ try {
     "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
+    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
