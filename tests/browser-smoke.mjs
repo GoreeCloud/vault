@@ -222,6 +222,19 @@ try {
   await pause(1250);
   assert.equal(await script("document.getElementById('otp-code').textContent"), "••••••",
     "periodic refresh must not re-expose a hidden TOTP code");
+  // Deliberately pause HMAC signing while the user clicks Copy code, lock
+  // before signing resolves, then confirm the revoked session never copies.
+  const copyDelayPatched = await script("(() => { const subtle=crypto.subtle; window.__gcOriginalSign=subtle.sign;window.__gcOriginalClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard'); window.__gcWrites=0;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{window.__gcWrites++}}});subtle.sign=function(...args){return new Promise((resolve,reject)=>{window.__gcReleaseSign=()=>window.__gcOriginalSign.apply(this,args).then(resolve,reject);});};const copy=[...document.querySelectorAll('#item-detail button')].find(b=>b.textContent==='Copy code');copy.click();return subtle.sign!==window.__gcOriginalSign;})()");
+  assert.equal(copyDelayPatched, true, "synthetic HMAC delay hook installed");
+  await until("typeof window.__gcReleaseSign==='function'", "delayed synthetic TOTP signature started");
+  await script("document.getElementById('lock-vault').click(); window.__gcReleaseSign()");
+  await pause(250);
+  assert.equal(await script("window.__gcWrites"), 0,
+    "async TOTP copy after locking cannot write revoked secret to clipboard");
+  await script("(() => {crypto.subtle.sign=window.__gcOriginalSign;const descriptor=window.__gcOriginalClipboard;if(descriptor) Object.defineProperty(navigator,'clipboard',descriptor); else delete navigator.clipboard; delete window.__gcOriginalSign;delete window.__gcOriginalClipboard;delete window.__gcReleaseSign;})()");
+  await script("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until("document.getElementById('app-screen').hidden === false && document.getElementById('item-count').textContent.startsWith('1 of')",
+    "unlock after stale authenticator copy was safely discarded");
   await script("document.getElementById('security-check').click()");
   await until("document.getElementById('health-dialog').open", "local security check opens");
   assert.equal(await script("document.getElementById('health-summary').textContent.includes('Logins reviewed')"), true);
@@ -354,7 +367,10 @@ try {
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), corruptedLocal, "tampered backup must not replace damaged local state");
   await script("document.getElementById('cancel-restore').click()");
   await until("document.getElementById('restore-dialog').open === false", "cancel tampered backup");
+  await script("(() => {const original=File.prototype.text;window.__gcRestoreOriginalText=original;File.prototype.text=function(){if(this.name.endsWith('.vault.json'))return new Promise((resolve,reject)=>{window.__gcFinishNewBackupRead=()=>original.call(this).then(resolve,reject);});return original.call(this);};})()");
   await send("DOM.setFileInputFiles", { nodeId: fileInput.nodeId, files: [backupPath] });
+  await until("typeof window.__gcFinishNewBackupRead==='function'", "new backup read intentionally delayed");
+  await script("document.getElementById('restore-dialog').dispatchEvent(new Event('close'));window.__gcFinishNewBackupRead();File.prototype.text=window.__gcRestoreOriginalText;delete window.__gcRestoreOriginalText;delete window.__gcFinishNewBackupRead");
   await until("document.getElementById('restore-dialog').open===true", "restore dialog opens");
   // Reproduce a close event queued by the cancelled previous backup import:
   // the newly opened dialog must not lose its pending authenticated backup.
@@ -498,8 +514,8 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "newest backup file selection wins over delayed older read", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection", "cross-tab localStorage.clear locks decrypted workspace",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "stale dialog close cannot invalidate an in-flight newer backup file read", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection", "cross-tab localStorage.clear locks decrypted workspace",
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "revoked sessions cannot copy delayed authenticator codes", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"

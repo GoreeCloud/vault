@@ -245,11 +245,20 @@ function field(label, value, options = {}) {
   container.append(line);
   return container;
 }
-async function copyValue(value) {
+async function copyValue(value, epoch = sessionId) {
+  // A detached secret button or an asynchronous authenticator calculation
+  // must never copy into the OS clipboard after session revocation.
+  if (!documentData || epoch !== sessionId) return;
   try {
     await navigator.clipboard.writeText(value);
-    announce("Copied. Other apps may retain clipboard contents.");
-  } catch { announce("Clipboard unavailable. Use HTTPS or localhost.", true); }
+    if (documentData && epoch === sessionId) {
+      announce("Copied. Other apps may retain clipboard contents.");
+    }
+  } catch {
+    if (documentData && epoch === sessionId) {
+      announce("Clipboard unavailable. Use HTTPS or localhost.", true);
+    }
+  }
 }
 function renderDetail() {
   const panel = byId("item-detail");
@@ -294,8 +303,17 @@ function renderDetail() {
     const copy = createText("button", "Copy code", "tiny-action");
     copy.type = "button";
     copy.addEventListener("click", async () => {
-      try { await copyValue(await generateTotp(record.totpSecret)); }
-      catch { announce("Invalid TOTP secret.", true); }
+      const epoch = sessionId;
+      try {
+        const value = await generateTotp(record.totpSecret);
+        if (!documentData || epoch !== sessionId || selection !== record.id ||
+            byId("otp-code") !== code) return;
+        await copyValue(value, epoch);
+      } catch {
+        if (documentData && epoch === sessionId && byId("otp-code") === code) {
+          announce("Invalid TOTP secret.", true);
+        }
+      }
     });
     const countdown = createText("small", "", "muted");
     countdown.id = "otp-remaining";
@@ -728,6 +746,7 @@ function setup() {
     // A dismissed dialog must not imply a pending authenticated restore was
     // cancelled while it could still commit after explicit confirmation.
     if (restoringBackup) event.preventDefault();
+    else backupSelectionId += 1; // Cancel immediately revokes the old read.
   });
   byId("cancel-restore").addEventListener("click", cancelRestore);
   byId("restore-dialog").addEventListener("close", () => {
@@ -735,7 +754,9 @@ function setup() {
     // different encrypted backup has already opened this same <dialog>.
     // Never clear that newer import's pending ciphertext or form state.
     if (byId("restore-dialog").open) return;
-    backupSelectionId += 1;
+    // "close" is queued: a new File.text() may already be in progress by
+    // the time it runs. Cancel invalidates synchronously; close only scrubs
+    // old modal state and must not revoke a newer file-selection token.
     pendingBackup = null;
     pendingExpectedStorage = null;
     byId("restore-form").reset();
