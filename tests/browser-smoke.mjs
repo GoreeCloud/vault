@@ -149,6 +149,42 @@ try {
   assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1').includes('dummy-only-do-not-use')"), false);
   await until("document.getElementById('edit-password').value === ''", "editor secret scrub after save");
   assert.equal(await script("document.getElementById('edit-password').type"), "password");
+
+  // Adversarial synthetic content should remain inert in both vault views.
+  const maliciousTitle = '<img src=x onerror="window.__gcVaultXssTriggered=true">';
+  const maliciousNotes = '<svg onload="window.__gcVaultXssTriggered=true"></svg>';
+  const beforeInvalidUrl = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
+  await script(
+    "(() => { document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click();" +
+    " document.getElementById('edit-title').value=" + JSON.stringify(maliciousTitle) + ";" +
+    " document.getElementById('edit-notes').value=" + JSON.stringify(maliciousNotes) + ";" +
+    " document.getElementById('edit-website').value='javascript:alert(1)';" +
+    " document.getElementById('editor-form').requestSubmit(); })()"
+  );
+  await until("document.getElementById('editor-message').textContent.includes('valid HTTP or HTTPS website URL')",
+    "dangerous website scheme rejected");
+  assert.equal(await script("localStorage.getItem('goreecloud.vault.encrypted.v1')"), beforeInvalidUrl,
+    "invalid website cannot modify committed ciphertext");
+
+  await script("document.getElementById('edit-website').value='https://example.test/secure'; document.getElementById('editor-form').requestSubmit()");
+  await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-detail').textContent.includes('onerror')",
+    "HTML-looking fields saved as plain text");
+  assert.equal(await script("document.querySelector('#item-list img, #item-detail img, #item-detail svg')===null"),
+    true, "vault fields must not create executable img/svg elements");
+  assert.equal(await script("window.__gcVaultXssTriggered === undefined"), true,
+    "HTML-looking field data must not execute scripts");
+  assert.equal(await script("document.getElementById('item-detail').textContent.includes('<svg onload=')"), true,
+    "notes rendered as literal text");
+  assert.equal(await script("document.querySelector('#item-detail a[href^=\"javascript:\"]')===null"), true,
+    "unsafe links are absent");
+  assert.equal(await script("(() => { const a=document.querySelector('#item-detail a[href^=\"https://example.test/secure\"]'); return !!a && a.target==='_blank' && a.rel.includes('noopener') && a.rel.includes('noreferrer'); })()"), true,
+    "external website links must be HTTPS, noopener and noreferrer");
+
+  await script("document.querySelector('#item-detail [data-vault-focus=\"detail:edit\"]').click(); document.getElementById('edit-title').value='Browser fixture login'; document.getElementById('edit-notes').value=''; document.getElementById('edit-website').value=''; document.getElementById('editor-form').requestSubmit()");
+  await until("document.getElementById('editor-dialog').open===false && document.getElementById('item-detail').textContent.includes('Browser fixture login')",
+    "restore benign browser test fixture");
+  assert.equal(await script("window.__gcVaultXssTriggered === undefined"), true);
+
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Never saved'; document.getElementById('edit-password').value='abandoned-test-only-secret'; document.getElementById('edit-totp').value='JBSWY3DPEHPK3PXP'; document.getElementById('cancel-editor').click()");
   await until("document.getElementById('edit-password').value === ''", "cancelled editor secret scrub");
   assert.equal(await script("document.getElementById('edit-totp').value"), "");
@@ -381,7 +417,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
