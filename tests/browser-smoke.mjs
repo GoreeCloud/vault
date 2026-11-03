@@ -1,7 +1,7 @@
 // GoreeCloud Vault — browser smoke audit (test-only, no real secrets)
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFile, mkdtemp, writeFile } from "node:fs/promises";
+import { readFile, readdir, mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, extname, sep } from "node:path";
@@ -98,6 +98,7 @@ try {
   await send("Page.enable");
   await send("Runtime.enable");
   await send("DOM.enable");
+  await send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: workspace });
   await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: "http://127.0.0.1:" + port + "/" });
   await until("document.readyState==='complete' && document.getElementById('auth-action')!==null", "initial auth screen");
@@ -164,8 +165,29 @@ try {
   assert.equal(await script("(() => { const e=document.querySelector('.gc-button.primary');const s=getComputedStyle(e);const c=x=>x.match(/[\\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255; return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});const a=c(s.color),b=c(s.backgroundColor);const l=x=>.2126*x[0]+.7152*x[1]+.0722*x[2];return (Math.max(l(a),l(b))+.05)/(Math.min(l(a),l(b))+.05)>=4.5;})()"), true,
     "primary action text passes 4.5:1 contrast in light appearance");
   const encryptedOriginal = await script("localStorage.getItem('goreecloud.vault.encrypted.v1')");
-  const backupPath = join(workspace, "validated-test-backup.json");
-  await writeFile(backupPath, encryptedOriginal, "utf8");
+  // Exercise the actual Export backup control; do not manufacture the backup
+  // by copying localStorage into a fixture file.
+  await script("document.getElementById('export-vault').click()");
+  const exportPattern = /^goreecloud-vault-encrypted-\\d{4}-\\d{2}-\\d{2}\\.vault\\.json$/;
+  let backupPath = "";
+  for (let i = 0; i < 100; i++) {
+    const names = await readdir(workspace);
+    const exported = names.find(name => exportPattern.test(name));
+    if (exported && !names.some(name => name.endsWith(".crdownload"))) {
+      backupPath = join(workspace, exported);
+      break;
+    }
+    await pause(100);
+  }
+  assert.ok(backupPath, "the Export backup button must download an encrypted .vault.json file");
+  const backupText = await readFile(backupPath, "utf8");
+  const backupEnvelope = JSON.parse(backupText);
+  assert.deepEqual(backupEnvelope, JSON.parse(encryptedOriginal),
+    "downloaded backup must match the committed encrypted vault envelope");
+  assert.equal(backupText.includes("dummy-only-do-not-use"), false,
+    "exported encrypted backup must not contain the fixture password");
+  assert.equal(backupText.includes("fixture-user"), false,
+    "exported encrypted backup must not contain the fixture username");
   await script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Temporary item'; document.getElementById('edit-password').value='test-value'; document.getElementById('editor-form').requestSubmit()");
   await until("document.getElementById('item-count').textContent.startsWith('2 of')", "second item saved");
   await script("document.getElementById('lock-vault').click()");
@@ -309,7 +331,7 @@ try {
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "mobile bottom navigation layout", "two-tab stale-save rejection",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
