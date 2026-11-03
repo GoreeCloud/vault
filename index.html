@@ -12,7 +12,10 @@
 </head>
 <body>
   <div id="auth-screen" class="auth-shell">
-    <div class="auth-brand"><span class="brand-mark" aria-hidden="true">✦</span> GoreeCloud <strong>Vault</strong></div>
+    <div class="auth-topbar">
+      <div class="auth-brand"><span class="brand-mark" aria-hidden="true">✦</span> GoreeCloud <strong>Vault</strong></div>
+      <button type="button" class="gc-button theme-button" data-theme-toggle aria-label="Choose appearance">Appearance: System</button>
+    </div>
     <main class="auth-card gc-panel">
       <div class="eyebrow"><span class="status-dot"></span> LOCAL-FIRST · PRIVATE PREVIEW</div>
       <h1>Your digital life.<br><span>Safely in your hands.</span></h1>
@@ -54,14 +57,14 @@
     <div class="main-area">
       <header class="topbar">
         <div><div class="eyebrow">YOUR PRIVATE SPACE</div><h1>Vault overview</h1></div>
-        <div class="top-actions"><button id="export-vault" type="button" class="gc-button secondary">Export backup</button><button id="change-passphrase" type="button" class="gc-button secondary">Change passphrase</button><button id="new-item" type="button" class="gc-button primary">＋ New item</button></div>
+        <div class="top-actions"><button type="button" class="gc-button secondary theme-button" data-theme-toggle aria-label="Choose appearance">Appearance: System</button><button id="export-vault" type="button" class="gc-button secondary">Export backup</button><button id="change-passphrase" type="button" class="gc-button secondary">Change passphrase</button><button id="new-item" type="button" class="gc-button primary">＋ New item</button></div>
       </header>
       <main class="content-area">
         <section class="list-section gc-panel" aria-labelledby="item-heading">
           <div class="section-top"><div><h2 id="item-heading">My items</h2><p id="item-count" class="muted">Loading</p></div><span class="secure-pill">◆&nbsp; Secured</span></div>
           <label for="search-items" class="sr-only">Search vault</label>
           <input id="search-items" type="search" class="gc-input search" placeholder="⌕  Search your vault" autocomplete="off" spellcheck="false">
-          <div id="item-list" class="item-list" role="list"></div>
+          <ul id="item-list" class="item-list"></ul>
         </section>
         <section class="detail-section gc-panel" aria-label="Selected item details">
           <div id="item-detail" class="detail-inner">

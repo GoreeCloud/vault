@@ -2,6 +2,7 @@ import { createVault, openVault, sealVault, validateEnvelope } from "./crypto.mj
 import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs";
 import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
 import { verifyEncryptedBackup } from "./recovery.mjs";
+import { installTheme } from "./theme.mjs";
 
 const STORAGE_KEY = "goreecloud.vault.encrypted.v1";
 const IDLE_MS = 5 * 60 * 1000;
@@ -132,10 +133,10 @@ async function commitDraft(change, success, afterCommit = () => {}) {
 }
 
 function itemNode(record) {
+  const item = document.createElement("li");
   const button = document.createElement("button");
   button.type = "button";
   button.className = "item-row" + (selection === record.id ? " selected" : "");
-  button.setAttribute("role", "listitem");
   button.setAttribute("aria-pressed", String(selection === record.id));
   const icon = document.createElement("span");
   icon.className = "item-icon";
@@ -152,7 +153,8 @@ function itemNode(record) {
   favorite.textContent = record.favorite ? "★" : "›";
   button.append(icon, body, favorite);
   button.addEventListener("click", () => { selection = record.id; render(); });
-  return button;
+  item.append(button);
+  return item;
 }
 function renderList() {
   const query = byId("search-items").value.toLocaleLowerCase().trim();
@@ -167,7 +169,7 @@ function renderList() {
   const list = byId("item-list");
   list.replaceChildren();
   if (!visible.length) {
-    const empty = document.createElement("p");
+    const empty = document.createElement("li");
     empty.className = "muted empty-list";
     empty.textContent = documentData.items.length ? "No matching items." : "Your vault is empty. Add your first item.";
     list.append(empty);
@@ -211,10 +213,14 @@ function field(label, value, options = {}) {
   if (options.mask && value) {
     const reveal = createText("button", "Show", "tiny-action");
     reveal.type = "button";
+    reveal.setAttribute("aria-label", "Show " + label.toLowerCase());
+    reveal.setAttribute("aria-pressed", "false");
     reveal.addEventListener("click", () => {
       const isHidden = text.textContent !== value;
       text.textContent = isHidden ? value : "••••••••••••";
       reveal.textContent = isHidden ? "Hide" : "Show";
+      reveal.setAttribute("aria-label", (isHidden ? "Hide " : "Show ") + label.toLowerCase());
+      reveal.setAttribute("aria-pressed", String(isHidden));
     });
     line.append(reveal);
   }
@@ -522,6 +528,7 @@ async function changePassphrase(event) {
 }
 
 function setup() {
+  installTheme();
   if (!crypto?.subtle || !window.isSecureContext || !navigator.locks?.request) {
     message("auth-message", "This application requires Web Crypto, Web Locks, and HTTPS or localhost.");
     byId("auth-action").disabled = true;
