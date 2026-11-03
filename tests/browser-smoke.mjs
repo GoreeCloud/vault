@@ -483,10 +483,22 @@ try {
   const winningTab = firstLocked ? script2 : script;
   assert.equal(await winningTab("document.getElementById('item-count').textContent.startsWith('2 of 2')"), true,
     "only one of two concurrently added items should persist");
+  // A StorageEvent for localStorage.clear() has key=null, unlike setItem
+  // and removeItem. Clear from the already-locked tab and prove that the
+  // other tab cannot retain a stale unlocked plaintext view.
+  const clearingTab = firstLocked ? script : script2;
+  const waitWinner = firstLocked ? until2 : until;
+  await clearingTab("localStorage.clear()");
+  await waitWinner("document.getElementById('auth-screen').hidden===false && document.getElementById('item-detail').children.length===0 && document.getElementById('item-list').children.length===0",
+    "external storage-clear locks and scrubs the formerly winning vault tab");
+  assert.equal(await winningTab("localStorage.getItem('goreecloud.vault.encrypted.v1')"), null,
+    "storage clear removed the synthetic encrypted vault from both tab views");
+  assert.equal(await winningTab("document.getElementById('auth-message').textContent.includes('cleared in another tab')"), true,
+    "user sees a clear same-origin data change notice");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "duplicate create submissions are serialized", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "reject cleartext fields outside encrypted backup envelope", "newest backup file selection wins over delayed older read", "verified passphrase rotation and old-credential rejection", "in-flight passphrase rotation cannot be cancelled or double-submitted",
-    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
+    "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "stale restore-dialog close cannot clear newer encrypted import", "in-flight backup verification blocks double-submit and cancellation", "actual exported backup download and restore", "encrypted export opens in a separate clean browser profile", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection", "cross-tab localStorage.clear locks decrypted workspace",
     "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "authenticator codes masked by default and stay hidden after refresh", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "named dialogs and keyboard Escape secret cleanup", "hardened loopback-only preview browser acceptance", "safe rendering of hostile HTML text and URL rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
