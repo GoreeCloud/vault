@@ -1,6 +1,7 @@
 import { createVault, openVault, sealVault, validateEnvelope } from "./crypto.mjs";
 import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs";
 import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
+import { verifyEncryptedBackup } from "./recovery.mjs";
 
 const STORAGE_KEY = "goreecloud.vault.encrypted.v1";
 const IDLE_MS = 5 * 60 * 1000;
@@ -452,11 +453,11 @@ async function verifyAndRestore(event) {
   message("restore-message", "Authenticating and validating encrypted backup…");
   try {
     // This must succeed before we offer to overwrite the current vault.
-    const verified = await openVault(backup, byId("restore-passphrase").value);
+    const verified = await verifyEncryptedBackup(backup, byId("restore-passphrase").value);
     if (epoch !== sessionId || pendingBackup !== backup) {
       throw new VaultWriteConflict("The vault changed during backup verification.");
     }
-    const count = verified.document.items.length;
+    const count = verified.itemCount;
     if (!confirm("Validated encrypted backup with " + count + " item(s). Replace the current local vault? This action cannot be undone, and does not merge items.")) {
       message("restore-message", "Import cancelled. No local data was replaced.");
       return;
