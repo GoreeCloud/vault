@@ -425,6 +425,14 @@ async function saveEditor(event) {
   editorSaving = true;
   controls.forEach(control => { control.disabled = true; });
   try {
+    if (entry.totpSecret) {
+      try {
+        await generateTotp(entry.totpSecret);
+      } catch {
+        message("editor-message", "Invalid authenticator secret. Enter a Base32 key (16–256 characters), or leave it blank.");
+        return;
+      }
+    }
     const saved = await commitDraft(draft => {
       if (targetId) {
         const index = draft.items.findIndex(item => item.id === targetId);
