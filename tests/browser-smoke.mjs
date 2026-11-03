@@ -23,7 +23,9 @@ try {
   ], { stdio: "ignore" });
   const active = join(workspace, "profile", "DevToolsActivePort");
   let debugging;
-  for (let i = 0; i < 80; i++) {
+  // Shared CI hosts can need substantially longer than eight seconds to
+  // initialize headless Chrome; fail closed after a bounded 30 seconds.
+  for (let i = 0; i < 300; i++) {
     if (existsSync(active)) {
       debugging = Number((await readFile(active, "utf8")).split("\n")[0]);
       break;
@@ -31,7 +33,7 @@ try {
     if (chrome.exitCode !== null) throw Error("Chromium exited before startup.");
     await pause(100);
   }
-  if (!debugging) throw Error("Chrome debugging endpoint unavailable.");
+  if (!debugging) throw Error("Chrome debugging endpoint unavailable after a bounded 30-second startup wait.");
   const tabs = await (await fetch("http://127.0.0.1:" + debugging + "/json/list")).json();
   const target = tabs.find(v => v.type === "page");
   if (!target?.webSocketDebuggerUrl) throw Error("No browser page target.");

@@ -86,7 +86,7 @@ The local prototype deliberately has **no backend**. The reviewable [encrypted s
 
 ## Quality and development
 
-Run `npm test` and `npm run check` after changes. The current code has not undergone third-party penetration testing, an independent cryptographic review, a full browser-based accessibility audit or final screenshot-led design acceptance; manual browser smoke screenshots have been reviewed for desktop/mobile workflow layout, but not all screen sizes/states; release gates remain open. Avoid storing real secrets in development test fixtures or in source control.
+Run `npm test` and `npm run check` after changes. GitHub CI uses commit-pinned checkout and Node setup actions, and the test suite checks that future workflow changes preserve those immutability and least-privilege constraints. The current code has not undergone third-party penetration testing, an independent cryptographic review, a full browser-based accessibility audit or final screenshot-led design acceptance; manual browser smoke screenshots have been reviewed for desktop/mobile workflow layout, but not all screen sizes/states; release gates remain open. Avoid storing real secrets in development test fixtures or in source control.
 
 The repository does not yet declare a redistribution license; public visibility **does not** itself grant an open-source license. The project's license needs a founder decision before external reuse or derivative distribution.
 
