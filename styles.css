@@ -419,3 +419,36 @@ label { display: block; margin: 15px 0 7px; font-size: 13px; font-weight: 650; c
   .health-summary { grid-template-columns: 1fr; }
   #security-check { max-width: 123px; padding-left: 8px; padding-right: 8px; }
 }
+
+
+/* GoreeCloud UI password generator controls: semantic surfaces and touch size */
+.generator-options {
+  margin: 12px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--gc-outline);
+  border-radius: 14px;
+  background: var(--gc-surface-tonal);
+}
+.generator-options legend {
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--gc-text);
+  font-weight: 750;
+}
+.generator-length { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.generator-length label { font-size: 13px; }
+.generator-length input { width: 105px; min-height: 44px; }
+.generator-classes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 12px; }
+.generator-classes label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.generator-classes input { accent-color: var(--gc-brand); width: 18px; height: 18px; }
+#generator-help { margin: 8px 0 0; font-size: 12px; line-height: 1.5; }
+@media (max-width: 360px) {
+  .generator-classes { grid-template-columns: minmax(0, 1fr); }
+}
