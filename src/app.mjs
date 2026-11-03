@@ -17,6 +17,7 @@ let editingId = null;
 let editorSaving = false;
 let passphraseChanging = false;
 let restoringBackup = false;
+let authenticating = false;
 let activeFilter = "all";
 let lastActivity = Date.now();
 let operations = Promise.resolve();
@@ -460,6 +461,11 @@ async function saveEditor(event) {
 
 async function unlockOrCreate(event) {
   event.preventDefault();
+  // Disabling the button does not prevent programmatic form submissions
+  // or every rapid keyboard submit. Only one PBKDF2 authentication/create
+  // attempt may own a session epoch at a time.
+  if (authenticating) return;
+  authenticating = true;
   const passphraseInput = byId("passphrase");
   const passphrase = passphraseInput.value;
   const button = byId("auth-action");
@@ -507,6 +513,7 @@ async function unlockOrCreate(event) {
     passphraseInput.value = "";
     byId("create-confirm").value = "";
     button.disabled = false;
+    authenticating = false;
   }
 }
 
