@@ -19,7 +19,7 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - An attacker who steals only the encrypted localStorage value should face offline passphrase guessing costs. The user's passphrase strength is critical.
 - An attacker with JavaScript execution in the application's origin, an unlocked browser session, malicious extensions, keylogging or device compromise **can read secrets**. No browser application can prevent all such attacks.
 - Browser developer tools, swap, memory dumps, clipboard managers, backup tools and local OS facilities may preserve sensitive values despite UI locking.
-- Multi-tab writes can conflict. A storage-change event locks other open tabs, but does not provide an atomic cross-tab transaction guarantee.
+- In browsers supporting Web Locks, cooperating tabs serialize encrypted writes and reject stale ciphertext revisions; noncooperating or malicious scripts can bypass these checks. A future server must enforce durable revisions independently.
 - An exported encrypted backup can be retained indefinitely; key rotation **does not revoke** previously exported backups encrypted under old passphrases.
 - Local storage can be cleared by the user/browser, quota exhaustion or private browsing termination. **There is no account recovery**.
 - The confidentiality of fields in ciphertext does not hide the presence, size and timing of saved records in local storage or exported backups.
@@ -34,7 +34,9 @@ This architecture demonstrates **encrypted local data at rest** but has **not** 
 - Finite document/item length limits before encryption and after decryption.
 - Explicit confirmation before replacing the local encrypted vault with an import.
 - Fresh IV on every save; fresh salt on passphrase change.
-- Inactivity lock and cross-tab change lock.
+- Inactivity lock, session-epoch invalidation of delayed operations and cross-tab change lock.
+- Web Locks exclusive critical section with expected ciphertext comparison before writes; unsupported browsers disable writes.
+- Draft-based encrypted mutations only update the visible document after storage succeeds.
 - No actual production keys, provider credentials, analytics IDs or remote vault URLs in the repository.
 
 ## Known gaps and security-critical work
@@ -59,5 +61,6 @@ Do **not** expose this prototype on a public domain, import real user credential
 ## Testing evidence
 
 - Unit tests in `tests/crypto.test.mjs` cover encrypt/decrypt, fresh IVs, wrong passphrases, ciphertext tampering, document validation, password character-class requirements, URL validation and published RFC TOTP vectors.
+- Unit tests in `tests/storage.test.mjs` exercise cooperating-tab conflicts, stale writes, session revocation, storage failures and browsers missing Web Locks.
 - GitHub Actions runs syntax checks and unit tests when the workflow is enabled on a branch or pull request.
 - Passing these checks **cannot** prove production security, browser UX correctness or independent cryptographic review.
