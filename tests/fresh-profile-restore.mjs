@@ -30,7 +30,8 @@ export async function verifyFreshProfileRestore({
     ], { stdio: "ignore" });
     const active = join(profile, "DevToolsActivePort");
     let debugPort;
-    for (let i = 0; i < 120; i++) {
+    // The second isolated Chrome process can also start slowly on CI hosts.
+    for (let i = 0; i < 300; i++) {
       if (existsSync(active)) {
         debugPort = Number((await readFile(active, "utf8")).split("\n")[0]);
         break;
@@ -38,7 +39,7 @@ export async function verifyFreshProfileRestore({
       if (chrome.exitCode !== null) throw Error("Fresh-profile Chromium exited during setup.");
       await pause(100);
     }
-    if (!debugPort) throw Error("Fresh-profile debugging endpoint unavailable.");
+    if (!debugPort) throw Error("Fresh-profile debugging endpoint unavailable after 30 seconds.");
 
     const targets = await (await fetch("http://127.0.0.1:" + debugPort + "/json/list")).json();
     const page = targets.find(target => target.type === "page");
