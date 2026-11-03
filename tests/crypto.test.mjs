@@ -27,6 +27,29 @@ test("rejects incorrect passphrases and tampered encrypted data", async () => {
   assert.throws(() => validateEnvelope({ ...envelope, iterations: 1 }));
 });
 
+test("rejects cleartext metadata or unreviewed fields outside the v1 ciphertext envelope", async () => {
+  const { envelope } = await createVault("synthetic v1 envelope passphrase");
+  assert.deepEqual(
+    Object.keys(envelope).sort(),
+    ["format", "kdf", "iterations", "salt", "iv", "ciphertext"].sort()
+  );
+  assert.throws(
+    () => validateEnvelope({ ...envelope, plaintextCredential: "synthetic-do-not-store" }),
+    /Unexpected vault encryption envelope fields/
+  );
+  assert.throws(
+    () => validateEnvelope({ ...envelope, extra: { deviceNote: "plaintext" } }),
+    /Unexpected vault encryption envelope fields/
+  );
+  const missing = { ...envelope };
+  delete missing.iv;
+  assert.throws(() => validateEnvelope(missing), /Unexpected vault encryption envelope fields/);
+  await assert.rejects(
+    openVault({ ...envelope, plaintextCredential: "synthetic-do-not-store" }, "synthetic v1 envelope passphrase"),
+    /Unexpected vault encryption envelope fields/
+  );
+});
+
 test("rejects invalid documents and short passphrases", async () => {
   assert.throws(() => validateDocument({ version: 1, items: [{ id: "x" }] }));
   await assert.rejects(createVault("short"), /12 characters/);
