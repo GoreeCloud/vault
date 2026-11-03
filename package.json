@@ -7,7 +7,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/crypto.mjs && node --check src/security.mjs && node --check src/storage.mjs && node --check src/app.mjs",
+    "check": "node --check src/crypto.mjs && node --check src/security.mjs && node --check src/storage.mjs && node --check src/recovery.mjs && node --check src/app.mjs",
     "serve": "python3 -m http.server 4173"
   }
 }

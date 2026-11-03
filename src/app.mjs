@@ -1,6 +1,7 @@
 import { createVault, openVault, sealVault, validateEnvelope } from "./crypto.mjs";
 import { generatePassword, generateTotp, normalizeWebsite } from "./security.mjs";
 import { guardedWrite, VaultWriteConflict } from "./storage.mjs";
+import { verifyEncryptedBackup } from "./recovery.mjs";
 
 const STORAGE_KEY = "goreecloud.vault.encrypted.v1";
 const IDLE_MS = 5 * 60 * 1000;
@@ -15,6 +16,8 @@ let lastActivity = Date.now();
 let operations = Promise.resolve();
 let sessionId = 0;
 let lastSerialized = null;
+let pendingBackup = null;
+let pendingExpectedStorage = null;
 let noticeTimer;
 
 function announce(message, error = false) {
@@ -36,6 +39,10 @@ function showAuth(note = "") {
   const exists = Boolean(localStorage.getItem(STORAGE_KEY));
   byId("auth-action").textContent = exists ? "Unlock vault" : "Create my vault";
   byId("passphrase").setAttribute("autocomplete", exists ? "current-password" : "new-password");
+  byId("passphrase").minLength = exists ? 1 : 12;
+  byId("create-confirm-group").hidden = exists;
+  byId("create-confirm").required = !exists;
+  byId("create-confirm").value = "";
   byId("passphrase").value = "";
   message("auth-message", note || (exists
     ? "Enter the passphrase used to encrypt this device's vault."
@@ -54,12 +61,16 @@ function lockVault(reason = "") {
   encryptionKey = null;
   cryptoParameters = null;
   lastSerialized = null;
+  pendingBackup = null;
+  pendingExpectedStorage = null;
   selection = null;
   editingId = null;
   byId("editor-form").reset();
   byId("passphrase-form").reset();
+  byId("restore-form").reset();
   if (byId("editor-dialog").open) byId("editor-dialog").close();
   if (byId("passphrase-dialog").open) byId("passphrase-dialog").close();
+  if (byId("restore-dialog").open) byId("restore-dialog").close();
   byId("item-list").replaceChildren();
   byId("item-detail").replaceChildren();
   showAuth(reason || "Vault locked. Unlock again to continue.");
@@ -359,6 +370,9 @@ async function unlockOrCreate(event) {
       cryptoParameters = { salt: saved.salt };
       lastSerialized = raw;
     } else {
+      if (passphrase !== byId("create-confirm").value) {
+        throw new Error("The new vault passphrases do not match.");
+      }
       const created = await createVault(passphrase);
       const serialized = JSON.stringify(created.envelope);
       await guardedWrite(localStorage, {
@@ -380,6 +394,7 @@ async function unlockOrCreate(event) {
     message("auth-message", error.message);
   } finally {
     passphraseInput.value = "";
+    byId("create-confirm").value = "";
     button.disabled = false;
   }
 }
@@ -402,25 +417,79 @@ async function exportBackup() {
 async function importBackup(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  const epoch = sessionId;
   try {
     if (documentData) throw new Error("Lock the vault before importing.");
     if (file.size > 7 * 1024 * 1024) throw new Error("Backup exceeds the import size limit.");
     const backup = JSON.parse(await file.text());
     validateEnvelope(backup);
-    if (!confirm("Replace the local vault on this device? This does not merge items. Export your current vault first.")) return;
-    const expected = localStorage.getItem(STORAGE_KEY);
-    const epoch = ++sessionId;
+    if (epoch !== sessionId || documentData) {
+      throw new VaultWriteConflict("Vault state changed while reading the backup.");
+    }
+    pendingBackup = backup;
+    pendingExpectedStorage = localStorage.getItem(STORAGE_KEY);
+    message("restore-message", "");
+    byId("restore-form").reset();
+    byId("restore-dialog").showModal();
+    byId("restore-passphrase").focus();
+  } catch (error) {
+    message("auth-message", "Import preparation failed: " + error.message);
+  } finally {
+    event.target.value = "";
+  }
+}
+
+async function verifyAndRestore(event) {
+  event.preventDefault();
+  const backup = pendingBackup;
+  const expected = pendingExpectedStorage;
+  const epoch = sessionId;
+  if (!backup) {
+    message("restore-message", "Choose an encrypted backup file first.");
+    return;
+  }
+  const button = byId("verify-restore");
+  button.disabled = true;
+  message("restore-message", "Authenticating and validating encrypted backup…");
+  try {
+    // This must succeed before we offer to overwrite the current vault.
+    const verified = await verifyEncryptedBackup(backup, byId("restore-passphrase").value);
+    if (epoch !== sessionId || pendingBackup !== backup) {
+      throw new VaultWriteConflict("The vault changed during backup verification.");
+    }
+    const count = verified.itemCount;
+    if (!confirm("Validated encrypted backup with " + count + " item(s). Replace the current local vault? This action cannot be undone, and does not merge items.")) {
+      message("restore-message", "Import cancelled. No local data was replaced.");
+      return;
+    }
+    const writeEpoch = ++sessionId;
     await guardedWrite(localStorage, {
       key: STORAGE_KEY,
       expected,
       next: JSON.stringify(backup),
       locks: navigator.locks,
-      isCurrent: () => sessionId === epoch
+      isCurrent: () => sessionId === writeEpoch && pendingBackup === backup
     });
-    lastSerialized = null;
-    showAuth("Encrypted backup imported. Enter its original passphrase.");
-  } catch (error) { message("auth-message", "Import failed: " + error.message); }
-  finally { event.target.value = ""; }
+    pendingBackup = null;
+    pendingExpectedStorage = null;
+    byId("restore-dialog").close();
+    showAuth("Encrypted backup verified and restored. Unlock using its backup passphrase.");
+  } catch (error) {
+    if (error instanceof VaultWriteConflict) {
+      lockVault("Vault changed during restore. No backup was imported.");
+    } else {
+      message("restore-message", "Backup not imported: " + error.message);
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function cancelRestore() {
+  pendingBackup = null;
+  pendingExpectedStorage = null;
+  byId("restore-form").reset();
+  if (byId("restore-dialog").open) byId("restore-dialog").close();
 }
 
 async function changePassphrase(event) {
@@ -461,6 +530,13 @@ function setup() {
   showAuth();
   byId("auth-form").addEventListener("submit", unlockOrCreate);
   byId("import-file").addEventListener("change", importBackup);
+  byId("restore-form").addEventListener("submit", verifyAndRestore);
+  byId("cancel-restore").addEventListener("click", cancelRestore);
+  byId("restore-dialog").addEventListener("close", () => {
+    pendingBackup = null;
+    pendingExpectedStorage = null;
+    byId("restore-form").reset();
+  });
   byId("new-item").addEventListener("click", () => openEditor());
   byId("editor-form").addEventListener("submit", saveEditor);
   byId("cancel-editor").addEventListener("click", () => byId("editor-dialog").close());

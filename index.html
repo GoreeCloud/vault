@@ -20,6 +20,10 @@
       <form id="auth-form">
         <label for="passphrase">Vault passphrase</label>
         <input class="gc-input" id="passphrase" type="password" autocomplete="current-password" minlength="1" required placeholder="Enter your vault passphrase">
+        <div id="create-confirm-group" hidden>
+          <label for="create-confirm">Confirm new passphrase</label>
+          <input class="gc-input" id="create-confirm" type="password" autocomplete="new-password" minlength="12" placeholder="Re-enter your vault passphrase">
+        </div>
         <button type="submit" id="auth-action" class="gc-button primary">Unlock vault</button>
       </form>
       <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
@@ -84,6 +88,20 @@
       <label class="checkline"><input id="edit-favorite" type="checkbox"> Add to favorites</label>
       <p class="form-message" id="editor-message" aria-live="polite"></p>
       <div class="dialog-actions"><button type="button" id="discard-editor" class="gc-button secondary">Cancel</button><button type="submit" id="save-editor" class="gc-button primary">Save encrypted item</button></div>
+    </form>
+  </dialog>
+  <dialog id="restore-dialog" class="gc-dialog compact-dialog" aria-labelledby="restore-heading">
+    <form id="restore-form">
+      <span class="eyebrow">ENCRYPTED RECOVERY</span>
+      <h2 id="restore-heading">Verify encrypted backup</h2>
+      <p class="muted">Enter the passphrase used for this backup. GoreeCloud Vault will authenticate and validate its encrypted contents before any existing local vault can be replaced.</p>
+      <label for="restore-passphrase">Backup passphrase</label>
+      <input id="restore-passphrase" class="gc-input" type="password" autocomplete="off" required>
+      <p class="form-message" id="restore-message" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancel-restore" class="gc-button secondary">Cancel</button>
+        <button type="submit" id="verify-restore" class="gc-button danger">Verify and replace</button>
+      </div>
     </form>
   </dialog>
   <dialog id="passphrase-dialog" class="gc-dialog compact-dialog">
