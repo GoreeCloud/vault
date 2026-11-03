@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; upgrade-insecure-requests">
+  <title>GoreeCloud Vault — Private by design</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/app.mjs"></script>
+</head>
+<body>
+  <div id="auth-screen" class="auth-shell">
+    <div class="auth-brand"><span class="brand-mark" aria-hidden="true">✦</span> GoreeCloud <strong>Vault</strong></div>
+    <main class="auth-card gc-panel">
+      <div class="eyebrow"><span class="status-dot"></span> LOCAL-FIRST · PRIVATE PREVIEW</div>
+      <h1>Your digital life.<br><span>Safely in your hands.</span></h1>
+      <p class="intro">An encrypted home for your passwords, secrets and authentication codes. Your vault stays on this device.</p>
+      <form id="auth-form">
+        <label for="passphrase">Vault passphrase</label>
+        <input class="gc-input" id="passphrase" type="password" autocomplete="current-password" minlength="1" required placeholder="Enter your vault passphrase">
+        <button type="submit" id="auth-action" class="gc-button primary">Unlock vault</button>
+      </form>
+      <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
+      <div class="auth-divider"><span>ENCRYPTED BACKUP</span></div>
+      <label class="file-label" for="import-file">Import an encrypted vault backup <span aria-hidden="true">↗</span></label>
+      <input id="import-file" type="file" accept=".json,application/json" aria-label="Import encrypted vault backup">
+      <p class="fine-print">Pre-alpha software · No cloud sync · No account recovery · Not audited. Keep a secure backup and do not rely on this preview as your only password store.</p>
+    </main>
+    <div class="auth-foot">A quieter kind of security. <span>Built for the GoreeCloud ecosystem.</span></div>
+  </div>
+
+  <div id="app-screen" class="app-shell" hidden>
+    <aside class="sidebar gc-lens">
+      <div class="sidebar-brand"><span class="brand-mark" aria-hidden="true">✦</span><div>GoreeCloud <b>Vault</b><small>PERSONAL WORKSPACE</small></div></div>
+      <nav aria-label="Vault categories" class="nav-stack">
+        <button type="button" class="nav-link active" data-filter="all" aria-current="page"><span aria-hidden="true">▤</span> All items</button>
+        <button type="button" class="nav-link" data-filter="favorite"><span aria-hidden="true">☆</span> Favorites</button>
+        <div class="nav-heading">COLLECTIONS</div>
+        <button type="button" class="nav-link" data-filter="login"><span aria-hidden="true">⌘</span> Logins</button>
+        <button type="button" class="nav-link" data-filter="note"><span aria-hidden="true">▧</span> Secure notes</button>
+        <button type="button" class="nav-link" data-filter="secret"><span aria-hidden="true">◇</span> Secrets</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="security-tag"><span class="status-dot"></span><span>Encrypted on this device<small>Offline workspace</small></span></div>
+        <button type="button" id="lock-vault" class="gc-button quiet">⏻ &nbsp; Lock vault</button>
+      </div>
+    </aside>
+    <div class="main-area">
+      <header class="topbar">
+        <div><div class="eyebrow">YOUR PRIVATE SPACE</div><h1>Vault overview</h1></div>
+        <div class="top-actions"><button id="export-vault" type="button" class="gc-button secondary">Export backup</button><button id="change-passphrase" type="button" class="gc-button secondary">Change passphrase</button><button id="new-item" type="button" class="gc-button primary">＋ New item</button></div>
+      </header>
+      <main class="content-area">
+        <section class="list-section gc-panel" aria-labelledby="item-heading">
+          <div class="section-top"><div><h2 id="item-heading">My items</h2><p id="item-count" class="muted">Loading</p></div><span class="secure-pill">◆&nbsp; Secured</span></div>
+          <label for="search-items" class="sr-only">Search vault</label>
+          <input id="search-items" type="search" class="gc-input search" placeholder="⌕  Search your vault" autocomplete="off" spellcheck="false">
+          <div id="item-list" class="item-list" role="list"></div>
+        </section>
+        <section class="detail-section gc-panel" aria-label="Selected item details">
+          <div id="item-detail" class="detail-inner">
+            <div class="empty-art" aria-hidden="true">✧</div><h2>Your safe space</h2><p>Select a saved item or create your first credential to get started.</p>
+          </div>
+        </section>
+      </main>
+      <footer class="workspace-footer"><span>GoreeCloud Vault · Local-first pre-alpha</span><span>Keys remain in this browser session</span></footer>
+    </div>
+  </div>
+  <dialog id="editor-dialog" class="gc-dialog">
+    <form id="editor-form">
+      <div class="dialog-top"><div><span class="eyebrow">ENCRYPTED ITEM</span><h2 id="editor-heading">New item</h2></div><button type="button" id="cancel-editor" class="gc-icon-button" aria-label="Close editor">×</button></div>
+      <label for="edit-type">Item type</label>
+      <select id="edit-type" class="gc-input"><option value="login">Login</option><option value="note">Secure note</option><option value="secret">Developer secret</option></select>
+      <label for="edit-title">Title</label><input id="edit-title" class="gc-input" maxlength="256" required autocomplete="off">
+      <label for="edit-username">Username / account</label><input id="edit-username" class="gc-input" autocomplete="off">
+      <label for="edit-password">Password / secret value</label>
+      <div class="inline-field"><input id="edit-password" class="gc-input" type="password" autocomplete="new-password"><button type="button" id="generate-password" class="gc-button secondary">Generate</button><button type="button" id="reveal-editor-password" class="gc-button quiet" aria-label="Reveal or hide secret">◉</button></div>
+      <label for="edit-website">Website URL</label><input id="edit-website" class="gc-input" type="text" autocomplete="off" placeholder="https://example.com">
+      <label for="edit-totp">TOTP secret (Base32, optional)</label><input id="edit-totp" class="gc-input" type="password" autocomplete="off">
+      <label for="edit-notes">Private notes</label><textarea id="edit-notes" class="gc-input" rows="4" maxlength="100000"></textarea>
+      <label for="edit-tags">Tags (comma-separated)</label><input id="edit-tags" class="gc-input" autocomplete="off">
+      <label class="checkline"><input id="edit-favorite" type="checkbox"> Add to favorites</label>
+      <p class="form-message" id="editor-message" aria-live="polite"></p>
+      <div class="dialog-actions"><button type="button" id="discard-editor" class="gc-button secondary">Cancel</button><button type="submit" id="save-editor" class="gc-button primary">Save encrypted item</button></div>
+    </form>
+  </dialog>
+  <dialog id="passphrase-dialog" class="gc-dialog compact-dialog">
+    <form id="passphrase-form">
+      <h2>Change vault passphrase</h2>
+      <p class="muted">This re-encrypts the complete local vault with a fresh random salt. Keep your new passphrase safe: there is no recovery service.</p>
+      <label for="next-passphrase">New passphrase (12+ characters)</label>
+      <input id="next-passphrase" class="gc-input" type="password" minlength="12" required autocomplete="new-password">
+      <label for="confirm-passphrase">Confirm new passphrase</label>
+      <input id="confirm-passphrase" class="gc-input" type="password" minlength="12" required autocomplete="new-password">
+      <p id="passphrase-message" role="status" class="form-message"></p>
+      <div class="dialog-actions"><button type="button" id="cancel-passphrase" class="gc-button secondary">Cancel</button><button id="submit-passphrase" type="submit" class="gc-button primary">Re-encrypt vault</button></div>
+    </form>
+  </dialog>
+  <div id="notice" class="gc-toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
