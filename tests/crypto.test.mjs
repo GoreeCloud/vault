@@ -50,6 +50,47 @@ test("rejects cleartext metadata or unreviewed fields outside the v1 ciphertext 
   );
 });
 
+test("rejects unversioned document and item extension fields even under valid encryption", async () => {
+  const good = sample();
+  assert.deepEqual(validateDocument(good), good);
+  assert.throws(
+    () => validateDocument({ ...good, unreviewedRoot: "untrusted metadata" }),
+    /Unexpected vault document fields/
+  );
+  assert.throws(
+    () => validateDocument({ ...good, items: [
+      { ...good.items[0], unreviewedItem: { arbitrary: "nested data" } }
+    ] }),
+    /Unexpected vault item fields/
+  );
+  // The AES-GCM tag may be valid even when the decrypted JSON is outside
+  // the supported v1 schema. Authenticate *and* validate both boundaries.
+  const passphrase = "synthetic strict-schema test phrase";
+  const { key, envelope } = await createVault(passphrase, good);
+  const invalid = { ...good, items: [
+    { ...good.items[0], extraRecordField: "unreviewed extension" }
+  ] };
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const forgedCiphertext = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv,
+      additionalData: new TextEncoder().encode("goreecloud.vault.local.v1")
+    },
+    key,
+    new TextEncoder().encode(JSON.stringify(invalid))
+  );
+  const authenticatedButMalformed = {
+    ...envelope,
+    iv: Buffer.from(iv).toString("base64"),
+    ciphertext: Buffer.from(forgedCiphertext).toString("base64")
+  };
+  await assert.rejects(
+    openVault(authenticatedButMalformed, passphrase),
+    /Unexpected vault item fields/
+  );
+});
+
 test("rejects invalid documents and short passphrases", async () => {
   assert.throws(() => validateDocument({ version: 1, items: [{ id: "x" }] }));
   await assert.rejects(createVault("short"), /12 characters/);
