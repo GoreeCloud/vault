@@ -75,7 +75,7 @@
       <footer class="workspace-footer"><span>GoreeCloud Vault · Local-first pre-alpha</span><span>Keys remain in this browser session</span></footer>
     </div>
   </div>
-  <dialog id="editor-dialog" class="gc-dialog">
+  <dialog id="editor-dialog" class="gc-dialog" aria-labelledby="editor-heading">
     <form id="editor-form">
       <div class="dialog-top"><div><span class="eyebrow">ENCRYPTED ITEM</span><h2 id="editor-heading">New item</h2></div><button type="button" id="cancel-editor" class="gc-icon-button" aria-label="Close editor">×</button></div>
       <label for="edit-type">Item type</label>
@@ -129,9 +129,9 @@
       </div>
     </form>
   </dialog>
-  <dialog id="passphrase-dialog" class="gc-dialog compact-dialog">
+  <dialog id="passphrase-dialog" class="gc-dialog compact-dialog" aria-labelledby="change-passphrase-heading">
     <form id="passphrase-form">
-      <h2>Change vault passphrase</h2>
+      <h2 id="change-passphrase-heading">Change vault passphrase</h2>
       <p class="muted">This re-encrypts the complete local vault with a fresh random salt. Keep your new passphrase safe: there is no recovery service.</p>
       <label for="current-passphrase">Current vault passphrase</label>
       <input id="current-passphrase" class="gc-input" type="password" autocomplete="current-password" required>
