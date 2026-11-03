@@ -79,7 +79,7 @@ index.html / styles.css / src/app.mjs  browser workspace
         localStorage (ciphertext envelope only)
 ```
 
-The local prototype deliberately has **no backend**. For the planned multi-user self-hosted architecture, ciphertext storage, device enrollment, authentication, key wrapping, revocation, share grants, recovery and security auditability must be designed and reviewed together before implementation. See [security model](docs/SECURITY_MODEL.md).
+The local prototype deliberately has **no backend**. The reviewable [encrypted synchronization architecture proposal](docs/ENCRYPTED_SYNC_ARCHITECTURE.md) describes candidate trust boundaries, device authorization, conflict control, key recovery and release gates. It is **design-only** and does not create server endpoints. For the planned multi-user self-hosted architecture, ciphertext storage, device enrollment, authentication, key wrapping, revocation, share grants, recovery and security auditability must be designed and reviewed together before implementation. See [security model](docs/SECURITY_MODEL.md).
 
 ## Quality and development
 

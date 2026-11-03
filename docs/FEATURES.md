@@ -57,7 +57,7 @@ The full requested product draws on the capabilities of Bitwarden, Vaultwarden, 
 
 - **Phase A (current):** isolated local-first security prototype, tests, accessibility and GC UI.
 - **Phase B:** threat model review, vetted cryptography, import/migration, security testing and encrypted backup recovery.
-- **Phase C:** secure self-hosted ciphertext sync API, authenticated clients, database migrations, rollback protection and multi-device tests.
+- **Phase C:** review and approve the [encrypted synchronization architecture proposal](ENCRYPTED_SYNC_ARCHITECTURE.md), then implement a secure self-hosted ciphertext sync API, authenticated clients, database migrations, rollback protection and multi-device tests.
 - **Phase D:** native Android/Linux clients, browser extension, passkeys, autofill and offline sync.
 - **Phase E:** shared vaults, family recovery, developer secrets and enterprise features.
 - **Phase F:** cross-product integrations, deployment hardening, independent audits and stable release gates.
