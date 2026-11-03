@@ -23,7 +23,7 @@ const server = createServer(async (req, res) => {
     res.end(bytes);
   } catch { res.statusCode = 404; res.end("Not found."); }
 });
-let chrome, ws;
+let chrome, ws, ws2;
 try {
   await new Promise(ok => server.listen(0, "127.0.0.1", ok));
   const port = server.address().port;
@@ -140,13 +140,77 @@ try {
   assert.equal(await script("document.documentElement.scrollWidth <= window.innerWidth"), true, "mobile layout must not scroll sideways");
   assert.equal(await script("Math.abs(document.querySelector('.sidebar .nav-stack').getBoundingClientRect().bottom - window.innerHeight) <= 2"), true, "mobile nav stays at bottom of viewport");
   await screenshot("04-mobile-workspace");
+
+  // Simultaneous editing in two real Chromium tabs with shared origin and
+  // browser profile. One save must win; the stale tab must lock/fail closed.
+  const secondTarget = await send("Target.createTarget", { url: "http://127.0.0.1:" + port + "/" });
+  const currentTabs = await (await fetch("http://127.0.0.1:" + debugging + "/json/list")).json();
+  const secondTab = currentTabs.find(tab => tab.id === secondTarget.targetId);
+  if (!secondTab?.webSocketDebuggerUrl) throw Error("Second browser tab could not be inspected.");
+  ws2 = new WebSocket(secondTab.webSocketDebuggerUrl);
+  await new Promise((ok, fail) => {
+    ws2.addEventListener("open", ok, { once: true });
+    ws2.addEventListener("error", fail, { once: true });
+  });
+  const inflight2 = new Map();
+  let sequence2 = 0;
+  ws2.addEventListener("message", event => {
+    const packet = JSON.parse(event.data);
+    if (packet.id) {
+      const waiter = inflight2.get(packet.id);
+      if (waiter) {
+        inflight2.delete(packet.id);
+        packet.error ? waiter.reject(Error(packet.error.message)) : waiter.resolve(packet.result);
+      }
+    } else if (packet.method === "Runtime.exceptionThrown") {
+      exceptions.push(packet.params.exceptionDetails?.text || "Unhandled second-tab exception");
+    }
+  });
+  function send2(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = ++sequence2;
+      inflight2.set(id, { resolve, reject });
+      ws2.send(JSON.stringify({ id, method, params }));
+    });
+  }
+  async function script2(expression) {
+    const result = await send2("Runtime.evaluate", {
+      expression, awaitPromise: true, returnByValue: true, userGesture: true
+    });
+    if (result.exceptionDetails) throw Error(result.exceptionDetails.text);
+    return result.result.value;
+  }
+  async function until2(expression, label, timeout = 8000) {
+    for (let i = 0; i < timeout / 100; i++) {
+      if (await script2(expression)) return;
+      await pause(100);
+    }
+    throw Error("Timed out: " + label);
+  }
+  await send2("Page.enable");
+  await send2("Runtime.enable");
+  await until2("document.readyState==='complete' && document.getElementById('auth-form')!==null", "second tab loaded");
+  await script2("document.getElementById('passphrase').value='test-only secure browser phrase'; document.getElementById('auth-form').requestSubmit()");
+  await until2("document.getElementById('app-screen').hidden===false", "second tab unlocked");
+  await Promise.all([
+    script("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Concurrent first tab'; document.getElementById('editor-form').requestSubmit()"),
+    script2("document.getElementById('new-item').click(); document.getElementById('edit-title').value='Concurrent second tab'; document.getElementById('editor-form').requestSubmit()")
+  ]);
+  await pause(1400);
+  const firstLocked = await script("document.getElementById('app-screen').hidden");
+  const secondLocked = await script2("document.getElementById('app-screen').hidden");
+  assert.notEqual(firstLocked, secondLocked, "exactly one tab must remain unlocked after competing saves");
+  const winningTab = firstLocked ? script2 : script;
+  assert.equal(await winningTab("document.getElementById('item-count').textContent.startsWith('2 of 2')"), true,
+    "only one of two concurrently added items should persist");
   assert.deepEqual(exceptions, [], "no uncaught browser exceptions");
   console.log(JSON.stringify({ status: "pass", scenarios: [
-    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout"
+    "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified restore", "mobile bottom navigation layout", "two-tab stale-save rejection"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png"
   ].map(name => join(workspace, name)) }, null, 2));
 } finally {
+  ws2?.close();
   ws?.close();
   chrome?.kill("SIGTERM");
   await new Promise(ok => server.close(ok));
