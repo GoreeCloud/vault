@@ -1,31 +1,18 @@
 // GoreeCloud Vault — browser smoke audit (test-only, no real secrets)
 import { spawn } from "node:child_process";
-import { createServer } from "node:http";
+import { startPreviewServer } from "../scripts/preview.mjs";
 import { readFile, readdir, mkdtemp, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, extname, sep } from "node:path";
+import { join } from "node:path";
 import assert from "node:assert/strict";
-const root = process.cwd();
 const chromePath = process.env.CHROME_BIN;
 if (!chromePath || !existsSync(chromePath)) throw Error("Set CHROME_BIN to an inspected, installed Chromium binary.");
 const pause = ms => new Promise(done => setTimeout(done, ms));
 const workspace = await mkdtemp(join(tmpdir(), "gc-vault-browser-"));
-const server = createServer(async (req, res) => {
-  let path;
-  try {
-    const pathname = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
-    path = resolve(root, "." + (pathname === "/" ? "/index.html" : pathname));
-    if (path !== root && !path.startsWith(root + sep)) throw Error("Denied path.");
-    const bytes = await readFile(path);
-    res.setHeader("Content-Type", { ".html": "text/html; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" }[extname(path)] || "application/octet-stream");
-    res.setHeader("Cache-Control", "no-store");
-    res.end(bytes);
-  } catch { res.statusCode = 404; res.end("Not found."); }
-});
-let chrome, ws, ws2;
+let server, chrome, ws, ws2;
 try {
-  await new Promise(ok => server.listen(0, "127.0.0.1", ok));
+  server = await startPreviewServer(0);
   const port = server.address().port;
   chrome = spawn(chromePath, [
     "--headless=new", "--disable-gpu", "--disable-dev-shm-usage",
@@ -371,7 +358,7 @@ try {
   console.log(JSON.stringify({ status: "pass", scenarios: [
     "first-run confirmation", "encrypted item creation", "local ciphertext-only storage", "lock and unlock", "authenticated backup rejection", "verified passphrase rotation and old-credential rejection",
     "corrupted local ciphertext rejection and recovery from authenticated backup", "verified restore", "actual exported backup download and restore", "backup remains exportable after rejected save", "mobile bottom navigation layout", "two-tab stale-save rejection",
-    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups"
+    "OS/system + light/dark preference", "light-theme action contrast", "320px viewport and high contrast/motion preferences", "local-only password health report", "stable keyboard focus after item selection and favorite update", "closed-editor secret scrubbing and duplicate-save protection", "TOTP secret enrollment validation", "automatic inactivity lock scrubs open secret editor", "generated passwords masked until explicitly revealed", "configurable generator length and character groups", "hardened loopback-only preview browser acceptance"
   ], screenshotPaths: [
     "01-create-vault.png", "02-empty-workspace.png", "03-item-details.png", "04-mobile-workspace.png",
     "05-light-auth.png", "06-light-workspace.png", "07-narrow-mobile.png", "08-health-check.png", "09-generator-options.png"
@@ -380,6 +367,6 @@ try {
   ws2?.close();
   ws?.close();
   chrome?.kill("SIGTERM");
-  await new Promise(ok => server.close(ok));
+  if (server) await new Promise(ok => server.close(ok));
   // Leave temporary screenshots in workspace for the visual review; no real secrets were used.
 }
