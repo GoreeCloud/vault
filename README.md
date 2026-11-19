@@ -8,10 +8,10 @@ An **open-source, offline-first encrypted vault development preview** for web, L
 
 | Target | Technology | Current behavior |
 | --- | --- | --- |
-| Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, backup export/import, lock on tab hidden |
-| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage, user-confirmed encrypted backup import/export via Linux file chooser |
-| Android | Flutter native Android | Same native Flutter client, Android screenshot blocking in source; physical-device acceptance pending; Android Storage Access Framework encrypted backup import/export |
-| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, custom fields/tags/favorites, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
+| Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, backup export/import with fresh unlock, lock on tab hidden and in-flight unlock invalidation |
+| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage with Linux encrypted-file mode 0600, user-confirmed encrypted backup import/export via Linux file chooser |
+| Android | Flutter native Android | Same native Flutter client, Android FLAG_SECURE; limited Android 16 device install/launch and synthetic first-run verified; full device acceptance pending; encrypted backup via Android Storage Access Framework in source |
+| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, custom fields/tags/favorites, locked restore, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
 
 **Not a WebView wrapper.** Flutter is an approved native Linux and Android UI framework under the current GoreeCloud project standards.
 
@@ -21,7 +21,7 @@ All clients are **local-only**; the Firefox extension has its own isolated encry
 
 PBKDF2 is a conservative interoperable initial choice, not the final password-manager KDF decision. Investigate memory-hard Argon2id, rigorous security review, OS-backed key handling, secure memory, device and browser threat models, data recovery, backup import and cross-platform migration *before* accepting real-world secrets. Neither TLS/identity integration nor multi-device synchronization is implemented.
 
-The web application uses a restrictive production CSP and does not connect to a cloud API. The Firefox extension requests only `storage`, `activeTab`, and `scripting` (no broad host permissions), and verifies an exact HTTPS origin before user-requested form fill. Malicious browser extensions, compromised JavaScript dependencies, compromised OS accounts, memory capture, browser storage removal, and malicious browser environments remain threats. A self-hosted password manager needs much more than encryption to be production-ready.
+The web application uses a restrictive production CSP and does not connect to a cloud API. Web and native clients invalidate in-flight unlock operations when locked or backgrounded. Encrypted backup replacement requires a fresh unlock. The Firefox extension requests only `storage`, `activeTab`, and `scripting` (no broad host permissions), and verifies an exact HTTPS origin before user-requested form fill. Malicious browser extensions, compromised JavaScript dependencies, compromised OS accounts, memory capture, browser storage removal, and malicious browser environments remain threats. A self-hosted password manager needs much more than encryption to be production-ready.
 
 See [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
 
@@ -52,7 +52,7 @@ flutter test
 flutter run -d linux             # native Linux desktop
 flutter run -d <android-device>  # native Android device
 ```
-Linux build: `flutter build linux --release`. Android development APK: `flutter build apk --debug` (requires a full Java 17 JDK and Android SDK). Neither output is a validated signed release. Keep Android build signing credentials outside source control.
+Linux build: `flutter build linux --release`. Android development APK: `flutter build apk --debug` (requires a full Java 17 JDK and Android SDK). Neither output is a validated signed release. The Android debug manifest requests INTERNET for Flutter development tooling; the main Android manifest does not request Internet. Keep signing keys outside source control and inspect final release permissions.
 
 **Firefox extension**, Node.js 24+:
 
@@ -69,6 +69,10 @@ npm run test:e2e
 ```
 
 For developer testing, open Firefox `about:debugging` → **This Firefox** → **Load Temporary Add-on** and select `apps/firefox/dist/manifest.json`. This is **not** a signed Firefox Add-ons Store package. The extension's local vault is separate from the browser website's storage; use encrypted export and import deliberately to transfer records. See [extension documentation](docs/FIREFOX-EXTENSION.md).
+
+## Verified development scope
+
+Automated checks include Chromium and Firefox encrypted-backup, relock and hidden-tab race tests, Firefox-popup mock API tests, and native cryptography, OTP, symlink and private-file-mode tests. A physical Android 16 phone accepted a debug APK, launched the app, created an empty synthetic vault and exposed the note editor through accessibility controls. FLAG_SECURE prevented screen capture. **Full device item-save and native backup/recovery acceptance remain pending.** No real credentials were used.
 
 ## Repository layout
 

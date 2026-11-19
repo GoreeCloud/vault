@@ -20,7 +20,8 @@ const canvas = Color(0xFF0D121D),
     ink = Color(0xFFF2F4FB);
 
 class VaultApp extends StatelessWidget {
-  const VaultApp({super.key});
+  const VaultApp({super.key, this.store});
+  final VaultStore? store;
   @override
   Widget build(BuildContext context) => MaterialApp(
       title: 'GoreeCloud Vault',
@@ -46,17 +47,21 @@ class VaultApp extends StatelessWidget {
                   OutlineInputBorder(borderRadius: BorderRadius.circular(14))),
           appBarTheme:
               const AppBarTheme(backgroundColor: canvas, foregroundColor: ink)),
-      home: const VaultHome());
+      home: VaultHome(store: store));
 }
 
 class VaultHome extends StatefulWidget {
-  const VaultHome({super.key});
+  const VaultHome({super.key, this.store});
+  final VaultStore? store;
   @override
   State<VaultHome> createState() => _VaultHomeState();
 }
 
 class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
-  final _store = VaultStore();
+  late final VaultStore _store = widget.store ?? VaultStore();
+  // Asynchronous KDF/encryption operations must never reopen the vault after
+  // lock, background, or a system document-picker lifecycle transition.
+  int _lockEpoch = 0;
   final _master = TextEditingController(), _search = TextEditingController();
   VaultEnvelope? _envelope;
   SecretKey? _key;
@@ -81,10 +86,13 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       _lock();
+      // Dismiss decrypted editor/password dialogs as well as locking state.
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
@@ -109,6 +117,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
   }
 
   void _lock() {
+    _lockEpoch++;
     _key = null;
     _master.clear();
     if (mounted) {
@@ -120,6 +129,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   Future<void> _unlock() async {
     if (_busy || _error != null && _envelope == null) return;
+    final epoch = _lockEpoch;
     setState(() {
       _busy = true;
       _error = null;
@@ -132,16 +142,18 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
         _master.clear();
         if (mounted) {
           setState(() {
-            _key = key;
             _envelope = env;
-            _entries = [];
+            if (epoch == _lockEpoch) {
+              _key = key;
+              _entries = [];
+            }
           });
         }
       } else {
         final key = await VaultCrypto.derive(password, _envelope!.salt);
         final items = await VaultCrypto.decrypt(key, _envelope!);
         _master.clear();
-        if (mounted) {
+        if (mounted && epoch == _lockEpoch) {
           setState(() {
             _key = key;
             _entries = items;
@@ -165,17 +177,19 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   Future<bool> _persist(List<VaultEntry> next) async {
     if (_key == null || _envelope == null || _busy) return false;
+    final epoch = _lockEpoch;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       final sealed = await VaultCrypto.seal(next, _key!, _envelope!.salt);
+      if (epoch != _lockEpoch || !mounted) return false;
       await _store.save(sealed);
       if (mounted) {
         setState(() {
           _envelope = sealed;
-          _entries = next;
+          if (epoch == _lockEpoch) _entries = next;
         });
       }
       return true;
@@ -313,8 +327,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
         _error = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content:
-              Text('Encrypted backup imported. Verify the restored items.')));
+          content: Text(
+              'Encrypted backup restored. Unlock with its master password.')));
     } catch (_) {
       if (mounted) {
         setState(() => _error =
@@ -587,7 +601,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   Future<void> _copyOtp(VaultEntry entry) async {
     final otp = entry.otp;
-    if (otp == null) return;
+    if (otp == null || _key == null) return;
+    final epoch = _lockEpoch;
     try {
       if (otp.type == 'hotp') {
         final yes = await showDialog<bool>(
@@ -607,6 +622,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
         if (yes != true) return;
       }
       final code = await otp.generate();
+      if (epoch != _lockEpoch || _key == null || !mounted) return;
       if (otp.type == 'hotp') {
         final next = _entries!
             .map((x) => x.id == entry.id
@@ -627,7 +643,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
             .toList();
         if (!await _persist(next)) return;
       }
-      if (!mounted) return;
+      if (!mounted || epoch != _lockEpoch || _key == null) return;
       await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(

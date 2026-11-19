@@ -1,6 +1,6 @@
 # GoreeCloud Vault — Native encrypted backup and recovery
 
-**Status:** Source implementation and synthetic tests; *not yet validated* end-to-end on Android hardware or in a representative Linux user session. Do not rely on this preview for real credentials.
+**Status:** Source implementation, synthetic tests and limited physical Android 16 first-run verification; *not yet validated* end-to-end backup restoration on Android hardware or a representative Linux graphical session. Do not rely on this preview for real credentials.
 
 ## Supported format
 
@@ -13,7 +13,7 @@ The portable backup uses the exact [encrypted version 1 JSON envelope](CRYPTO-FO
 3. Choose a location using the OS picker. Linux uses the system save dialog; Android uses **ACTION_CREATE_DOCUMENT** with the system Documents provider.
 4. The export contains ciphertext only. Keep the master password separately and protect the destination and its copies.
 
-The Android native channel receives bounded encrypted bytes via Base64 and does not request external-storage, file-system-wide or Internet permissions. The channel wipes its transient byte array after save/cancellation. This cannot guarantee that other process copies are zeroized.
+The Android backup channel receives bounded ciphertext and does not request broad storage or Internet permissions itself. The Flutter debug manifest requests Internet for development tooling; the main manifest does not. The channel wipes its transient byte array after save/cancellation. This cannot guarantee that other process copies are zeroized.
 
 ## Restore
 
@@ -27,7 +27,9 @@ Restore **replaces** local data. It does not merge or synchronize items, automat
 
 ## Tested and untested scope
 
-Synthetic Dart tests cover multi-type export/inspect/re-encryption, authenticated decryption, rejection of tampered GCM ciphertext, wrong-password failures, unsupported envelope, and oversized input. Native Flutter analyzer/tests and Linux release compilation verify source compatibility. Android debug APK CI compilation tests the Kotlin bridge at build time.
+Synthetic Dart tests cover Linux 0600 mode, random exclusive temp files, symlink and oversized-file rejection, and multi-type export/inspect/re-encryption, authenticated decryption, rejection of tampered GCM ciphertext, wrong-password failures, unsupported envelope, and oversized input. Native Flutter analyzer/tests and Linux release compilation verify source compatibility. Android debug APK CI compilation tests the Kotlin bridge at build time.
+
+A debug APK was installed and launched on Android 16; an empty synthetic vault was created and the note editor inspected. The backup picker was not exercised.
 
 Not yet validated: actual file picker behavior, cloud-provider documents, app interruption during picker/write, SAF provider truncation semantics across Android vendors, directory permissions, physical-device backup import/export, cancellation, and real crash/power-loss atomicity. No rollback-detection policy exists for valid but older backups.
 

@@ -2,7 +2,7 @@
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:label="goreecloud_vault"
+        android:label="GoreeCloud Vault"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -11,9 +11,9 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 - AES-256-GCM authenticated encryption with fresh per-write nonces.
 - PBKDF2-HMAC-SHA-256 with fixed 600,000-iteration policy and per-vault random salt.
 - No intentional app telemetry, advertising, synchronization, external vault API or secret logging.
-- Native app storage in platform application support directory; Android backup disabled in the Android manifest, and Android FLAG_SECURE screenshot/recents blocking in MainActivity (runtime acceptance pending).
-- Web application CSP and lock-on-tab-hidden behavior; native client locks on paused/hidden lifecycle.
-- Encryption before writing, and native temporary-file-then-rename storage; no plaintext export.
+- Native app storage in platform application support directory; Android backup disabled in the Android manifest, and Android FLAG_SECURE screenshot/recents blocking in MainActivity (screen capture blocked in an Android 16 device smoke test).
+- Web CSP, lock-on-tab-hidden and cancellation of in-flight KDF; native app locks on inactive/paused/hidden and invalidates pending decryptions, dismissing sensitive editor dialogs.
+- Encryption before writing; native bounded ciphertext, exclusive random temporary files with Linux mode 0600 set before writing, symlink refusal and rename; no plaintext export.
 - Synthetic tests exercising authentication rejection, nonce randomness, multi-type cross-runtime fixtures and RFC 4226/6238 OTP vectors.
 - Firefox extension uses explicit user action and exact HTTPS origin checks to constrain form filling; no broad host permissions or background listener.
 
@@ -24,7 +24,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 | Master password | Password-strength UX, throttling where defensible, KDF selection/migration, stronger Argon2id memory-hard alternative, UX for unrecoverable passwords |
 | JavaScript runtime | XSS, malicious extensions, browser compromise, dependency injection, CSP audit, trusted HTTPS distribution, browser storage quota/clearing |
 | Native runtime | Secure-memory erasure limits, OS account compromise, screenshots/recents, Android accessibility misuse, Linux file permissions, device-keystore use |
-| Data integrity | Malicious replacement/rollback of an entire encrypted envelope, crash-safe file atomicity and fsync, backup restore rehearsals |
+| Data integrity | Valid older encrypted backups can roll back later data; atomic rename and file flush do not prove directory fsync or device crash durability. Device recovery rehearsals remain required |
 | Sync and identity | No sync or account service exists; authenticated enrollment, malicious-server model, tampering/replay/rollback, key rotations, authorization and recovery required |
 | Autofill | Not implemented; requires origin-matching anti-phishing tests, user gesture, safe accessibility/Autofill framework integration |
 | Export/import | Encrypted JSON import/export source exists for web, Firefox, Linux and Android, but independent device restore rehearsal, power-loss tests, safe original-vault retention, corrupt backup handling and rollback remain mandatory |

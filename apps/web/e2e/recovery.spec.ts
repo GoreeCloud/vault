@@ -44,6 +44,10 @@ test('encrypted backup exports, rejects wrong password and restores only after c
     return dialog.dismiss();
   });
   await input.setInputFiles({name:backupName,mimeType:'application/json',buffer:bytes});
+  // Backup replacement now deliberately requires a fresh unlock.
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock securely'}).click();
   await expect(page.getByRole('button',{name:/Synthetic alpha/})).toBeVisible();
   await expect(page.getByRole('button',{name:/Synthetic beta/})).toHaveCount(0);
   await page.getByRole('button',{name:'Lock vault'}).click();
@@ -63,4 +67,32 @@ test('secure note and authenticator remain encrypted with supported OTP',async({
   expect(ciphertext).not.toContain('IRREPLACEABLE-NOT-REAL-DATA');
   expect(ciphertext).not.toContain('JBSWY3DPEHPK3PXP');
   await expect(page.getByRole('button',{name:/Synthetic OTP/}).first()).toBeVisible();
+});
+
+
+test('hiding browser during master-key derivation cannot reopen or persist a new vault', async({page})=>{
+  await page.goto('/');
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Create vault'}).click();
+  await page.evaluate(()=>{
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.getByRole('heading',{name:'Create an encrypted vault'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Create vault'})).toBeEnabled({timeout:10000});
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'))).toBeNull();
+});
+
+test('hiding browser while unlocking cannot expose the decrypted dashboard',async({page})=>{
+  await initialize(page);
+  await page.getByRole('button',{name:'Lock vault'}).click();
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock securely'}).click();
+  await page.evaluate(()=>{
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Unlock securely'})).toBeEnabled({timeout:10000});
+  await expect(page.getByRole('heading',{name:/All items/})).toHaveCount(0);
 });
