@@ -95,6 +95,45 @@ void main() {
     }
   });
 
+  test('fresh unlock reloads current ciphertext instead of a cached envelope',
+      () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-fresh-unlock-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (key, first) =
+          await VaultCrypto.initialize('synthetic-fresh-unlock-password');
+      await store.save(first);
+      final currentFirst = await store.loadForUnlock();
+      expect(currentFirst?.serialize(), first.serialize());
+      final newer = await VaultCrypto.seal([
+        const VaultEntry(
+            id: 'updated-ciphertext',
+            title: 'Newer encrypted note',
+            kind: 'note',
+            username: '',
+            password: '',
+            website: '',
+            notes: 'NON-SECRET-TEST')
+      ], key, first.salt);
+      await store.save(newer);
+
+      final observed = await store.loadForUnlock(previouslyObserved: first);
+      expect(observed?.serialize(), newer.serialize());
+      final opened = await VaultCrypto.decrypt(key, observed!);
+      expect(opened.single.title, 'Newer encrypted note');
+      await expectLater(store.ensureUnchanged(first), throwsFormatException);
+      await expectLater(store.ensureUnchanged(newer), completes);
+
+      final path = File('${temp.path}/vault.enc.json');
+      await path.delete();
+      await expectLater(store.loadForUnlock(previouslyObserved: newer),
+          throwsFormatException);
+      expect(await store.loadForUnlock(), isNull);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
   test('refuses symlink as local ciphertext target', () async {
     if (!Platform.isLinux) return;
     final temp = await Directory.systemTemp.createTemp('gcv-store-symlink-');

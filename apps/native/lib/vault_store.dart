@@ -49,6 +49,21 @@ class VaultStore {
     return VaultEnvelope.parse(await file.readAsString());
   }
 
+  /// Every new master-password unlock must use the authoritative on-disk
+  /// ciphertext, never an in-memory envelope cached before a backgrounded
+  /// operation or another process's authorized replacement.
+  ///
+  /// If a previously observed vault disappeared, fail closed rather than
+  /// silently creating a new empty vault with the user's next password.
+  Future<VaultEnvelope?> loadForUnlock(
+      {VaultEnvelope? previouslyObserved}) async {
+    final current = await load();
+    if (current == null && previouslyObserved != null) {
+      throw const FormatException('Previously opened vault is missing');
+    }
+    return current;
+  }
+
   /// Reject a migration based on an outdated encrypted snapshot.
   ///
   /// This only detects changes *before* the final save: it is not a
