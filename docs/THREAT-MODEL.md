@@ -27,7 +27,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 | Data integrity | Malicious replacement/rollback of an entire encrypted envelope, crash-safe file atomicity and fsync, backup restore rehearsals |
 | Sync and identity | No sync or account service exists; authenticated enrollment, malicious-server model, tampering/replay/rollback, key rotations, authorization and recovery required |
 | Autofill | Not implemented; requires origin-matching anti-phishing tests, user gesture, safe accessibility/Autofill framework integration |
-| Export/import | Browser encrypted backup export is implemented. Native backup export and safe import/restore are not; high data-loss risk without rehearsed recovery |
+| Export/import | Encrypted JSON import/export source exists for web, Firefox, Linux and Android, but independent device restore rehearsal, power-loss tests, safe original-vault retention, corrupt backup handling and rollback remain mandatory |
 | One-time codes | Secrets encrypted but copying introduces clipboard exposure; TOTP clock skew, malformed URIs, replay, HOTP counter durability, and QR provisioning require review |
 | Firefox extension | Popup and injected content security boundaries, malicious login pages, tab navigation races, compromised browser profile, third-party dependencies and unsigned distribution; no independent extension audit |
 | Passkeys | Reference metadata does not create or authenticate with passkeys. Browser/OS credential manager, WebAuthn RP binding, native authenticator control, key protection and recovery require design/verification |

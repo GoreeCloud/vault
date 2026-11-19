@@ -41,6 +41,7 @@ function Extension() {
   const [edit,setEdit]=useState<Entry|null>(null);
   const [otpText,setOtpText]=useState('');
   const [code,setCode]=useState('');
+  const [revealCustom,setRevealCustom]=useState(false);
   const [tab,setTab]=useState<BrowserTab|null>(null);
   useEffect(()=>{
     void (async()=>{
@@ -149,8 +150,8 @@ function Extension() {
     }
     await save(items.some(x=>x.id===next.id)?items.map(x=>x.id===next.id?next:x):[...items,next]);
   }
-  function newItem(kind:VaultKind){setSelected(null);setEdit(initial(kind));setOtpText('');setError('');}
-  function editing(item:Entry){setSelected(null);setEdit({...item});setOtpText(item.otp?.secret??'');setError('');}
+  function newItem(kind:VaultKind){setSelected(null);setEdit(initial(kind));setOtpText('');setRevealCustom(false);setError('');}
+  function editing(item:Entry){setSelected(null);setEdit({...item});setOtpText(item.otp?.secret??'');setRevealCustom(false);setError('');}
 
   const visible=(items??[]).filter(x=>[x.title,x.username,x.website].some(y=>y.toLowerCase().includes(search.toLowerCase())));
   return <div className="popup">
@@ -179,7 +180,7 @@ function Extension() {
         <input className="search" value={search} aria-label="Search vault items" placeholder="Search encrypted items"
           onChange={e=>setSearch(e.target.value)}/>
         <div className="list">{visible.length?visible.map(item=><button className="item" key={item.id}
-          onClick={()=>{setSelected(item);setCode('');setError('');}}>
+          onClick={()=>{setSelected(item);setCode('');setRevealCustom(false);setError('');}}>
           <span className="glyph">{item.kind==='note'?'▤':item.kind==='otp'?'◷':item.kind==='passkey'?'✧':'◈'}</span>
           <span className="copy"><strong>{item.title}</strong><small>{kindName[item.kind??'login']}</small></span>›
         </button>):<p className="empty">No items. Add one or import an encrypted backup.</p>}</div>
@@ -202,8 +203,13 @@ function Extension() {
             onClick={()=>void fill(selected)}>Fill current HTTPS site</button>}
           {selected.notes&&<p className="note-content">{selected.notes}</p>}
         </>}
+        {(selected.customFields??[]).length>0&&
+          <button className="secondary" onClick={()=>setRevealCustom(!revealCustom)}>
+            {revealCustom?'Conceal secret fields':'Reveal custom fields'}
+          </button>}
         {(selected.customFields??[]).map((field,i)=><p className="detail" key={i}>
-          {field.name}<strong>{field.concealed?'••••••':field.value}</strong></p>)}
+          {field.name}<strong>{field.concealed&&!revealCustom?'••••••':field.value}</strong></p>)}
+        {(selected.tags??[]).length>0&&<p className="muted">Tags: {selected.tags?.join(', ')}</p>}
         <button className="secondary" onClick={()=>editing(selected)}>Edit item</button>
       </>:<form className="editor" onSubmit={e=>void submitEdit(e)}>
         <button type="button" className="back" onClick={()=>setEdit(null)}>← Cancel</button>
@@ -225,6 +231,50 @@ function Extension() {
           <label>RP domain<input value={edit!.passkey?.rpId??''}
             onChange={e=>setEdit({...edit!,passkey:{rpId:e.target.value,credentialId:'',userHandle:''}})}/></label></>}
         <label>Encrypted notes<textarea rows={4} value={edit!.notes} onChange={e=>setEdit({...edit!,notes:e.target.value})}/></label>
+        <label>Tags (comma-separated)
+          <input maxLength={3500} value={(edit!.tags??[]).join(', ')}
+            onChange={e=>setEdit({...edit!,tags:e.target.value.split(',')
+              .map(t=>t.trim().slice(0,120)).filter(Boolean).slice(0,30)})}/>
+        </label>
+        <label className="check-field">Favorite
+          <input type="checkbox" checked={edit!.favorite===true}
+            onChange={e=>setEdit({...edit!,favorite:e.target.checked})}/>
+        </label>
+        <h3 className="field-heading">Custom encrypted fields</h3>
+        {(edit!.customFields??[]).map((field,i)=><div className="custom-field" key={i}>
+          <label>Field name
+            <input maxLength={150} value={field.name}
+              onChange={e=>setEdit({...edit!,customFields:(edit!.customFields??[]).map(
+                (f,j)=>j===i?{...f,name:e.target.value}:f)})}/>
+          </label>
+          <label>Value
+            <input maxLength={20000} type={field.concealed&&!revealCustom?'password':'text'}
+              value={field.value}
+              onChange={e=>setEdit({...edit!,customFields:(edit!.customFields??[]).map(
+                (f,j)=>j===i?{...f,value:e.target.value}:f)})}/>
+          </label>
+          <label className="check-field">Conceal value
+            <input type="checkbox" checked={field.concealed}
+              onChange={e=>setEdit({...edit!,customFields:(edit!.customFields??[]).map(
+                (f,j)=>j===i?{...f,concealed:e.target.checked}:f)})}/>
+          </label>
+          <button type="button" className="secondary"
+            onClick={()=>setEdit({...edit!,customFields:(edit!.customFields??[]).filter((_,j)=>j!==i)})}>
+            Remove field
+          </button>
+        </div>)}
+        <div className="field-actions">
+          <button type="button" className="secondary"
+            onClick={()=>setRevealCustom(!revealCustom)}>
+            {revealCustom?'Hide custom values':'Reveal custom values'}
+          </button>
+          <button type="button" className="secondary"
+            disabled={(edit!.customFields??[]).length>=30}
+            onClick={()=>setEdit({...edit!,customFields:[...(edit!.customFields??[]),
+              {name:'',value:'',concealed:true}]})}>
+            + Custom field
+          </button>
+        </div>
         <button className="primary" disabled={busy}>Save encrypted</button>
         {items.some(x=>x.id===edit!.id)&&<button type="button" className="danger"
           onClick={()=>{if(window.confirm('Delete encrypted item?'))void save(items.filter(x=>x.id!==edit!.id));}}>Delete item</button>}

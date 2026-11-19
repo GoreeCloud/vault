@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'vault_crypto.dart';
 import 'vault_store.dart';
 import 'vault_editor.dart';
+import 'vault_backup.dart';
+import 'vault_backup_files.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -193,6 +195,136 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<String?> _requestBackupPassword() async {
+    final controller = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Unlock encrypted backup'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Enter the master password used to encrypt this backup. '
+                'The backup is validated before your local vault can be replaced.'),
+            const SizedBox(height: 14),
+            TextField(
+              autofocus: true,
+              controller: controller,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              maxLength: 1024,
+              decoration:
+                  const InputDecoration(labelText: 'Backup master password'),
+              onSubmitted: (_) {
+                if (controller.text.isNotEmpty) {
+                  Navigator.pop(ctx, controller.text);
+                }
+              },
+            )
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  Navigator.pop(ctx, controller.text);
+                }
+              },
+              child: const Text('Validate backup'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.clear();
+      controller.dispose();
+    }
+  }
+
+  Future<void> _exportBackup() async {
+    if (_busy || _entries == null || _envelope == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final ciphertext = VaultBackupCodec.exportEncrypted(_envelope!);
+      final saved = await VaultBackupFiles.exportEncrypted(ciphertext);
+      if (!mounted) return;
+      if (saved) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Encrypted backup saved. Keep the master password safe.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error =
+            'Could not export encrypted backup. No vault data changed.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _importBackup() async {
+    if (_busy || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final encrypted = await VaultBackupFiles.importEncrypted();
+      if (!mounted || encrypted == null) return;
+      final password = await _requestBackupPassword();
+      if (!mounted || password == null) return;
+      final candidate = await VaultBackupCodec.inspect(encrypted, password);
+      if (!mounted) return;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Replace local encrypted vault?'),
+          content: Text(
+              'This authenticated backup contains ${candidate.entries.length} encrypted items. Importing replaces the current local vault and its master password. Export a backup of your current vault first. This operation cannot be automatically undone.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Keep current vault')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Replace local vault')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+      // The encrypted store uses a temporary file plus rename. The in-memory
+      // key/items are updated only AFTER the encrypted file write succeeds.
+      await _store.save(candidate.envelope);
+      if (!mounted) return;
+      _master.clear();
+      _search.clear();
+      setState(() {
+        _envelope = candidate.envelope;
+        // A restore ends in the LOCKED state, even if Android foreground
+        // transitions occurred while its system picker was open.
+        _key = null;
+        _entries = null;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Encrypted backup imported. Verify the restored items.')));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error =
+            'Import rejected or save failed. Existing encrypted vault was not replaced.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
@@ -219,11 +351,33 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                   ])
             ]),
             actions: [
-              if (_entries != null)
+              if (_entries != null) ...[
+                PopupMenuButton<String>(
+                  tooltip: 'Encrypted backup options',
+                  enabled: !_busy,
+                  onSelected: (value) {
+                    if (value == 'export') {
+                      _exportBackup();
+                    }
+                    if (value == 'import') {
+                      _importBackup();
+                    }
+                  },
+                  itemBuilder: (ctx) => const [
+                    PopupMenuItem(
+                        value: 'export',
+                        child: Text('Export encrypted backup')),
+                    PopupMenuItem(
+                        value: 'import',
+                        child: Text('Restore encrypted backup')),
+                  ],
+                  icon: const Icon(Icons.backup_outlined),
+                ),
                 IconButton(
                     tooltip: 'Lock vault',
                     onPressed: _lock,
                     icon: const Icon(Icons.lock_outline))
+              ]
             ]),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -307,6 +461,12 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                                     : _envelope == null
                                         ? 'Create vault'
                                         : 'Unlock securely')),
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: _busy ? null : _importBackup,
+                              icon: const Icon(Icons.settings_backup_restore),
+                              label: const Text('Restore encrypted backup'),
+                            ),
                             if (_error != null)
                               Padding(
                                   padding: const EdgeInsets.only(top: 12),
