@@ -31,7 +31,7 @@ test('encrypted backup exports, rejects wrong password and restores only after c
   expect(envelope.cipher.name).toBe('aes-256-gcm');
   expect(bytes.toString('utf8')).not.toContain('NOT-A-REAL-PRIVATE-NOTE');
   await createNote(page,'Synthetic beta','SECOND TEST NOTE');
-  const input=page.locator('aside input[type=file]');
+  const input=page.locator('aside label.import-label').first().locator('input[type=file]');
 
   page.once('dialog',dialog=>dialog.accept('incorrect-master-password'));
   await input.setInputFiles({name:backupName,mimeType:'application/json',buffer:bytes});

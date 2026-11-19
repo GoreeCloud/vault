@@ -11,7 +11,7 @@ An **open-source, offline-first encrypted vault development preview** for web, L
 | Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, backup export/import with fresh unlock, lock on tab hidden and in-flight unlock invalidation |
 | Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage with Linux encrypted-file mode 0600, user-confirmed encrypted backup import/export via Linux file chooser |
 | Android | Flutter native Android | Same native Flutter client, Android FLAG_SECURE; limited Android 16 device install/launch and synthetic first-run verified; full device acceptance pending; encrypted backup via Android Storage Access Framework in source |
-| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, custom fields/tags/favorites, locked restore, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
+| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, custom fields/tags/favorites, local Bitwarden plaintext-JSON login/note migration, locked restore, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
 
 **Not a WebView wrapper.** Flutter is an approved native Linux and Android UI framework under the current GoreeCloud project standards.
 
@@ -23,7 +23,7 @@ PBKDF2 is a conservative interoperable initial choice, not the final password-ma
 
 The web application uses a restrictive production CSP and does not connect to a cloud API. Web and native clients invalidate in-flight unlock operations when locked or backgrounded. Encrypted backup replacement requires a fresh unlock. The Firefox extension requests only `storage`, `activeTab`, and `scripting` (no broad host permissions), and verifies an exact HTTPS origin before user-requested form fill. Malicious browser extensions, compromised JavaScript dependencies, compromised OS accounts, memory capture, browser storage removal, and malicious browser environments remain threats. A self-hosted password manager needs much more than encryption to be production-ready.
 
-See [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
+See [Bitwarden import boundaries](docs/IMPORTING-BITWARDEN.md), [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
 
 ## Getting started
 
@@ -92,6 +92,6 @@ The five mandatory platform systems are architecturally relevant but **not yet i
 
 ## Provenance and license
 
-GoreeCloud Vault's newly authored application code is provided under **AGPL-3.0-only** (see [LICENSE](LICENSE)). It does not bundle Bitwarden/Proton Pass source. Third-party libraries and the copied MIT GoreeCloud UI token snapshot retain their own licenses; see [third-party notices](docs/THIRD-PARTY-NOTICES.md). Open-source availability does not mean a security audit has occurred.
+GoreeCloud Vault's newly authored application code is provided under **AGPL-3.0-only** (see [LICENSE](LICENSE)). It does not bundle Bitwarden/Proton Pass source. The local Bitwarden plaintext JSON importer uses a documented data shape, not Bitwarden application code, and does not migrate existing passkey private keys, organization items or attachments. Third-party libraries and the copied MIT GoreeCloud UI token snapshot retain their own licenses; see [third-party notices](docs/THIRD-PARTY-NOTICES.md). Open-source availability does not mean a security audit has occurred.
 
 Issues and carefully scoped pull requests are welcome. **Never include passwords, master passwords, private vault data, keys or recovery codes in bug reports, logs, screenshots or issues.**
