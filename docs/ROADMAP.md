@@ -29,3 +29,12 @@ A bounded, explicitly confirmed, local parser for manually extracted plaintext P
 ## WebAuthn domain-scoping foundation
 
 Web and Firefox metadata editors validate newly entered RP domains using a Public Suffix List-aware parser, with pure RP-domain/origin-suffix tests. This does **not** implement passkey registration or sign-in. Next engineering phases are test-RP challenge verification, secure authenticator lifecycle and recovery, user consent and UV, permission-minimized browser integration, Android Credential Provider, security review and signed distribution. Do not relax password autofill exact-origin constraints.
+
+
+## WebAuthn protocol experiment
+
+A disposable localhost test relying party checks fresh one-use challenges,
+user-verified registration and assertion signatures using a browser virtual
+authenticator. The next passkey workstream must establish safe browser-extension
+and Android platform credential-provider contracts, user consent and device
+key custody, not merely attach the test-RP code to production routes.
