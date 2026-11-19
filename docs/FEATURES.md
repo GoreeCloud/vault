@@ -17,7 +17,7 @@
 | Proton Pass extracted plaintext data.json import | Web and Firefox source / synthetic tests | Active personal logins/notes, first URL, TOTP, basic custom fields; explicit counts of unsupported items, aliases, passkeys, files and deleted entries. No ZIP/PGP/CSV decryption or passkey transfer |
 | Bitwarden plaintext JSON import | Web + Firefox browser tests; Flutter native parser and encrypted-append source with synthetic tests | Explicit user action; personal logins/notes, basic custom fields, folder tags and TOTP; preview counts skipped passkeys, unsupported item types, organization items, history, attachments, extra URLs and reprompt policies; not lossless |
 | Firefox WebExtension | Implemented / compiled and linted | MV3 popup, encrypted storage, explicit origin-scoped fill; unsigned; installed temporarily in Firefox 159 headless, popup mocked-WebExtensions testing; real tab autofill pending |
-| Passkey reference records | Implemented | Metadata **only**: not registration, storage of private keys, or authentication |
+| Passkey reference records | Implemented with web/Firefox RP-domain preflight | Metadata **only**. Web/Firefox editors reject public suffixes and malformed domains. Not registration, private keys, or authentication |
 | Usable WebAuthn/passkey authenticator | Not implemented | Requires browser/OS integration, credential lifecycle and RP-bound authorization |
 | Cloud sync, sharing, broad autofill, aliases | Not implemented | Requires separately reviewed security architecture |
 | Signed release and deployment | Not verified | Do not treat development builds as production |

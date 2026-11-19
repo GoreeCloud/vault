@@ -25,3 +25,7 @@ Implement full capability-aware migration from supported password-manager export
 ## Proton Pass migration scope
 
 A bounded, explicitly confirmed, local parser for manually extracted plaintext Proton Pass data.json has been implemented in the browser and Firefox clients. It maps active login/note records with supported fields into the encrypted local vault and counts omitted unsupported types, passkeys, attachments, additional URLs and other metadata. Supported content-format versions are limited to 1–8. No ZIP or PGP decryption is implemented; native import and true passkey migration remain separately gated. Before production acceptance, exercise real authorized Proton exports (never uploading their contents), verify version upgrades, malicious JSON, user cancellation, independent backup restores and complete field preservation.
+
+## WebAuthn domain-scoping foundation
+
+Web and Firefox metadata editors validate newly entered RP domains using a Public Suffix List-aware parser, with pure RP-domain/origin-suffix tests. This does **not** implement passkey registration or sign-in. Next engineering phases are test-RP challenge verification, secure authenticator lifecycle and recovery, user consent and UV, permission-minimized browser integration, Android Credential Provider, security review and signed distribution. Do not relax password autofill exact-origin constraints.

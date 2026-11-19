@@ -2,7 +2,7 @@
 
 An **open-source, offline-first encrypted vault development preview** for web, Linux, Android and Firefox. Inspired by the user-owned privacy principles of Bitwarden and Proton Pass, without importing their proprietary or restricted source. **Not independently security audited; do not entrust irreplaceable credentials to this preview.**
 
-**Project state:** Source implementation and automated checks in progress. No stable release, hosted service, production deployment, cloud sync, Android system autofill, usable/passkey-authenticator support, email aliases, or device-security audit is claimed. Passkey *references* are not passkeys.
+**Project state:** Source implementation and automated checks in progress. No stable release, hosted service, production deployment, cloud sync, Android system autofill, usable/passkey-authenticator support, email aliases, or device-security audit is claimed. Passkey *references* are not passkeys. Web/Firefox editors validate new RP reference domains using a Public Suffix List-aware parser; this does not authorize WebAuthn signing.
 
 ## Applications
 

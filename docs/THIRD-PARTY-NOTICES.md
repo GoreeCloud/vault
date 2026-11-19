@@ -11,6 +11,7 @@ Original GoreeCloud Vault files are licensed under AGPL-3.0-only. The following 
 | cryptography (Dart) | PBKDF2 + AES-GCM | https://github.com/dint-dev/cryptography | Apache-2.0 |
 | path_provider | Platform app-support path | https://github.com/flutter/packages | BSD-3-Clause |
 | file_selector 1.0.3 | Native OS file selection and Linux save dialog | https://github.com/flutter/packages | BSD-3-Clause |
+| tldts and tldts-core 7.5.4 | Public Suffix List-aware WebAuthn RP metadata preflight, web/Firefox | https://github.com/remusao/tldts | MIT |
 | Playwright test runner | Browser recovery and regression testing (development only) | https://github.com/microsoft/playwright | Apache-2.0 |
 | Mozilla web-ext CLI | Firefox extension development lint/build (not included in runtime) | https://github.com/mozilla/web-ext | MPL-2.0 |
 | GoreeCloud UI token snapshot | App semantic design values | https://github.com/GoreeCloud/gc-ui | MIT |
