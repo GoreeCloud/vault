@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Browser app | Source implemented / build tested | React 19 + TypeScript |
 | Linux graphical application | Source implemented / static and crypto tests | Flutter native, representative runtime and packaging pending |
-| Android application | Source implemented / static and crypto tests | Flutter native Android runner; device install pending |
+| Android application | Source implemented / static and crypto tests | Flutter native Android runner and FLAG_SECURE screenshot prevention; APK build and physical-device install pending |
 | Local authenticated encryption | Implemented / synthetic tests | AES-256-GCM; PBKDF2-HMAC-SHA-256; no cryptographic audit |
 | Master password create/unlock | Implemented in source | No password recovery |
 | Login CRUD, search, random password generation | Implemented in source | User interaction, accessibility and persistence not yet fully runtime-tested |

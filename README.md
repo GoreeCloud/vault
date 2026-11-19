@@ -10,7 +10,7 @@ An **open-source, offline-first password-vault development preview** for the bro
 | --- | --- | --- |
 | Browser | React 19 + TypeScript + Vite | Create and unlock encrypted local vault, add/edit/delete/search logins, password generator, encrypted JSON backup export, auto-lock when tab hidden |
 | Linux desktop | Flutter native Linux | Create and unlock encrypted local vault, add/edit/delete/search logins, password generator, lock on app background |
-| Android | Flutter native Android | Same Flutter client source, Android platform runner and local app-private storage; physical-device behavior not yet verified |
+| Android | Flutter native Android | Same Flutter client source, Android platform runner and local app-private storage; Android screenshot blocking in source; physical-device behavior not yet verified |
 
 **Not a WebView wrapper.** Flutter is an approved native Linux and Android UI framework under the current GoreeCloud project standards.
 
@@ -46,7 +46,7 @@ flutter test
 flutter run -d linux             # native Linux desktop
 flutter run -d <android-device>  # native Android device
 ```
-Linux build: `flutter build linux --release`. Android development APK: `flutter build apk --debug`. Neither output is a validated signed release. Keep Android build signing credentials outside source control.
+Linux build: `flutter build linux --release`. Android development APK: `flutter build apk --debug` (requires a full Java 17 JDK and Android SDK). Neither output is a validated signed release. Keep Android build signing credentials outside source control.
 
 ## Repository layout
 

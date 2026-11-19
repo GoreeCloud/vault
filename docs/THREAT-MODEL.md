@@ -11,7 +11,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 - AES-256-GCM authenticated encryption with fresh per-write nonces.
 - PBKDF2-HMAC-SHA-256 with fixed 600,000-iteration policy and per-vault random salt.
 - No intentional app telemetry, advertising, synchronization, external vault API or secret logging.
-- Native app storage in platform application support directory; Android backup disabled in the Android manifest.
+- Native app storage in platform application support directory; Android backup disabled in the Android manifest, and Android FLAG_SECURE screenshot/recents blocking in MainActivity (runtime acceptance pending).
 - Web application CSP and lock-on-tab-hidden behavior; native client locks on paused/hidden lifecycle.
 - Encryption before writing, and native temporary-file-then-rename storage; no plaintext export.
 - Synthetic tests exercising authentication rejection, nonce randomness and a cross-runtime fixture.

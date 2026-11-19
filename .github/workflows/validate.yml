@@ -58,3 +58,28 @@ jobs:
       - name: Compile native Linux desktop
         working-directory: apps/native
         run: flutter build linux --release
+
+  android:
+    name: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4 pinned
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2 pinned
+        with:
+          flutter-version: '3.27.4'
+          channel: stable
+      - name: Resolve Dart dependencies
+        working-directory: apps/native
+        run: flutter pub get
+      - name: Compile Android debug APK
+        working-directory: apps/native
+        run: flutter build apk --debug
+      - name: Confirm generated development APK
+        run: test -s apps/native/build/app/outputs/flutter-apk/app-debug.apk

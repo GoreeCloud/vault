@@ -1,3 +1,4 @@
+import sample from '../../../tests/interop/sample-v1.json';
 import { describe, expect, test } from 'vitest';
 import { encryptEntries, from64, generatePassword, initialize, parseEnvelope, unlock, type Entry } from './crypto';
 describe('encrypted local vault format', () => {
@@ -16,6 +17,10 @@ describe('encrypted local vault format', () => {
     expect(from64(created.envelope.kdf.salt)).toHaveLength(16);
     expect(() => parseEnvelope(JSON.stringify({...created.envelope, version:2}))).toThrow();
     expect(() => parseEnvelope(JSON.stringify({...created.envelope, cipher:{...created.envelope.cipher,nonce:'bad'}}))).toThrow();
+  });
+  test('Node.js synthetic fixture decrypts in WebCrypto', async () => {
+    const result = await unlock('interop test password only', parseEnvelope(JSON.stringify(sample)));
+    expect(result.entries[0].password).toEqual('NOT-A-REAL-PASSWORD');
   });
   test('password generator', () => {
     expect(generatePassword(24)).toHaveLength(24);
