@@ -8,8 +8,11 @@ export default defineConfig({
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 12_000 },
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
+  ],
   use: {
-    browserName: 'chromium',
     trace: 'retain-on-failure',
     screenshot: 'off',
     video: 'off',

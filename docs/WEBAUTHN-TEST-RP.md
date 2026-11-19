@@ -17,12 +17,12 @@ GoreeCloud Vault's UI, encrypted format or native apps.
 
 ## Local development
 
-Node.js 24+, with trusted Playwright Chromium installed:
+Node.js 24+, with trusted Playwright Chromium and Firefox installed:
 
     cd tests/webauthn-rp
     npm ci --ignore-scripts
     npm test
-    npx playwright install chromium
+    npx playwright install chromium firefox
     npm run test:e2e
     # Optional manual localhost test only:
     npm start
@@ -53,9 +53,11 @@ not user credentials.
   test credentials at 16; serves static assets with a restrictive CSP and no
   persistent data, analytics, logs of WebAuthn responses or secrets
 
-Node unit tests cover the challenge ledger; browser tests use Chromium's virtual
-WebAuthn authenticator for registration, assertion, replay rejection,
+Node unit tests cover the challenge ledger; browser tests use the virtual
+WebAuthn authenticators in both Chromium and Firefox for registration, assertion, replay rejection,
 origin/host checks and cryptographically tampered assertions.
+This is test-RP browser support, not the Firefox extension acting as a
+WebAuthn authenticator.
 
 ## Explicit production blockers
 

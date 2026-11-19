@@ -173,8 +173,8 @@ jobs:
         run: npm ci --ignore-scripts --no-fund --no-audit
       - name: Test bounded one-time challenge lifecycle
         run: npm test
-      - name: Install Chromium for isolated virtual authenticator
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium and Firefox for isolated virtual authenticators
+        run: npx playwright install --with-deps chromium firefox
       - name: Run disposable WebAuthn protocol integration tests
         run: npm run test:e2e
       - name: Audit test RP dependencies

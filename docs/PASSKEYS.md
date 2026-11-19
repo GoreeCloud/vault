@@ -24,8 +24,8 @@ The PSL snapshot and dependencies must be kept current; future functional WebAut
 
 ## Disposable localhost WebAuthn protocol test
 
-A **separate test-only relying party** under tests/webauthn-rp/ uses a browser
-virtual authenticator, valid one-use server challenges and verified
+A **separate test-only relying party** under tests/webauthn-rp/ uses Chromium and Firefox browser
+virtual authenticators, valid one-use server challenges and verified
 registration/assertion signatures. It never stores private keys in GoreeCloud
 Vault or registers a credential on behalf of an unrelated website. See
 [disposable test RP boundaries](WEBAUTHN-TEST-RP.md). These tests are
