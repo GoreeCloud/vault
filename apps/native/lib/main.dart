@@ -397,23 +397,41 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   Future<void> _importBackup() async {
     if (_busy || !mounted) return;
+    // A restore is destructive. Pin the destination snapshot even when the
+    // vault is initially empty; neither picker activity nor dialogs authorize
+    // replacing a file that changed during the operation.
+    final original = _envelope;
     setState(() {
       _busy = true;
       _error = null;
     });
+    Uint8List? encrypted;
     try {
-      final encrypted = await VaultBackupFiles.importEncrypted();
+      encrypted =
+          await (widget.selectJsonBytes ?? VaultBackupFiles.importEncrypted)();
       if (!mounted || encrypted == null) return;
+
+      // The OS file picker may background and lock the native app. That
+      // transition is expected; all SUBSEQUENT transitions invalidate the
+      // candidate before its original destination can be replaced.
+      final epoch = _lockEpoch;
+      await _store.ensureSnapshot(original);
+      if (!mounted || epoch != _lockEpoch) return;
+
       final password = await _requestBackupPassword();
-      if (!mounted || password == null) return;
+      if (!mounted || password == null || epoch != _lockEpoch) return;
       final candidate = await VaultBackupCodec.inspect(encrypted, password);
-      if (!mounted) return;
+      if (!mounted || epoch != _lockEpoch) return;
+      final itemCount = candidate.entries.length;
+
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Replace local encrypted vault?'),
-          content: Text(
-              'This authenticated backup contains ${candidate.entries.length} encrypted items. Importing replaces the current local vault and its master password. Export a backup of your current vault first. This operation cannot be automatically undone.'),
+          content: Text('This authenticated backup contains $itemCount '
+              'encrypted items. Importing replaces the current local vault '
+              'and its master password. Export a backup of your current vault '
+              'first. This operation cannot be automatically undone.'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -424,30 +442,42 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
           ],
         ),
       );
-      if (confirm != true || !mounted) return;
-      // The encrypted store uses a temporary file plus rename. The in-memory
-      // key/items are updated only AFTER the encrypted file write succeeds.
+      if (confirm != true || !mounted || epoch != _lockEpoch) return;
+
+      // Detect stale destinations immediately before commit. This check is
+      // NOT an atomic compare-and-swap and does not guarantee crash durability.
+      await _store.ensureSnapshot(original);
+      if (!mounted || epoch != _lockEpoch) return;
       await _store.save(candidate.envelope);
       if (!mounted) return;
+
+      // Even if app lifecycle changed while a save was already in progress,
+      // publish only the encrypted envelope and NEVER the decrypted entries
+      // or derived key. A fresh unlock re-reads the authoritative file.
       _master.clear();
       _search.clear();
       setState(() {
         _envelope = candidate.envelope;
-        // A restore ends in the LOCKED state, even if Android foreground
-        // transitions occurred while its system picker was open.
         _key = null;
         _entries = null;
         _error = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Encrypted backup restored. Unlock with its master password.')));
+      if (epoch == _lockEpoch) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Encrypted backup restored. Unlock with its master password.')));
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error =
-            'Import rejected or save failed. Existing encrypted vault was not replaced.');
+            'Restore refused or interrupted. Verify your encrypted vault '
+                'before retrying; a failed storage operation is not proof of '
+                'automatic rollback.');
       }
     } finally {
+      // The returned byte array is owned by the caller; best-effort hygiene.
+      // Password strings and other managed-language buffers are not zeroizable.
+      encrypted?.fillRange(0, encrypted.length, 0);
       if (mounted) setState(() => _busy = false);
     }
   }

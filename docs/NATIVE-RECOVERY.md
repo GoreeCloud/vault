@@ -29,7 +29,13 @@ The Android backup channel receives bounded ciphertext and does not request broa
 2. Choose an encrypted JSON file. Selection is capped at 5,000,000 bytes. The native file reader checks the provider-reported size and independently caps streamed bytes, rejecting truncation, extra bytes, or a provider reporting a smaller size than it delivers.
 3. Enter the **password for that backup**. Invalid format, incorrect password and altered authenticated ciphertext are rejected *before* local state is changed.
 4. Review the number of authenticated items and explicitly confirm **Replace local vault**.
-5. The app writes the encrypted envelope through its existing temp-file-and-rename store. Only after the write succeeds does it replace the current encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
+5. The app writes the encrypted envelope through its existing temp-file-and-rename store. Before writing, the app checks that the current encrypted destination still
+matches the previously observed snapshot, including an originally missing
+vault. The restore also rejects newly invalidated app lock sessions after
+the OS picker returns; changing apps during password validation or confirmation
+aborts the operation. These are best-effort safeguards, not cross-process
+atomic compare-and-swap or verified power-loss durability. Only after the
+write succeeds does it replace the current encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
 
 Restore **replaces** local data. It does not merge or synchronize items, automatically retain a history, change the master password on existing files, recover a forgotten password, or detect rollback of a valid older encrypted backup. Back up current encrypted data first.
 
@@ -39,7 +45,9 @@ Synthetic Dart tests cover bounded provider-stream reads (misreported size, over
 
 A debug APK was installed and launched on Android 16; an empty synthetic vault was created and the note editor inspected. The backup picker was not exercised.
 
-Not yet validated: actual file picker behavior, cloud-provider documents, app interruption during picker/write, SAF provider truncation semantics across Android vendors, directory permissions, physical-device backup import/export, cancellation, and real crash/power-loss atomicity. No rollback-detection policy exists for valid but older backups.
+Not yet validated: actual file picker behavior, cloud-provider documents, app interruption during picker/write, SAF provider truncation semantics across Android vendors, directory permissions, physical-device backup import/export, cancellation, and real crash/power-loss atomicity. No rollback-detection policy exists for valid but older backups. If storage
+fails during restore, inspect the actual encrypted destination before retrying;
+do not assume that all write failures automatically preserve the original.
 
 ## Recovery acceptance checklist
 
