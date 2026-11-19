@@ -5,6 +5,7 @@ import { encryptEntries, generatePassword, initialize, parseEnvelope, randomId, 
 import { generateOtp, parseOtp } from './otp';
 import {normalizePasskeyRpId} from './passkey_rp';
 import { bitwardenImportWarning, parseBitwardenPlaintextJson } from './import_bitwarden';
+import { parseProtonPassPlaintextJson, protonImportWarning } from './import_proton';
 import './style.css';
 
 const blank = (kind: VaultKind): Entry =>
@@ -200,6 +201,32 @@ function App() {
     } finally { setBusy(false); }
   }
 
+  async function importProton(event: React.ChangeEvent<HTMLInputElement>) {
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if (!file || entries===null || !key.current || busy) return;
+    if (file.size===0 || file.size>5_000_000) {
+      setNotice('Select an extracted Proton Pass plaintext data.json (max 5 MB), not a ZIP or PGP file.');
+      return;
+    }
+    const epoch=lockEpoch.current;
+    setBusy(true);setNotice('');
+    try {
+      const source=await file.text();
+      if (epoch!==lockEpoch.current || document.visibilityState!=='visible') return;
+      const preview=parseProtonPassPlaintextJson(source,randomId);
+      if(entries.length+preview.entries.length>20_000)throw Error('Too many entries');
+      if(!window.confirm(protonImportWarning(preview)))return;
+      if(epoch!==lockEpoch.current || document.visibilityState!=='visible')return;
+      const written=await persist([...entries,...preview.entries]);
+      if(written && epoch===lockEpoch.current)
+        setNotice('Proton Pass login/note items encrypted locally. Review imported records.');
+    }catch{
+      if(epoch===lockEpoch.current)
+        setNotice('Proton Pass import rejected or save failed. Inspect the encrypted vault before retrying.');
+    }finally{setBusy(false);}
+  }
+
   async function saveEditor(event: React.FormEvent) {
     event.preventDefault();
     if (!edit || !entries) return;
@@ -307,10 +334,13 @@ function App() {
         <label className="quiet backup import-label">↑ Restore encrypted backup
           <input type="file" accept=".json,application/json" onChange={e=>void importBackup(e)} hidden /></label>
         <div className="side-heading second">IMPORT FROM OTHER MANAGERS</div>
-        <p className="sidebar-note">Bitwarden plaintext JSON only. The source stays on your disk; review the omissions before importing and delete the plaintext copy when safe.</p>
+        <p className="sidebar-note">Bitwarden plaintext JSON, or Proton Pass data.json extracted from an unencrypted ZIP. Sources remain on disk; review omissions and protect or securely delete plaintext when safe.</p>
         <label className="quiet backup import-label">↑ Import Bitwarden plaintext JSON
           <input type="file" aria-label="Bitwarden plaintext JSON file" accept=".json,application/json"
             disabled={busy} onChange={e=>void importBitwarden(e)} hidden /></label>
+        <label className="quiet backup import-label">↑ Import Proton Pass data.json
+          <input type="file" aria-label="Proton Pass plaintext data.json file" accept=".json,application/json"
+            disabled={busy} onChange={e=>void importProton(e)} hidden /></label>
       </aside>
       <section className="workspace">
         <div className="workspace-head"><div><span className="eyebrow">YOUR PRIVATE LIBRARY</span>

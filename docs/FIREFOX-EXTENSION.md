@@ -84,3 +84,7 @@ Automated synthetic Firefox popup tests exercise a deliberately delayed
 extension-storage write across the inactivity lock and a fresh unlock.
 This is not a general guarantee of atomic multi-window writes, OS memory
 zeroization, or protection against malicious privileged extensions.
+
+## Proton Pass migration (limited)
+
+The popup can also parse a manually extracted **plaintext Proton Pass data.json** file into encrypted personal login/note records after user consent and a count-only omission preview. It does not import ZIP archives, PGP ciphertext, CSV, alias forwarding, attachments or usable passkeys. A source plaintext file remains on the user's disk. See [Proton import boundaries](IMPORTING-PROTON-PASS.md) and do not assume user exports are fully portable.
