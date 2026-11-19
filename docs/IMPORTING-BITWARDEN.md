@@ -4,13 +4,13 @@
 
 **Security caution:** Plaintext password-manager exports are extremely sensitive. Export only on a trusted device, do not send the file through email/cloud/network services, and delete the plaintext source when you have independently checked your encrypted GoreeCloud backup and data. Bitwarden's [export guidance](https://bitwarden.com/help/export-your-data/) warns against insecure storage of plaintext exports.
 
-## Web and Firefox workflow
+## Web, Firefox, Linux and Android workflow
 
 1. Create or unlock a GoreeCloud Vault local encrypted vault.
-2. Under **Import from other managers** (web) or **Import Bitwarden JSON** (Firefox), choose a Bitwarden **plaintext JSON** export, max 5 MB.
-3. Read the preview: number of personal logins/secure notes and count of unsupported/omitted content. No passwords or item titles are shown in the confirmation.
-4. Confirm explicitly. The client generates new random record identifiers and **appends** supported records to the current vault; it does not overwrite, merge, deduplicate, or sync across devices.
-5. Review every migrated entry. Export a *GoreeCloud encrypted JSON backup* only after successful import; to transfer to Linux/Android, use the native **Restore encrypted backup** path, which replaces the native device vault after separate confirmation and requires a fresh unlock.
+2. Under **Import from other managers** (web), **Import Bitwarden JSON** (Firefox), or the native **Encrypted backup options → Import Bitwarden plaintext JSON** menu (Linux/Android), choose a **plaintext JSON** export, max 5 MB. For native clients create a local encrypted vault first.
+3. Native clients require re-entry of the destination master password **after the file picker closes** because backgrounding locks the app. Read the preview: number of personal logins/secure notes and count of unsupported/omitted content. No passwords or item titles are shown in the confirmation.
+4. Confirm explicitly. The client generates new random record identifiers and **appends** supported records to the current encrypted vault; it does not overwrite, merge, deduplicate, or sync across devices.
+5. Native clients **remain locked** after importing. Unlock and review every entry. Export a *GoreeCloud encrypted JSON backup* only after successful import; to transfer to Linux/Android, use the native **Restore encrypted backup** path, which replaces the native device vault after separate confirmation and requires a fresh unlock.
 
 Supported mappings (personal vault only):
 
@@ -31,8 +31,8 @@ Bitwarden's password-protected or account-restricted encrypted JSON is **not sup
 
 - Parsing and transformation execute locally in memory. No plaintext export is sent to GoreeCloud or saved as a GoreeCloud plaintext file.
 - A fresh cryptographic record identifier is created for each imported item.
-- The application validates a strict 5 MB input size and records with the existing encrypted-format limits.
-- Imported entries are encrypted using the currently unlocked AES-256-GCM vault before writing persistent storage. On a validation/encryption/storage failure, the old encrypted vault remains untouched.
-- The source plaintext file still exists wherever the original password manager exported it. JavaScript memory and OS caches are not guaranteed to be zeroized; browser extensions and compromised devices remain relevant threats.
+- All applications validate a strict 5 MB input size and records with the existing encrypted-format limits.
+- Imported entries are encrypted using the destination AES-256-GCM vault before writing persistent storage. Native clients require the destination master password after OS selection and seal the combined item list before replacing the encrypted file. On a validation/encryption/storage failure, the old encrypted vault remains untouched.
+- The source plaintext file still exists wherever the original password manager exported it. JavaScript/Dart memory and OS caches are not guaranteed to be zeroized; browser extensions and compromised devices remain relevant threats.
 - There is no fully lossless migration, collection/organization migration, attachment migration, or passkey signing implementation.
-- Automated synthetic tests cover conversion, omissions, encrypted writes, invalid sources, cancellation/rejection and post-import unlock in Chromium, Firefox, and the Firefox extension popup's mocked WebExtensions runtime. Real Firefox extension integration and production acceptance remain pending.
+- Automated synthetic tests cover conversion, omissions, encrypted writes, invalid sources, cancellation/rejection and post-import unlock in Chromium, Firefox, the Firefox extension popup's mocked WebExtensions runtime, and Dart unit tests. Native file-picker migration still requires Android and Linux graphical-session testing. Real Firefox extension integration and production acceptance remain pending.

@@ -10,25 +10,30 @@ class VaultBackupFiles {
   static const _android = MethodChannel('goreecloud.vault/backup');
   static const _types = [
     XTypeGroup(
-        label: 'Encrypted GoreeCloud vault',
+        label: 'JSON file for encrypted backup or migration',
         extensions: ['json'],
         mimeTypes: ['application/json']),
   ];
   static const defaultName = 'goreecloud-vault-encrypted.json';
 
-  static Future<Uint8List?> importEncrypted() async {
+  static Future<Uint8List?> importEncrypted() => selectLocalJsonBytes();
+
+  /// Bounded local JSON selection for either encrypted backup or explicit
+  /// plaintext Bitwarden migration. Caller owns validation, authentication,
+  /// confirmation and encryption. No bytes are sent by this helper.
+  static Future<Uint8List?> selectLocalJsonBytes() async {
     final XFile? file = await openFile(acceptedTypeGroups: _types);
     if (file == null) return null;
     final length = await file.length();
     if (length == 0 || length > maxEncryptedBackupBytes) {
-      throw const FormatException('Encrypted backup size is invalid');
+      throw const FormatException('Selected JSON file size is invalid');
     }
     final bytes = await file.readAsBytes();
     if (bytes.length != length ||
         bytes.isEmpty ||
         bytes.length > maxEncryptedBackupBytes) {
       throw const FormatException(
-          'Encrypted backup was modified or is oversized');
+          'Selected JSON file changed or exceeds size limit');
     }
     return bytes;
   }
