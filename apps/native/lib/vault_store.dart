@@ -49,6 +49,17 @@ class VaultStore {
     return VaultEnvelope.parse(await file.readAsString());
   }
 
+  /// Reject a migration based on an outdated encrypted snapshot.
+  ///
+  /// This only detects changes *before* the final save: it is not a
+  /// cross-process lock or a guarantee against filesystem-level races.
+  Future<void> ensureUnchanged(VaultEnvelope expected) async {
+    final current = await load();
+    if (current == null || current.serialize() != expected.serialize()) {
+      throw const FormatException('Encrypted vault changed during operation');
+    }
+  }
+
   Future<void> save(VaultEnvelope envelope) async {
     final file = await _location();
     await _verifyPath(file);
