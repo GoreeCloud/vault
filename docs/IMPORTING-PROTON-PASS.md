@@ -1,6 +1,6 @@
 # Importing Proton Pass data into GoreeCloud Vault
 
-**Status:** Development preview for the web app and Firefox extension. Only synthetic export data has been tested. This is not a full-fidelity Proton Pass importer or a usable passkey migration.
+**Status:** Development preview for web, Firefox extension, Linux and Android source clients. Only synthetic export data has been tested. This is not a full-fidelity Proton Pass importer or a usable passkey migration.
 
 ## What the importer accepts
 
@@ -22,7 +22,10 @@
 | Vault name | Encrypted tag |
 | Pinned item | Favorite |
 
-New random identifiers are generated; existing entries are **not replaced, merged or deduplicated**. The source is processed locally in memory, and only AES-GCM encrypted GoreeCloud records are saved on confirmation. Neither the app nor the extension uploads the source to a server.
+New random identifiers are generated; existing entries are **not replaced, merged or deduplicated**. The source is processed locally in memory, and only AES-GCM encrypted GoreeCloud records are saved on confirmation. The native Linux/Android app likewise processes imports locally without
+uploading their plaintext sources. The native client requires master-password
+reauthentication after the OS picker returns. This does not establish real
+device acceptance.
 
 ## Omitted or changed material
 
@@ -34,9 +37,9 @@ The confirmation reports counts for unsupported item types (including cards, ide
 
 1. On a trusted machine, export from Proton Pass using its own export interface. If you choose its **unencrypted ZIP**, understand that the data inside is plaintext.
 2. Extract the plaintext data.json locally. Do **not** upload it to a public issue, log, source repository, cloud storage, or this conversation.
-3. Unlock GoreeCloud Vault web or Firefox extension. Choose **Import Proton Pass data.json**.
+3. Unlock GoreeCloud Vault web, Firefox, Linux or Android. Choose **Import Proton Pass data.json**.
 4. Review item counts and omissions, then confirm. Validation errors and canceled confirmation do not write to the destination vault. If a storage write itself fails, inspect the encrypted vault before retrying; storage failure is not proof that a write was rolled back.
 5. Lock and unlock the destination to inspect the imported entries. Export a fresh **GoreeCloud encrypted JSON backup** for portable recovery.
 6. Keep the original manager and its secure backup until every required credential and 2FA configuration has been checked. Protect or securely delete plaintext export files from disk, downloads, backups and sync folders when safe.
 
-JavaScript memory cannot be guaranteed to be zeroized, and an OS, malicious extension or website compromise remains outside this preview's security guarantees. Web and Firefox tests use fake credentials only, including a simulated delayed encrypted storage write across the inactivity lock. This feature does not provide complete Proton Pass replacement, alias hosting, passkey authentication, or cloud sync.
+JavaScript and Dart decoded plaintext memory cannot be guaranteed to be zeroized, and an OS, malicious extension or website compromise remains outside this preview's security guarantees. Web, Firefox and native tests use fake credentials only, including a simulated delayed encrypted storage write across the inactivity lock. This feature does not provide complete Proton Pass replacement, alias hosting, passkey authentication, or cloud sync.

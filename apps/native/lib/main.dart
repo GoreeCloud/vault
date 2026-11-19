@@ -8,6 +8,7 @@ import 'vault_editor.dart';
 import 'vault_backup.dart';
 import 'vault_backup_files.dart';
 import 'vault_bitwarden.dart';
+import 'vault_proton.dart';
 import 'vault_idle.dart';
 
 void main() {
@@ -515,6 +516,84 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _importProton() async {
+    if (_busy || _envelope == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    Uint8List? plaintext;
+    try {
+      // The system picker may background the app; the lifecycle observer then
+      // LOCKS it, so re-authentication is mandatory after the picker returns.
+      plaintext = await VaultBackupFiles.selectLocalJsonBytes();
+      if (!mounted || plaintext == null) return;
+      // The file picker may already have locked the vault. Capture the
+      // resulting epoch only AFTER it closes and reject any later lifecycle
+      // changes throughout password entry, preview and encryption.
+      final epoch = _lockEpoch;
+      final preview = VaultProton.parse(plaintext);
+      if (!mounted || epoch != _lockEpoch) return;
+      final master = await _requestCurrentMasterPassword();
+      if (!mounted || master == null || epoch != _lockEpoch) return;
+      final original = _envelope!;
+      final key = await VaultCrypto.derive(master, original.salt);
+      final existing = await VaultCrypto.decrypt(key, original);
+      if (!mounted || epoch != _lockEpoch) return;
+      if (existing.length + preview.entries.length > 20000) {
+        throw const FormatException('Too many items');
+      }
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title:
+              const Text('Import Proton Pass extracted plaintext data.json?'),
+          content: SingleChildScrollView(child: Text(preview.warning())),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Keep local vault unchanged')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Encrypt and append')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted || epoch != _lockEpoch) return;
+      final next = await VaultCrypto.seal(
+          [...existing, ...preview.entries], key, original.salt);
+      if (!mounted || epoch != _lockEpoch) return;
+      // Reject imports when the ciphertext changed while the user reviewed
+      // the migration. This is a comparison, not a cross-process lock.
+      await _store.ensureUnchanged(original);
+      if (!mounted || epoch != _lockEpoch) return;
+      await _store.save(next);
+      if (!mounted) return;
+      _master.clear();
+      _search.clear();
+      setState(() {
+        _envelope = next;
+        _key = null;
+        _entries = null;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Proton Pass logins and notes encrypted locally. '
+            'Unlock to review imported items.'),
+      ));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Proton Pass import refused or save failed. '
+            'Verify encrypted vault before retrying; storage failures may leave new ciphertext.');
+      }
+    } finally {
+      // Best-effort memory hygiene; decoded Dart strings cannot be guaranteed
+      // to be zeroized, and the source file remains on the user's device.
+      plaintext?.fillRange(0, plaintext.length, 0);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
@@ -555,6 +634,9 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                     if (value == 'bitwarden') {
                       _importBitwarden();
                     }
+                    if (value == 'proton') {
+                      _importProton();
+                    }
                   },
                   itemBuilder: (ctx) => const [
                     PopupMenuItem(
@@ -566,6 +648,9 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                     PopupMenuItem(
                         value: 'bitwarden',
                         child: Text('Import Bitwarden plaintext JSON')),
+                    PopupMenuItem(
+                        value: 'proton',
+                        child: Text('Import Proton Pass data.json')),
                   ],
                   icon: const Icon(Icons.backup_outlined),
                 ),
