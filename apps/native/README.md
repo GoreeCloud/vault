@@ -15,6 +15,6 @@ flutter build linux --release
 flutter build apk --debug
 ```
 
-The Android debug APK is **not** a signed production release. The Linux bundle is a development build. Real device acceptance, backups/import/export, KDF migration, hardening and security review are outstanding. See the repository [README](../../README.md) and [threat model](../../docs/THREAT-MODEL.md).
+The Android debug APK is **not** a signed production release. The Linux bundle is a development build. The native app includes encrypted JSON backup export and validated import with an explicit replacement confirmation; it remains a development preview. Android uses a Storage Access Framework create-document action for exports and the system picker for imports. Linux uses a native file chooser for both. These flows still need physical-device and recovery acceptance. Real device acceptance, KDF migration, hardening and security review are outstanding. See the repository [README](../../README.md) and [threat model](../../docs/THREAT-MODEL.md).
 
 Source: first-party code under root AGPL-3.0-only; Flutter and `cryptography` are separate appropriately attributed upstream dependencies.

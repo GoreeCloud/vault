@@ -6,8 +6,8 @@ Offline encrypted vault format; React browser UI; native Flutter Linux/Android U
 
 ## Next highest priorities
 
-1. Complete security review for new item types, OTP input parsing, extension messaging/DOM injection and backup/rollback handling; extend cross-client runtime tests.
-2. Add native encrypted backup/export/import with explicit integrity, confirmation, rollback and tested restore.
+1. Complete security review for new item types, OTP input parsing, extension messaging/DOM injection and backup/rollback handling; maintain Chromium/Firefox recovery E2E tests and add real extension runtime tests.
+2. Validate native encrypted backup/export/import end-to-end on Linux and Android devices (system file picker, cancelled operations, replacement confirmation, simulated write failure, restore rehearsal and data-loss rollback).
 3. Design Argon2id versioned migration, vetted OS key/secret-storage integration and independent cryptographic/security review.
 4. Validate native Linux bundle, Android install/upgrade/lifecycle, Firefox extension sideload, UI and accessibility on authorized real devices.
 5. Threat-model and build a self-hosted encrypted-blob sync service with proven identity/session protection and rollback-aware sync; no server-side plaintext.

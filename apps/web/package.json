@@ -6,14 +6,16 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run",
-    "audit": "npm audit --omit=dev"
+    "test": "vitest run src",
+    "audit": "npm audit --omit=dev",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.1.0",

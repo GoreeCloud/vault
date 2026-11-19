@@ -9,8 +9,8 @@ An **open-source, offline-first encrypted vault development preview** for web, L
 | Target | Technology | Current behavior |
 | --- | --- | --- |
 | Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, backup export/import, lock on tab hidden |
-| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage |
-| Android | Flutter native Android | Same native Flutter client, Android screenshot blocking in source; physical-device acceptance pending |
+| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage, user-confirmed encrypted backup import/export via Linux file chooser |
+| Android | Flutter native Android | Same native Flutter client, Android screenshot blocking in source; physical-device acceptance pending; Android Storage Access Framework encrypted backup import/export |
 | Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
 
 **Not a WebView wrapper.** Flutter is an approved native Linux and Android UI framework under the current GoreeCloud project standards.
@@ -23,7 +23,7 @@ PBKDF2 is a conservative interoperable initial choice, not the final password-ma
 
 The web application uses a restrictive production CSP and does not connect to a cloud API. The Firefox extension requests only `storage`, `activeTab`, and `scripting` (no broad host permissions), and verifies an exact HTTPS origin before user-requested form fill. Malicious browser extensions, compromised JavaScript dependencies, compromised OS accounts, memory capture, browser storage removal, and malicious browser environments remain threats. A self-hosted password manager needs much more than encryption to be production-ready.
 
-See [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
+See [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
 
 ## Getting started
 
@@ -35,10 +35,15 @@ npm run dev
 # tests and production static build
 npm test
 npm run build
+# Browser-based recovery smoke tests require Playwright Chromium and Firefox:
+npx playwright install chromium firefox
+npm run test:e2e
 ```
 Vite listens on `127.0.0.1` by default. Serve `apps/web/dist/` from a trusted HTTPS origin for any non-local deployment. Do not expose an unreviewed development server to the internet.
 
 **Native**, Flutter 3.27.4 / Dart 3.6, with the relevant Linux desktop toolchain or Android SDK:
+
+Encrypted backup import/export is accessible from the native app. Linux export uses a user-selected destination; Android export uses the system Documents provider with no broad storage permission. Imports validate the encrypted envelope and master password, then require confirmation before replacing the local vault. **Backups remain portable encrypted JSON**, and restore has been tested only with synthetic fixtures, not physical devices.
 ```sh
 cd apps/native
 flutter pub get

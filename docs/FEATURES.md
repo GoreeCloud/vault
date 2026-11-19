@@ -8,9 +8,9 @@
 | Local authenticated encryption | Implemented / synthetic tests | AES-256-GCM; PBKDF2-HMAC-SHA-256; no cryptographic audit |
 | Master password create/unlock | Implemented in source | No password recovery |
 | Login CRUD, search, random password generation | Implemented in source | User interaction, accessibility and persistence not yet fully runtime-tested |
-| Encrypted JSON backup export and import | Implemented for web and Firefox; tests pending broader recovery | Native export/import and rehearsed backup recovery pending |
+| Encrypted JSON backup export and import | Implemented for web and Firefox; tests pending broader recovery | Native encrypted import/export and validated restore implemented in source; physical-device backup/restore rehearsal pending |
 | Native encrypted local file | Implemented in source | Data durability/restore/device checks pending |
-| Cross-platform encrypted fixture | Node-generated synthetic multi-item fixture tested by web and Flutter | In-app migration and encrypted restore scenarios pending |
+| Cross-platform encrypted fixture | Node-generated synthetic multi-item fixture tested by web and Flutter | Browser-based restoration tested with synthetic Playwright Chromium and Firefox; device tests pending |
 | TOTP SHA1/SHA256/SHA512 and HOTP | Implemented in web, native and Firefox code | RFC test vectors and parser tests; physical app acceptance pending |
 | Secure notes, custom fields, favorites, tags | Implemented in web/native and interoperable encrypted schema | Firefox popup can read encrypted custom fields; editor surface is more limited |
 | Firefox WebExtension | Implemented / compiled and linted | MV3 popup, encrypted storage, explicit origin-scoped fill; unsigned and untested on real browser |

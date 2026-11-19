@@ -34,3 +34,7 @@
 
 # Unsigned development extension packages
 apps/firefox/artifacts/
+
+# Playwright browser test outputs
+apps/web/test-results/
+apps/web/playwright-report/
