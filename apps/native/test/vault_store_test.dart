@@ -95,6 +95,31 @@ void main() {
     }
   });
 
+  test('restore snapshot guard protects empty, existing and vanished vaults',
+      () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-restore-guard-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      // A restore beginning on a never-created vault must not overwrite one
+      // which appears while its encrypted source is being authenticated.
+      await expectLater(store.ensureSnapshot(null), completes);
+      final (_, original) =
+          await VaultCrypto.initialize('synthetic-restore-guard-password');
+      await store.save(original);
+      final path =
+          File([temp.path, 'vault.enc.json'].join(Platform.pathSeparator));
+      final before = await path.readAsBytes();
+      await expectLater(store.ensureSnapshot(null), throwsFormatException);
+      expect(await path.readAsBytes(), before);
+      await expectLater(store.ensureSnapshot(original), completes);
+      await path.delete();
+      await expectLater(store.ensureSnapshot(original), throwsFormatException);
+      await expectLater(store.ensureSnapshot(null), completes);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
   test('fresh unlock reloads current ciphertext instead of a cached envelope',
       () async {
     final temp = await Directory.systemTemp.createTemp('gcv-fresh-unlock-');
