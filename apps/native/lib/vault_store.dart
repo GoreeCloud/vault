@@ -64,16 +64,27 @@ class VaultStore {
     return current;
   }
 
+  /// Checks that encrypted storage is still EXACTLY the state observed before
+  /// an operation. A null expected value means there must still be no vault.
+  ///
+  /// This is best-effort freshness detection, not an interprocess transaction.
+  /// Another writer can race between this check and the subsequent rename.
+  Future<void> ensureSnapshot(VaultEnvelope? expected) async {
+    final current = await load();
+    if (expected == null && current == null) return;
+    if (expected == null ||
+        current == null ||
+        current.serialize() != expected.serialize()) {
+      throw const FormatException('Encrypted vault changed during operation');
+    }
+  }
+
   /// Reject a migration based on an outdated encrypted snapshot.
   ///
   /// This only detects changes *before* the final save: it is not a
   /// cross-process lock or a guarantee against filesystem-level races.
-  Future<void> ensureUnchanged(VaultEnvelope expected) async {
-    final current = await load();
-    if (current == null || current.serialize() != expected.serialize()) {
-      throw const FormatException('Encrypted vault changed during operation');
-    }
-  }
+  Future<void> ensureUnchanged(VaultEnvelope expected) =>
+      ensureSnapshot(expected);
 
   Future<void> save(VaultEnvelope envelope) async {
     final file = await _location();
