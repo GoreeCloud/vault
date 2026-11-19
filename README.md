@@ -95,3 +95,5 @@ The five mandatory platform systems are architecturally relevant but **not yet i
 GoreeCloud Vault's newly authored application code is provided under **AGPL-3.0-only** (see [LICENSE](LICENSE)). It does not bundle Bitwarden/Proton Pass source. The local Bitwarden plaintext JSON importers use a documented data shape, not Bitwarden application code, and does not migrate existing passkey private keys, organization items or attachments. Third-party libraries and the copied MIT GoreeCloud UI token snapshot retain their own licenses; see [third-party notices](docs/THIRD-PARTY-NOTICES.md). Open-source availability does not mean a security audit has occurred.
 
 Issues and carefully scoped pull requests are welcome. **Never include passwords, master passwords, private vault data, keys or recovery codes in bug reports, logs, screenshots or issues.**
+
+Native encrypted-backup and Bitwarden JSON imports enforce a 5 MB bound during streaming, independently of provider-reported document size; graphical device acceptance remains pending.
