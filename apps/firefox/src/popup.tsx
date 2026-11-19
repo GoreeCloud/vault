@@ -5,6 +5,7 @@ import {encryptEntries, initialize, parseEnvelope, randomId, unlock, generatePas
 import {parseOtp, generateOtp} from '../../web/src/otp';
 import {matchingHttpsOrigin, fillActiveDocument} from './autofill';
 import {bitwardenImportWarning,parseBitwardenPlaintextJson} from '../../web/src/import_bitwarden';
+import {parseProtonPassPlaintextJson,protonImportWarning} from '../../web/src/import_proton';
 import './style.css';
 
 type BrowserTab = {id?: number; url?: string};
@@ -190,6 +191,37 @@ function Extension() {
       if(active(epoch))setError('Bitwarden import rejected. Inspect the encrypted vault before retrying.');
     }finally{setBusy(false);}
   }
+  async function importProton(event:React.ChangeEvent<HTMLInputElement>) {
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file||items===null||!key.current||!envelope||busy)return;
+    if(file.size===0||file.size>5_000_000){
+      setError('Select extracted Proton Pass plaintext data.json (max 5 MB); no ZIP/PGP support.');
+      return;
+    }
+    const epoch=lockEpoch.current;
+    const activeKey=key.current;
+    const activeEnvelope=envelope;
+    setBusy(true);setError('');
+    try{
+      const source=await file.text();
+      if(!active(epoch))return;
+      const preview=parseProtonPassPlaintextJson(source,randomId);
+      if(items.length+preview.entries.length>20_000)throw Error('Too many items');
+      if(!window.confirm(protonImportWarning(preview)))return;
+      if(!active(epoch))return;
+      const next=[...items,...preview.entries];
+      const encrypted=await encryptEntries(next,activeKey,activeEnvelope.kdf.salt);
+      if(!active(epoch))return;
+      await browser.storage.local.set({[STORAGE_KEY]:encrypted});
+      if(!active(epoch))return;
+      setEnvelope(encrypted);setItems(next);setSelected(null);setEdit(null);
+      setError('Proton Pass logins/notes encrypted locally. Review imported records.');
+    }catch{
+      if(active(epoch))setError(
+        'Proton Pass import rejected. Inspect the current encrypted vault before retrying.');
+    }finally{setBusy(false);}
+  }
   async function fill(item:Entry) {
     if(item.kind&&item.kind!=='login')return;
     if(tab?.id===undefined||!tab.url){setError('No active website tab.');return;}
@@ -281,10 +313,13 @@ function Extension() {
         </button>):<p className="empty">No items. Add one or import an encrypted backup.</p>}</div>
         <div className="bottom-actions"><button onClick={exportFile}>↓ Encrypted backup</button>
           <label className="import-button">↑ Import<input type="file" accept=".json" hidden onChange={e=>void restore(e)}/></label></div>
-        <p className="muted">Migration: Bitwarden plaintext JSON only. Review omissions. Delete the plaintext export when safe.</p>
+        <p className="muted">Migration: Bitwarden plaintext JSON or extracted Proton Pass data.json (no ZIP/PGP). Review omissions and protect the plaintext source.</p>
         <label className="secondary import-button">↑ Import Bitwarden JSON
           <input type="file" aria-label="Bitwarden plaintext JSON file" accept=".json" hidden disabled={busy}
             onChange={e=>void importBitwarden(e)}/></label>
+        <label className="secondary import-button">↑ Import Proton data.json
+          <input type="file" aria-label="Proton Pass plaintext data.json file" accept=".json" hidden disabled={busy}
+            onChange={e=>void importProton(e)}/></label>
       </>:selected?<><button className="back" onClick={()=>setSelected(null)}>← Back</button>
         <h2>{selected.title}</h2><p className="muted">{kindName[selected.kind??'login']}</p>
         {selected.kind==='note'?<p className="note-content">{selected.notes}</p>:<>

@@ -275,3 +275,122 @@ test('a delayed encrypted save never reopens a popup after its inactivity lock',
   await page.getByRole('button',{name:'Unlock'}).click();
   await expect(page.getByRole('button',{name:/Synthetic delayed item/})).toBeVisible();
 });
+
+test('Firefox popup imports extracted Proton Pass data.json without plaintext storage',async({page})=>{
+  await page.addInitScript(()=>{
+    const storage:Record<string,unknown>={};
+    Object.defineProperty(window,'__protonSyntheticStorage',{value:storage});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:storage[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(storage,values)
+      }},
+      tabs:{query:async()=>[{id:78,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-proton-firefox-master-password');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  const source=JSON.stringify({version:'1.40.2',vaults:{FAKE:{name:'Personal',items:[
+    {state:1,contentFormatVersion:8,data:{type:'login',
+      metadata:{name:'Synthetic Proton login',note:'FAKE-NOTE'},
+      content:{itemUsername:'fake',password:'NOT-A-REAL-PROTON-PASSWORD',
+        urls:['https://example.invalid']},extraFields:[]}},
+    {state:1,contentFormatVersion:8,data:{type:'note',
+      metadata:{name:'Synthetic Proton secure note',note:'NOT-A-REAL-SECRET-NOTE'},
+      content:{},extraFields:[]}}
+  ]}}});
+  let confirmed=false;
+  page.on('dialog',dialog=>{
+    expect(dialog.message()).toContain('2 supported Proton Pass logins/notes');
+    confirmed=true;
+    return dialog.accept();
+  });
+  await page.getByLabel('Proton Pass plaintext data.json file').setInputFiles({
+    name:'data.json',mimeType:'application/json',buffer:Buffer.from(source)
+  });
+  await expect(page.getByRole('button',{name:/Synthetic Proton login/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Synthetic Proton secure note/})).toBeVisible();
+  expect(confirmed).toBe(true);
+  const serialized=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {__protonSyntheticStorage:Record<string,unknown>}).__protonSyntheticStorage
+  ));
+  expect(serialized).not.toContain('NOT-A-REAL-PROTON-PASSWORD');
+  expect(serialized).not.toContain('NOT-A-REAL-SECRET-NOTE');
+  await page.getByTitle('Lock extension vault').click();
+  await page.getByLabel('Master password').fill('synthetic-proton-firefox-master-password');
+  await page.getByRole('button',{name:'Unlock'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic Proton secure note/})).toBeVisible();
+});
+
+test('Proton import waiting on encrypted storage cannot reopen a locked Firefox popup',async({page})=>{
+  await page.clock.install();
+  await page.addInitScript(()=>{
+    const stored:Record<string,unknown>={};
+    const gate:{blocked:boolean;waiting:boolean;release:(()=>void)|null}={
+      blocked:false,waiting:false,release:null
+    };
+    Object.defineProperty(window,'__protonWriteGate',{value:gate});
+    Object.defineProperty(window,'__protonEpochStorage',{value:stored});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:stored[key]}),
+        set:async(values:Record<string,unknown>)=>{
+          if(gate.blocked){
+            gate.waiting=true;
+            await new Promise<void>(resolve=>{gate.release=resolve});
+            gate.waiting=false;
+          }
+          Object.assign(stored,values);
+        }
+      }},
+      tabs:{query:async()=>[{id:78,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+  await page.goto('/popup.html');
+  const master='synthetic-proton-stalled-storage-master-password';
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:/My vault/})).toBeVisible();
+
+  const source=JSON.stringify({version:'1.40.2',vaults:{FAKE:{
+    name:'Synthetic',items:[{state:1,contentFormatVersion:8,
+      data:{type:'note',metadata:{name:'Synthetic delayed Proton note',
+        note:'NOT-A-REAL-SECRET-NOTE'},content:{},extraFields:[]}}
+    ]
+  }}});
+  page.on('dialog',dialog=>dialog.accept());
+  await page.evaluate(()=>{
+    (window as unknown as {__protonWriteGate:{blocked:boolean}}
+    ).__protonWriteGate.blocked=true;
+  });
+  await page.getByLabel('Proton Pass plaintext data.json file').setInputFiles({
+    name:'data.json',mimeType:'application/json',buffer:Buffer.from(source)
+  });
+  await page.waitForFunction(()=>(window as unknown as {
+    __protonWriteGate:{waiting:boolean}
+  }).__protonWriteGate.waiting);
+  await page.clock.fastForward(301_000);
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Working…'})).toBeDisabled();
+
+  await page.evaluate(()=>{
+    (window as unknown as {__protonWriteGate:{release:(()=>void)|null}}
+    ).__protonWriteGate.release?.();
+  });
+  await page.waitForFunction(()=>!(window as unknown as {
+    __protonWriteGate:{waiting:boolean}
+  }).__protonWriteGate.waiting);
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Synthetic delayed Proton note/})).toHaveCount(0);
+  const storage=await page.evaluate(()=>JSON.stringify((window as unknown as {
+    __protonEpochStorage:Record<string,unknown>
+  }).__protonEpochStorage));
+  expect(storage).not.toContain('NOT-A-REAL-SECRET-NOTE');
+
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic delayed Proton note/})).toBeVisible();
+});

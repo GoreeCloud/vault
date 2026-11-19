@@ -8,10 +8,10 @@ An **open-source, offline-first encrypted vault development preview** for web, L
 
 | Target | Technology | Current behavior |
 | --- | --- | --- |
-| Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, Bitwarden plaintext-JSON migration, backup export/import with fresh unlock, lock on tab hidden and in-flight unlock invalidation, five-minute idle auto-lock |
+| Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, Bitwarden plaintext-JSON and extracted Proton Pass data.json login/note migration, backup export/import with fresh unlock, lock on tab hidden and in-flight unlock invalidation, five-minute idle auto-lock |
 | Linux desktop | Flutter native Linux | Five-minute idle auto-lock; local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage with Linux encrypted-file mode 0600, user-confirmed encrypted backup import/export and Bitwarden plaintext-JSON login/note migration via Linux file chooser |
 | Android | Flutter native Android | Same native Flutter client with five-minute idle auto-lock; Android FLAG_SECURE, limited Android 16 device install/launch and synthetic first-run; full device acceptance pending; backup and Bitwarden plaintext-JSON migration in source |
-| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault with five-minute idle auto-lock, encrypted backup, login/notes/OTP/passkey metadata references, custom fields/tags/favorites, local Bitwarden plaintext-JSON migration, locked restore, user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
+| Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault with five-minute idle auto-lock, encrypted backup, login/notes/OTP/passkey metadata references, custom fields/tags/favorites, local Bitwarden plaintext-JSON and extracted Proton Pass data.json login/note migration, locked restore, user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
 
 **Not a WebView wrapper.** Flutter is an approved native Linux and Android UI framework under the current GoreeCloud project standards.
 
@@ -23,7 +23,7 @@ PBKDF2 is a conservative interoperable initial choice, not the final password-ma
 
 The web application uses a restrictive production CSP and does not connect to a cloud API. Web and native clients invalidate in-flight unlock operations when locked or backgrounded. Encrypted backup replacement requires a fresh unlock. Web, native and Firefox popup sessions automatically lock after five minutes without local activity; local pointer, keyboard and input events reset the clock. The Firefox popup invalidates stale asynchronous operations when locked, waits for pending encrypted writes before a new unlock, and re-reads the current ciphertext on reauthentication. The Firefox extension requests only `storage`, `activeTab`, and `scripting` (no broad host permissions), and verifies an exact HTTPS origin before user-requested form fill. Malicious browser extensions, compromised JavaScript dependencies, compromised OS accounts, memory capture, browser storage removal, and malicious browser environments remain threats. A self-hosted password manager needs much more than encryption to be production-ready.
 
-See [Bitwarden import boundaries](docs/IMPORTING-BITWARDEN.md), [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
+See [Bitwarden import boundaries](docs/IMPORTING-BITWARDEN.md), [Proton Pass import limitations](docs/IMPORTING-PROTON-PASS.md), [native recovery](docs/NATIVE-RECOVERY.md), [threat model](docs/THREAT-MODEL.md), [encrypted interchange format](docs/CRYPTO-FORMAT.md), [Firefox extension](docs/FIREFOX-EXTENSION.md), [passkey boundaries](docs/PASSKEYS.md), and [roadmap](docs/ROADMAP.md).
 
 ## Getting started
 
