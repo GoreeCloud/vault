@@ -38,3 +38,7 @@ apps/firefox/artifacts/
 # Playwright browser test outputs
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Firefox popup browser mock integration outputs
+apps/firefox/test-results/
+apps/firefox/playwright-report/

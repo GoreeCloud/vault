@@ -145,3 +145,9 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
       - name: Exercise synthetic encrypted backup and OTP flows in real browsers
         run: npm run test:e2e
+      - name: Install Firefox extension popup test dependencies
+        working-directory: apps/firefox
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Exercise extension popup with a mock browser API in Firefox
+        working-directory: apps/firefox
+        run: npm run test:e2e

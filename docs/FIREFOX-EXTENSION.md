@@ -13,6 +13,9 @@ npm run build
 npm test
 npm run lint:extension
 npm run package
+# Browser-engine popup UI tests (mocked WebExtensions storage and tab APIs):
+npx playwright install firefox
+npm run test:e2e
 ```
 
 To temporarily test locally, visit Firefox `about:debugging` → **This Firefox** → **Load Temporary Add-on** and choose `apps/firefox/dist/manifest.json`. Temporary add-ons are removed when Firefox restarts; production distribution requires Mozilla signing and separate acceptance.
@@ -41,3 +44,16 @@ The extension can create and read logins, secure notes, TOTP/HOTP authenticators
 ## Security and release acceptance
 
 Before a signed release: audit dependencies and generated bundle, manually test temporary installation, verify exact-origin autofill and navigation races, test import/export/backup recovery, validate accessibility, verify no data transmission, obtain appropriate extension signing, document update/rollback and test on supported Firefox versions. The React runtime can trigger Mozilla linter warnings for internal `innerHTML` assignment; app code does not intentionally call `dangerouslySetInnerHTML`. Review these warnings and generated source, not just linter exit status.
+
+
+## Validation evidence
+
+Automated popup UI tests run in the Playwright Firefox browser engine with
+an in-memory mocked WebExtensions API. They cover encrypted note save/lock/
+unlock and user-triggered exact-HTTPS-origin fill argument construction. The
+WebExtensions runtime add-on has also been temporarily installed in a fresh
+Firefox 159 headless profile through `web-ext run`, with an installation success
+message. This is **not** end-to-end verification of live in-tab injection,
+browser permission handling, autofill phishing resistance, popup on-screen
+rendering, or a signed AMO distribution. Treat the mocked test and temporary
+add-on installation as separate evidence categories.

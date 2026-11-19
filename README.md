@@ -63,6 +63,9 @@ npm run build
 npm test
 npm run lint:extension
 npm run package
+# Browser-engine popup integration test with a mocked WebExtensions API:
+npx playwright install firefox
+npm run test:e2e
 ```
 
 For developer testing, open Firefox `about:debugging` → **This Firefox** → **Load Temporary Add-on** and select `apps/firefox/dist/manifest.json`. This is **not** a signed Firefox Add-ons Store package. The extension's local vault is separate from the browser website's storage; use encrypted export and import deliberately to transfer records. See [extension documentation](docs/FIREFOX-EXTENSION.md).
