@@ -27,3 +27,12 @@ textarea{resize:vertical}.primary{background:#BFB8FF;color:#272057;font-weight:7
 .alert{color:#FFB4AB;background:#4F1410;padding:10px;border-radius:12px;overflow-wrap:anywhere}
 .danger{margin-top:12px;padding:10px;background:#4F1410;color:#FFB4AB;width:100%}.empty{text-align:center;padding:26px 12px}
 footer{border-top:1px solid #252D3D;padding:10px;color:#9CA8BC;text-align:center;font-size:10px}
+
+/* Extended encrypted item editor: keyboard accessible within the popup. */
+.field-heading{font-size:13px;color:#CED5E5;margin:20px 0 8px}
+.custom-field{border:1px solid #505B70;border-radius:12px;margin-top:10px;padding:10px}
+.custom-field label{margin:8px 0}
+.check-field{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.check-field input{margin:0;width:20px;min-height:20px;accent-color:#BFB8FF}
+.field-actions{display:flex;gap:8px}
+.field-actions .secondary{flex:1;font-size:11px;min-width:0}

@@ -28,6 +28,10 @@ test('encrypted popup stores private notes locally and unlocks',async({page})=>{
   await page.getByRole('button',{name:'+ Secure note'}).click();
   await page.getByLabel('Title').fill('Synthetic note');
   await page.getByLabel('Encrypted notes').fill('SYNTHETIC NOTE CONTENT');
+  await page.getByLabel('Tags (comma-separated)').fill('synthetic, encrypted');
+  await page.getByRole('button',{name:'+ Custom field'}).click();
+  await page.getByLabel('Field name').fill('Synthetic field');
+  await page.getByLabel('Value', {exact:true}).fill('FAKE-PRIVATE-CUSTOM-VALUE');
   await page.getByRole('button',{name:'Save encrypted'}).click();
   await expect(page.getByRole('button',{name:/Synthetic note/})).toBeVisible();
   const raw=await page.evaluate(()=>JSON.stringify((window as unknown as {
@@ -35,8 +39,14 @@ test('encrypted popup stores private notes locally and unlocks',async({page})=>{
   }).__vaultSyntheticState));
   expect(raw).toContain('goreecloud-vault');
   expect(raw).not.toContain('SYNTHETIC NOTE CONTENT');
+  expect(raw).not.toContain('FAKE-PRIVATE-CUSTOM-VALUE');
+  expect(raw).not.toContain('synthetic, encrypted');
   await page.getByRole('button',{name:/Synthetic note/}).click();
   await expect(page.getByText('SYNTHETIC NOTE CONTENT')).toBeVisible();
+  await expect(page.getByText('••••••')).toBeVisible();
+  await page.getByRole('button',{name:'Reveal custom fields'}).click();
+  await expect(page.getByText('FAKE-PRIVATE-CUSTOM-VALUE')).toBeVisible();
+  await expect(page.getByText('Tags: synthetic, encrypted')).toBeVisible();
   await page.getByTitle('Lock extension vault').click();
   await page.getByLabel('Master password').fill('synthetic-popup-master-password-long');
   await page.getByRole('button',{name:'Unlock'}).click();

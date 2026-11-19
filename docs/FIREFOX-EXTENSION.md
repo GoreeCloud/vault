@@ -37,7 +37,7 @@ The injected function writes fields inside the **current top document** only, no
 
 ## Supported encrypted records
 
-The extension can create and read logins, secure notes, TOTP/HOTP authenticators and passkey **references**, and read custom encrypted fields from imported vaults. The current popup editor does not yet expose every native/web custom-field editing control. The OTP secret, like every other record field, remains encrypted at rest.
+The extension can create and read logins, secure notes, TOTP/HOTP authenticators and passkey **references**, and read custom encrypted fields from imported vaults. The popup editor supports tags, favorites, and encrypted custom field names/values with explicit conceal/reveal controls. Its feature coverage still requires real-browser review. The OTP secret, like every other record field, remains encrypted at rest.
 
 **Passkey references are not passkey sign-in.** Firefox's WebAuthn/passkey integration is a separate browser/OS authenticator boundary; full management must not be claimed until WebAuthn registration and assertion are explicitly tested against real relying parties.
 

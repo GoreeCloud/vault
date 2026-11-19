@@ -12,7 +12,7 @@
 | Native encrypted local file | Implemented in source | Data durability/restore/device checks pending |
 | Cross-platform encrypted fixture | Node-generated synthetic multi-item fixture tested by web and Flutter | Browser-based restoration tested with synthetic Playwright Chromium and Firefox; device tests pending |
 | TOTP SHA1/SHA256/SHA512 and HOTP | Implemented in web, native and Firefox code | RFC test vectors and parser tests; physical app acceptance pending |
-| Secure notes, custom fields, favorites, tags | Implemented in web/native and interoperable encrypted schema | Firefox popup can read encrypted custom fields; editor surface is more limited |
+| Secure notes, custom fields, favorites, tags | Implemented in web/native and interoperable encrypted schema | Firefox popup can create/edit encrypted custom fields, tags and favorites; runtime extension interaction pending |
 | Firefox WebExtension | Implemented / compiled and linted | MV3 popup, encrypted storage, explicit origin-scoped fill; unsigned and untested on real browser |
 | Passkey reference records | Implemented | Metadata **only**: not registration, storage of private keys, or authentication |
 | Usable WebAuthn/passkey authenticator | Not implemented | Requires browser/OS integration, credential lifecycle and RP-bound authorization |
