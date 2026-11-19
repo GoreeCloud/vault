@@ -6,6 +6,7 @@ import 'vault_store.dart';
 import 'vault_editor.dart';
 import 'vault_backup.dart';
 import 'vault_backup_files.dart';
+import 'vault_bitwarden.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -339,6 +340,123 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
+  Future<String?> _requestCurrentMasterPassword() async {
+    final controller = TextEditingController();
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Authenticate local vault'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text(
+                'Enter the master password for the EXISTING local vault. '
+                'Your source Bitwarden JSON is plaintext, and migration will '
+                'only proceed after the destination vault is authenticated.'),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              maxLength: 1024,
+              decoration: const InputDecoration(
+                  labelText: 'Local vault master password'),
+              onSubmitted: (_) {
+                if (controller.text.isNotEmpty) {
+                  Navigator.pop(ctx, controller.text);
+                }
+              },
+            )
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  if (controller.text.isNotEmpty) {
+                    Navigator.pop(ctx, controller.text);
+                  }
+                },
+                child: const Text('Authenticate')),
+          ],
+        ),
+      );
+    } finally {
+      controller.clear();
+      controller.dispose();
+    }
+  }
+
+  Future<void> _importBitwarden() async {
+    if (_busy || _envelope == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    Uint8List? plaintext;
+    try {
+      // The system picker may background the app; the lifecycle observer then
+      // LOCKS it, so re-authentication is mandatory after the picker returns.
+      plaintext = await VaultBackupFiles.selectLocalJsonBytes();
+      if (!mounted || plaintext == null) return;
+      final preview = VaultBitwarden.parse(plaintext);
+      if (!mounted) return;
+      final master = await _requestCurrentMasterPassword();
+      if (!mounted || master == null) return;
+      final original = _envelope!;
+      final key = await VaultCrypto.derive(master, original.salt);
+      final existing = await VaultCrypto.decrypt(key, original);
+      if (!mounted) return;
+      if (existing.length + preview.entries.length > 20000) {
+        throw const FormatException('Too many items');
+      }
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Import Bitwarden plaintext JSON?'),
+          content: SingleChildScrollView(child: Text(preview.warning())),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Keep local vault unchanged')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Encrypt and append')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+      final next = await VaultCrypto.seal(
+          [...existing, ...preview.entries], key, original.salt);
+      await _store.save(next);
+      if (!mounted) return;
+      _master.clear();
+      _search.clear();
+      setState(() {
+        _envelope = next;
+        _key = null;
+        _entries = null;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Bitwarden logins and notes encrypted locally. '
+            'Unlock to review imported items.'),
+      ));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Bitwarden import refused or save failed. '
+            'Original encrypted vault was retained.');
+      }
+    } finally {
+      // Best-effort memory hygiene; decoded Dart strings cannot be guaranteed
+      // to be zeroized, and the source file remains on the user's device.
+      plaintext?.fillRange(0, plaintext.length, 0);
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
@@ -376,6 +494,9 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                     if (value == 'import') {
                       _importBackup();
                     }
+                    if (value == 'bitwarden') {
+                      _importBitwarden();
+                    }
                   },
                   itemBuilder: (ctx) => const [
                     PopupMenuItem(
@@ -384,6 +505,9 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                     PopupMenuItem(
                         value: 'import',
                         child: Text('Restore encrypted backup')),
+                    PopupMenuItem(
+                        value: 'bitwarden',
+                        child: Text('Import Bitwarden plaintext JSON')),
                   ],
                   icon: const Icon(Icons.backup_outlined),
                 ),

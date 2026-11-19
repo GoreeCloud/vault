@@ -9,7 +9,7 @@ An **open-source, offline-first encrypted vault development preview** for web, L
 | Target | Technology | Current behavior |
 | --- | --- | --- |
 | Browser | React 19 + TypeScript + Vite | Encrypted local vault with login CRUD, secure notes, custom fields, OTP generators, tags, favorites, passkey metadata references, backup export/import with fresh unlock, lock on tab hidden and in-flight unlock invalidation |
-| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage with Linux encrypted-file mode 0600, user-confirmed encrypted backup import/export via Linux file chooser |
+| Linux desktop | Flutter native Linux | Local encrypted vault, login/notes/OTP editors and crypto, tags, custom fields, passkey metadata references, native app-private storage with Linux encrypted-file mode 0600, user-confirmed encrypted backup import/export and Bitwarden plaintext-JSON login/note migration via Linux file chooser |
 | Android | Flutter native Android | Same native Flutter client, Android FLAG_SECURE; limited Android 16 device install/launch and synthetic first-run verified; full device acceptance pending; encrypted backup via Android Storage Access Framework in source |
 | Firefox add-on | Firefox WebExtensions Manifest V3 + React | Isolated encrypted local vault, import/export of encrypted backups, login/notes/OTP/passkey references, custom fields/tags/favorites, local Bitwarden plaintext-JSON login/note migration, locked restore, explicit user-triggered exact-HTTPS-origin autofill; unsigned, temporary developer installation only |
 
@@ -43,7 +43,7 @@ Vite listens on `127.0.0.1` by default. Serve `apps/web/dist/` from a trusted HT
 
 **Native**, Flutter 3.27.4 / Dart 3.6, with the relevant Linux desktop toolchain or Android SDK:
 
-Encrypted backup import/export is accessible from the native app. Linux export uses a user-selected destination; Android export uses the system Documents provider with no broad storage permission. Imports validate the encrypted envelope and master password, then require confirmation before replacing the local vault. **Backups remain portable encrypted JSON**, and restore has been tested only with synthetic fixtures, not physical devices.
+Encrypted backup import/export and local Bitwarden plaintext JSON import are accessible from the native app (create a native vault first). Linux export uses a user-selected destination; Android export uses the system Documents provider with no broad storage permission. Imports validate the encrypted envelope and master password, then require confirmation before replacing the local vault. **Backups remain portable encrypted JSON**, and restore has been tested only with synthetic fixtures, not physical devices. The Bitwarden importer requires a fresh native vault master password after the file picker closes and appends records only after successful encryption.
 ```sh
 cd apps/native
 flutter pub get
@@ -92,6 +92,6 @@ The five mandatory platform systems are architecturally relevant but **not yet i
 
 ## Provenance and license
 
-GoreeCloud Vault's newly authored application code is provided under **AGPL-3.0-only** (see [LICENSE](LICENSE)). It does not bundle Bitwarden/Proton Pass source. The local Bitwarden plaintext JSON importer uses a documented data shape, not Bitwarden application code, and does not migrate existing passkey private keys, organization items or attachments. Third-party libraries and the copied MIT GoreeCloud UI token snapshot retain their own licenses; see [third-party notices](docs/THIRD-PARTY-NOTICES.md). Open-source availability does not mean a security audit has occurred.
+GoreeCloud Vault's newly authored application code is provided under **AGPL-3.0-only** (see [LICENSE](LICENSE)). It does not bundle Bitwarden/Proton Pass source. The local Bitwarden plaintext JSON importers use a documented data shape, not Bitwarden application code, and does not migrate existing passkey private keys, organization items or attachments. Third-party libraries and the copied MIT GoreeCloud UI token snapshot retain their own licenses; see [third-party notices](docs/THIRD-PARTY-NOTICES.md). Open-source availability does not mean a security audit has occurred.
 
 Issues and carefully scoped pull requests are welcome. **Never include passwords, master passwords, private vault data, keys or recovery codes in bug reports, logs, screenshots or issues.**
