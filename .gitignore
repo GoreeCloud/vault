@@ -42,3 +42,8 @@ apps/web/playwright-report/
 # Firefox popup browser mock integration outputs
 apps/firefox/test-results/
 apps/firefox/playwright-report/
+
+# Disposable WebAuthn RP test output
+tests/webauthn-rp/test-results/
+tests/webauthn-rp/playwright-report/
+tests/webauthn-rp/.playwright/

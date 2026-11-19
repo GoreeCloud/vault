@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GoreeCloud Vault — Disposable WebAuthn test RP</title>
+  </head>
+  <body>
+    <main>
+      <h1>Disposable WebAuthn relying party</h1>
+      <p>This isolated localhost fixture tests the browser/OS authenticator.
+      It is not a GoreeCloud Vault passkey provider or a production login.</p>
+      <button id="register">Register disposable passkey</button>
+      <button id="authenticate">Authenticate disposable passkey</button>
+      <p id="status" role="status" aria-live="polite">No test credential registered.</p>
+    </main>
+    <script type="module" src="/client.mjs"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "@goreecloud/vault-disposable-webauthn-rp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Loopback-only disposable WebAuthn RP test fixture, NOT a Vault authenticator or production service",
+  "engines": {"node": ">=24"},
+  "scripts": {
+    "test": "node --test test/ledger.test.mjs",
+    "test:e2e": "playwright test",
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "14.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
