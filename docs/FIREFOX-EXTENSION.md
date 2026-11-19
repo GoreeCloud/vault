@@ -66,3 +66,21 @@ add-on installation as separate evidence categories.
 ## Bitwarden migration
 
 When unlocked, the popup supports a local, user-confirmed Bitwarden **plaintext JSON** login/note import using the same bounded parser as the web client. No plaintext is stored by the extension; the result is immediately encrypted under the current local vault. Unsupported data, including real passkey private keys, attachments and identities, is **not** migrated. See [migration details](IMPORTING-BITWARDEN.md). The Firefox extension still has only the three minimal existing permissions.
+
+
+## Asynchronous operation safety
+
+The popup invalidates an in-memory session epoch whenever the user locks it or
+the five-minute inactivity timer expires. Pending master-key derivation,
+encrypted record writes, Bitwarden migration, backup restore, OTP generation and
+active-tab autofill recheck the epoch before exposing decrypted data or invoking
+credential injection. A delayed storage write that was already dispatched may
+still finish, but it **must not reopen** the session. The unlock form
+remains disabled until that in-flight write resolves, preventing a concurrent
+unlock from observing an older ciphertext snapshot. A later explicit unlock
+reads the current encrypted storage snapshot rather than trusting cached data.
+
+Automated synthetic Firefox popup tests exercise a deliberately delayed
+extension-storage write across the inactivity lock and a fresh unlock.
+This is not a general guarantee of atomic multi-window writes, OS memory
+zeroization, or protection against malicious privileged extensions.
