@@ -18,7 +18,7 @@ The Android backup channel receives bounded ciphertext and does not request broa
 ## Restore
 
 1. On the lock screen or from the unlocked toolbar select **Restore encrypted backup**.
-2. Choose an encrypted JSON file. Selection is capped at 5,000,000 bytes.
+2. Choose an encrypted JSON file. Selection is capped at 5,000,000 bytes. The native file reader checks the provider-reported size and independently caps streamed bytes, rejecting truncation, extra bytes, or a provider reporting a smaller size than it delivers.
 3. Enter the **password for that backup**. Invalid format, incorrect password and altered authenticated ciphertext are rejected *before* local state is changed.
 4. Review the number of authenticated items and explicitly confirm **Replace local vault**.
 5. The app writes the encrypted envelope through its existing temp-file-and-rename store. Only after the write succeeds does it replace the current encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
@@ -27,7 +27,7 @@ Restore **replaces** local data. It does not merge or synchronize items, automat
 
 ## Tested and untested scope
 
-Synthetic Dart tests cover Linux 0600 mode, random exclusive temp files, symlink and oversized-file rejection, and multi-type export/inspect/re-encryption, authenticated decryption, rejection of tampered GCM ciphertext, wrong-password failures, unsupported envelope, and oversized input. Native Flutter analyzer/tests and Linux release compilation verify source compatibility. Android debug APK CI compilation tests the Kotlin bridge at build time.
+Synthetic Dart tests cover bounded provider-stream reads (misreported size, overrun, underrun, read failures), Linux 0600 mode, random exclusive temp files, symlink and oversized-file rejection, and multi-type export/inspect/re-encryption, authenticated decryption, rejection of tampered GCM ciphertext, wrong-password failures, unsupported envelope, and oversized input. Native Flutter analyzer/tests and Linux release compilation verify source compatibility. Android debug APK CI compilation tests the Kotlin bridge at build time.
 
 A debug APK was installed and launched on Android 16; an empty synthetic vault was created and the note editor inspected. The backup picker was not exercised.
 
