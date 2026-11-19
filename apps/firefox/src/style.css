@@ -1,0 +1,29 @@
+:root{font:14px system-ui,-apple-system,sans-serif;color:#F2F4FB;color-scheme:dark;background:#0D121D}
+*{box-sizing:border-box}body{margin:0;min-width:360px}button,input,textarea,select{font:inherit}
+button{cursor:pointer;border:0;border-radius:12px;min-height:38px}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #BFCBFF;outline-offset:2px}
+.popup{width:390px;max-height:600px;display:flex;flex-direction:column;background:#0D121D}
+header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #252D3D}
+.brand-mark{height:41px;width:41px;border:1px solid #5146C8;background:#413974;color:#E8E5FF;border-radius:14px;display:grid;place-items:center;font-size:25px}
+header strong,header small{display:block}header strong{font-size:16px}header small{font-size:9px;letter-spacing:1px;color:#BFB8FF;margin-top:4px}
+.icon-button{margin-left:auto;color:#CED5E5;background:#252D3D;padding:0 12px}
+main{padding:19px;overflow-y:auto;min-height:320px;max-height:520px}h1{font-size:23px;letter-spacing:-.7px;margin:12px 0}h2{font-size:20px;margin:14px 0}p{color:#CED5E5;line-height:1.55}
+.unlock{text-align:center}.lock-icon{margin:3px auto 12px;display:grid;place-items:center;height:58px;width:58px;background:#413974;color:#E8E5FF;border-radius:18px;font-size:33px}
+.unlock form{text-align:left}label{display:block;color:#CED5E5;font-size:12px;font-weight:650;margin:12px 0 9px}
+input,textarea,select{width:100%;border:1px solid #505B70;border-radius:12px;background:#171D2A;color:#F2F4FB;padding:11px;min-height:42px;margin-top:7px}
+textarea{resize:vertical}.primary{background:#BFB8FF;color:#272057;font-weight:750;padding:10px 16px;width:100%;margin:9px 0}.primary.compact{width:auto;margin:0}
+.secondary{display:block;color:#F2F4FB;background:#252D3D;padding:10px 14px;text-align:center;width:100%;margin-top:12px}
+.titlebar{display:flex;align-items:center;justify-content:space-between;gap:12px}.titlebar h1 span{font-size:13px;color:#CED5E5;background:#252D3D;padding:3px 9px;border-radius:100px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin:5px 0 10px}.quick button{background:#252D3D;color:#CED5E5;padding:0 10px;font-size:11px}
+.search{margin:9px 0 14px}.list{display:flex;flex-direction:column;gap:7px}
+.item{display:flex;align-items:center;gap:12px;text-align:left;background:#171D2A;color:#F2F4FB;padding:10px;width:100%;min-height:63px;border:1px solid #252D3D}.item:hover{background:#252D3D}
+.glyph{width:37px;height:37px;display:grid;place-items:center;background:#413974;color:#E8E5FF;border-radius:12px;font-size:20px}.copy{flex:1;min-width:0}
+.copy strong,.copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.copy small{color:#9CA8BC;font-size:11px;margin-top:4px}
+.bottom-actions{display:flex;gap:10px;margin-top:20px;align-items:center}.bottom-actions button,.bottom-actions label{width:50%;margin:0;min-height:38px;background:#252D3D;color:#CED5E5;padding:10px;border-radius:12px;font-size:11px;text-align:center;cursor:pointer}
+.import-button{cursor:pointer}.back{background:none;color:#BFB8FF;min-height:30px;padding:0 6px}
+.muted{font-size:12px;color:#9CA8BC}.detail{padding:11px;background:#171D2A;border-radius:12px;font-size:12px}.detail strong{display:block;color:#F2F4FB;margin-top:4px;overflow-wrap:anywhere}
+.note-content{white-space:pre-wrap;overflow-wrap:anywhere;color:#F2F4FB;background:#171D2A;padding:13px;border-radius:14px}
+.notice{font-size:12px;padding:10px;background:#252D3D;border-radius:12px}.code{font-size:28px;text-align:center;letter-spacing:4px;color:#BFB8FF;margin:12px}
+.alert{color:#FFB4AB;background:#4F1410;padding:10px;border-radius:12px;overflow-wrap:anywhere}
+.danger{margin-top:12px;padding:10px;background:#4F1410;color:#FFB4AB;width:100%}.empty{text-align:center;padding:26px 12px}
+footer{border-top:1px solid #252D3D;padding:10px;color:#9CA8BC;text-align:center;font-size:10px}

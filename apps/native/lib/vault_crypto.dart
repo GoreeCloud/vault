@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
+import 'vault_otp.dart';
 
 const vaultKdfIterations = 600000;
 const maxVaultFileLength = 5000000;
@@ -27,15 +28,51 @@ String generatePassword([int length = 24]) {
   return buffer.toString();
 }
 
+class VaultField {
+  const VaultField(
+      {required this.name, required this.value, required this.concealed});
+  final String name, value;
+  final bool concealed;
+  factory VaultField.fromJson(Object? raw) {
+    if (raw is! Map<String, dynamic> ||
+        raw['name'] is! String ||
+        raw['value'] is! String ||
+        raw['concealed'] is! bool ||
+        (raw['name'] as String).length > 150 ||
+        (raw['value'] as String).length > 20000) {
+      throw const FormatException('Invalid custom field');
+    }
+    return VaultField(
+        name: raw['name'] as String,
+        value: raw['value'] as String,
+        concealed: raw['concealed'] as bool);
+  }
+  Map<String, dynamic> toJson() =>
+      {'name': name, 'value': value, 'concealed': concealed};
+}
+
 class VaultEntry {
-  const VaultEntry(
-      {required this.id,
-      required this.title,
-      required this.username,
-      required this.password,
-      required this.website,
-      required this.notes});
-  final String id, title, username, password, website, notes;
+  const VaultEntry({
+    required this.id,
+    required this.title,
+    required this.username,
+    required this.password,
+    required this.website,
+    required this.notes,
+    this.kind = 'login',
+    this.favorite = false,
+    this.tags = const [],
+    this.customFields = const [],
+    this.otp,
+    this.passkey,
+  });
+  final String id, title, username, password, website, notes, kind;
+  final bool favorite;
+  final List<String> tags;
+  final List<VaultField> customFields;
+  final VaultOtp? otp;
+  final Map<String, String>? passkey;
+
   factory VaultEntry.fromJson(Object? raw) {
     if (raw is! Map<String, dynamic>) {
       throw const FormatException('Invalid entry');
@@ -48,21 +85,59 @@ class VaultEntry {
       return v;
     }
 
+    final kind = raw['kind'] ?? 'login';
+    if (!['login', 'note', 'otp', 'passkey'].contains(kind)) {
+      throw const FormatException('Invalid kind');
+    }
+    final favorite = raw['favorite'] ?? false;
+    final tags = raw['tags'] ?? <dynamic>[];
+    final customFields = raw['customFields'] ?? <dynamic>[];
+    final passkey = raw['passkey'];
+    if (favorite is! bool ||
+        tags is! List ||
+        tags.length > 30 ||
+        tags.any((t) => t is! String || t.length > 120) ||
+        customFields is! List ||
+        customFields.length > 30 ||
+        (passkey != null &&
+            (passkey is! Map<String, dynamic> ||
+                passkey['rpId'] is! String ||
+                passkey['credentialId'] is! String ||
+                passkey['userHandle'] is! String ||
+                (passkey['rpId'] as String).length > 253 ||
+                !RegExp(r'^[a-z0-9.-]+$').hasMatch(passkey['rpId'] as String) ||
+                (passkey['credentialId'] as String).length > 4096 ||
+                (passkey['userHandle'] as String).length > 4096))) {
+      throw const FormatException('Invalid extended entry fields');
+    }
     return VaultEntry(
         id: field('id'),
         title: field('title'),
         username: field('username'),
         password: field('password'),
         website: field('website'),
-        notes: field('notes'));
+        notes: field('notes'),
+        kind: kind as String,
+        favorite: favorite,
+        tags: List<String>.from(tags),
+        customFields: customFields.map((e) => VaultField.fromJson(e)).toList(),
+        otp: raw['otp'] == null ? null : VaultOtp.fromJson(raw['otp']),
+        passkey: passkey == null ? null : Map<String, String>.from(passkey));
   }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'username': username,
         'password': password,
         'website': website,
-        'notes': notes
+        'notes': notes,
+        'kind': kind,
+        'favorite': favorite,
+        'tags': tags,
+        'customFields': customFields.map((e) => e.toJson()).toList(),
+        if (otp != null) 'otp': otp!.toJson(),
+        if (passkey != null) 'passkey': passkey
       };
 }
 

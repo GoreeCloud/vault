@@ -36,7 +36,11 @@ void main() {
     final fixture = File('../../tests/interop/sample-v1.json');
     final env = VaultEnvelope.parse(await fixture.readAsString());
     final items = await VaultCrypto.unlock('interop test password only', env);
-    expect(items.single.website, 'example.invalid');
-    expect(items.single.password, 'NOT-A-REAL-PASSWORD');
+    expect(items.first.website, 'example.invalid');
+    expect(items.first.otp?.issuer, 'Example');
+    expect(items.first.customFields.single.concealed, isTrue);
+    expect(items[1].kind, 'note');
+    expect(items[2].passkey?['rpId'], 'example.invalid');
+    expect(items.first.password, 'NOT-A-REAL-PASSWORD');
   });
 }
