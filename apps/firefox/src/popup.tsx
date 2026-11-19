@@ -103,10 +103,11 @@ function Extension() {
     try{
       if(file.size>5_000_000)throw Error('too large');
       const value=parseEnvelope(await file.text());
-      const decrypted=await unlock(password,value);
+      await unlock(password,value);
       if(!window.confirm('Replace all encrypted items in this Firefox profile? Export a backup first.'))return;
       await browser.storage.local.set({[STORAGE_KEY]:value});
-      key.current=decrypted.key;setEnvelope(value);setItems(decrypted.entries);setCorrupt(false);
+      lock();setEnvelope(value);setCorrupt(false);
+      setError('Encrypted backup restored. Unlock with its master password.');
     }catch{setError('Import rejected. Wrong password or invalid encrypted backup. Original data retained.');}
     finally{setBusy(false);}
   }
@@ -147,6 +148,9 @@ function Extension() {
     if(next.kind==='otp'||otpText.trim()){
       try{next.otp=edit.otp?.secret===otpText.trim()?edit.otp:parseOtp(otpText.trim());}
       catch{setError('Invalid OTP secret or otpauth URI.');return;}
+    } else {
+      // Clearing the authenticator on an existing login must discard the seed.
+      delete next.otp;
     }
     await save(items.some(x=>x.id===next.id)?items.map(x=>x.id===next.id?next:x):[...items,next]);
   }

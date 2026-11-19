@@ -24,6 +24,9 @@ function App() {
     try { parseEnvelope(raw); return false; } catch { return true; }
   });
   const key = useRef<CryptoKey | null>(null);
+  // Incremented on every lock so in-flight KDF/encryption promises cannot
+  // reopen the vault after the document was hidden or explicitly locked.
+  const lockEpoch = useRef(0);
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [master, setMaster] = useState('');
   const [notice, setNotice] = useState('');
@@ -37,6 +40,7 @@ function App() {
   const [nowSeconds, setNowSeconds] = useState(Math.floor(Date.now()/1000));
 
   const lock = () => {
+    lockEpoch.current++;
     key.current = null; setEntries(null); setMaster(''); setEdit(null);
     setShowSecret(false); setOtpCodes({});
   };
@@ -57,7 +61,9 @@ function App() {
           catch { codes[entry.id] = 'Invalid OTP'; }
         }
       }
-      if (!cancelled) { setOtpCodes(codes); setNowSeconds(Math.floor(now / 1000)); }
+      if (!cancelled && key.current !== null && document.visibilityState === 'visible') {
+        setOtpCodes(codes); setNowSeconds(Math.floor(now / 1000));
+      }
     };
     void refresh();
     const timer = window.setInterval(() => { void refresh(); }, 1000);
@@ -65,31 +71,39 @@ function App() {
   }, [entries]);
 
   async function submitMaster(event: React.FormEvent) {
-    event.preventDefault(); if (corruptedAtLoad) return; setBusy(true); setNotice('');
+    event.preventDefault();
+    if (corruptedAtLoad || busy) return;
+    const epoch = lockEpoch.current;
+    setBusy(true); setNotice('');
     try {
       if (envelope) {
         const result = await unlock(master, envelope);
+        if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
         key.current = result.key; setEntries(result.entries);
       } else {
         const result = await initialize(master);
+        if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(result.envelope));
         key.current = result.key; setEnvelope(result.envelope); setEntries([]);
       }
       setMaster('');
-    } catch { setNotice('Unable to unlock. Check your password and vault integrity.'); }
-    finally { setBusy(false); }
+    } catch {
+      if (epoch === lockEpoch.current) setNotice('Unable to unlock. Check your password and vault integrity.');
+    } finally { setBusy(false); }
   }
 
   async function persist(next: Entry[]): Promise<boolean> {
-    if (!key.current || !envelope) return false;
+    if (!key.current || !envelope || busy) return false;
+    const epoch = lockEpoch.current;
     setBusy(true); setNotice('');
     try {
       const sealed = await encryptEntries(next, key.current, envelope.kdf.salt);
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return false;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
       setEnvelope(sealed); setEntries(next); setEdit(null);
       return true;
     } catch {
-      setNotice('Save failed. Your existing encrypted vault was retained.');
+      if (epoch === lockEpoch.current) setNotice('Save failed. Your existing encrypted vault was retained.');
       return false;
     } finally { setBusy(false); }
   }
@@ -110,16 +124,21 @@ function App() {
     if (file.size > 5_000_000) { setNotice('Backup is too large.'); return; }
     const password = window.prompt('Enter the MASTER PASSWORD of this encrypted backup:');
     if (password == null) return;
+    const epoch = lockEpoch.current;
     setBusy(true); setNotice('');
     try {
       const parsed = parseEnvelope(await file.text());
-      const restored = await unlock(password, parsed);
+      await unlock(password, parsed);
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
       if (!window.confirm('Replace this device\'s encrypted vault? Export a backup first. This does not merge items.')) return;
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      key.current = restored.key; setEnvelope(parsed); setEntries(restored.entries); setEdit(null);
-      setNotice('Encrypted backup restored locally. Export a fresh backup for recovery.');
-    } catch { setNotice('Restore failed. File is invalid or the backup password is wrong. Existing data is unchanged.'); }
-    finally { setBusy(false); }
+      lock();
+      setEnvelope(parsed);
+      setNotice('Encrypted backup restored. Unlock it with its master password.');
+    } catch {
+      if (epoch === lockEpoch.current) setNotice('Restore failed. File is invalid or the backup password is wrong. Existing data is unchanged.');
+    } finally { setBusy(false); }
   }
 
   async function saveEditor(event: React.FormEvent) {
@@ -131,22 +150,30 @@ function App() {
       try {
         next = {...next, otp: edit.otp && edit.otp.secret === otpInput.trim() ? edit.otp : parseOtp(otpInput.trim())};
       } catch { setNotice('Invalid OTP secret or otpauth URI.'); return; }
+    } else {
+      // Removing the authenticator secret from an existing login is intentional.
+      delete next.otp;
     }
     const exists = entries.some(item => item.id === next.id);
     await persist(exists ? entries.map(item => item.id === next.id ? next : item) : [...entries, next]);
   }
 
   async function copyOtp(entry: Entry) {
-    if (!entry.otp || !entries) return;
+    if (!entry.otp || !entries || !key.current) return;
+    const epoch = lockEpoch.current;
     try {
       const code = await generateOtp(entry.otp);
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
       if (entry.otp.type === 'hotp') {
         const updated = entries.map(x => x.id === entry.id ?
           {...x, otp: {...entry.otp!, counter: entry.otp!.counter + 1}} : x);
         if (!await persist(updated)) return;
       }
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
       await navigator.clipboard.writeText(code);
-      setNotice(entry.otp.type === 'hotp' ? 'HOTP copied; counter advanced in encrypted storage.' : 'Current OTP copied.');
+      if (epoch === lockEpoch.current) {
+        setNotice(entry.otp.type === 'hotp' ? 'HOTP copied; counter advanced in encrypted storage.' : 'Current OTP copied. Clipboard contents may persist.');
+      }
     } catch { setNotice('Could not copy the OTP. Check clipboard permissions.'); }
   }
 

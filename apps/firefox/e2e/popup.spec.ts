@@ -87,3 +87,55 @@ test('popup requires exact HTTPS origin for explicitly requested fill',async({pa
   expect(args).toEqual(['https://example.invalid','fake@example.invalid','NOT-A-REAL-PASSWORD']);
   await expect(page.getByRole('status')).toContainText('Credentials filled');
 });
+
+test('Firefox popup encrypted backup restore rejects wrong password and relocks', async({page})=>{
+  await page.addInitScript(()=>{
+    const storage:Record<string,unknown>={};
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:storage[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(storage,values)
+      }},
+      tabs:{query:async()=>[{id:77,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+  const master='synthetic-firefox-backup-password-only';
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+
+  async function note(name:string) {
+    await page.getByRole('button',{name:'+ Secure note'}).click();
+    await page.getByLabel('Title').fill(name);
+    await page.getByLabel('Encrypted notes').fill('FAKE NOTE NO SECRETS');
+    await page.getByRole('button',{name:'Save encrypted'}).click();
+    await expect(page.getByRole('button',{name:new RegExp(name)})).toBeVisible();
+  }
+  await note('Synthetic alpha');
+  const [download]=await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button',{name:/Encrypted backup/}).click()
+  ]);
+  const buffer=await (await import('node:fs/promises')).readFile(await download.path());
+  expect(buffer.toString('utf8')).not.toContain('FAKE NOTE NO SECRETS');
+  await note('Synthetic beta');
+
+  const input=page.locator('main .bottom-actions input[type=file]');
+  page.once('dialog',dialog=>dialog.accept('wrong-password'));
+  await input.setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer});
+  await expect(page.getByRole('status')).toContainText('Import rejected');
+  await expect(page.getByRole('button',{name:/Synthetic beta/})).toBeVisible();
+
+  page.on('dialog',dialog=>{
+    if(dialog.type()==='prompt')return dialog.accept(master);
+    if(dialog.type()==='confirm')return dialog.accept();
+    return dialog.dismiss();
+  });
+  await input.setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer});
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic alpha/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Synthetic beta/})).toHaveCount(0);
+});
