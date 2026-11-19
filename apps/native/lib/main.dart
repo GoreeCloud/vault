@@ -23,9 +23,78 @@ const canvas = Color(0xFF0D121D),
     textSoft = Color(0xFFCED5E5),
     ink = Color(0xFFF2F4FB);
 
+// The dialog owns its password controller for its FULL route lifecycle.
+// Disposing it in a caller's showDialog() finally can occur while the pop
+// animation still renders TextField, causing use-after-dispose exceptions.
+class _MasterPasswordPrompt extends StatefulWidget {
+  const _MasterPasswordPrompt({
+    required this.title,
+    required this.description,
+    required this.fieldLabel,
+    required this.confirmLabel,
+  });
+
+  final String title;
+  final String description;
+  final String fieldLabel;
+  final String confirmLabel;
+
+  @override
+  State<_MasterPasswordPrompt> createState() => _MasterPasswordPromptState();
+}
+
+class _MasterPasswordPromptState extends State<_MasterPasswordPrompt> {
+  final _controller = TextEditingController();
+  bool _submitted = false;
+
+  void _submit() {
+    if (_submitted || _controller.text.isEmpty) return;
+    setState(() => _submitted = true);
+    Navigator.of(context).pop(_controller.text);
+  }
+
+  @override
+  void dispose() {
+    _controller.clear();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.title),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(widget.description),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            maxLength: 1024,
+            decoration: InputDecoration(labelText: widget.fieldLabel),
+            onSubmitted: (_) => _submit(),
+          ),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: _submitted ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _submitted ? null : _submit,
+            child: Text(widget.confirmLabel),
+          ),
+        ],
+      );
+}
+
 class VaultApp extends StatelessWidget {
-  const VaultApp({super.key, this.store});
+  const VaultApp({super.key, this.store, this.selectJsonBytes});
   final VaultStore? store;
+  // Test seam only; production defaults to OS picker with bounded reads.
+  final Future<Uint8List?> Function()? selectJsonBytes;
   @override
   Widget build(BuildContext context) => MaterialApp(
       title: 'GoreeCloud Vault',
@@ -51,12 +120,13 @@ class VaultApp extends StatelessWidget {
                   OutlineInputBorder(borderRadius: BorderRadius.circular(14))),
           appBarTheme:
               const AppBarTheme(backgroundColor: canvas, foregroundColor: ink)),
-      home: VaultHome(store: store));
+      home: VaultHome(store: store, selectJsonBytes: selectJsonBytes));
 }
 
 class VaultHome extends StatefulWidget {
-  const VaultHome({super.key, this.store});
+  const VaultHome({super.key, this.store, this.selectJsonBytes});
   final VaultStore? store;
+  final Future<Uint8List?> Function()? selectJsonBytes;
   @override
   State<VaultHome> createState() => _VaultHomeState();
 }
@@ -260,53 +330,16 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
-  Future<String?> _requestBackupPassword() async {
-    final controller = TextEditingController();
-    try {
-      return await showDialog<String>(
+  Future<String?> _requestBackupPassword() => showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Unlock encrypted backup'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Enter the master password used to encrypt this backup. '
-                'The backup is validated before your local vault can be replaced.'),
-            const SizedBox(height: 14),
-            TextField(
-              autofocus: true,
-              controller: controller,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              maxLength: 1024,
-              decoration:
-                  const InputDecoration(labelText: 'Backup master password'),
-              onSubmitted: (_) {
-                if (controller.text.isNotEmpty) {
-                  Navigator.pop(ctx, controller.text);
-                }
-              },
-            )
-          ]),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  Navigator.pop(ctx, controller.text);
-                }
-              },
-              child: const Text('Validate backup'),
-            ),
-          ],
+        builder: (_) => const _MasterPasswordPrompt(
+          title: 'Unlock encrypted backup',
+          description: 'Enter the master password used to encrypt this backup. '
+              'The backup is validated before your local vault can be replaced.',
+          fieldLabel: 'Backup master password',
+          confirmLabel: 'Validate backup',
         ),
       );
-    } finally {
-      controller.clear();
-      controller.dispose();
-    }
-  }
 
   Future<void> _exportBackup() async {
     if (_busy || _entries == null || _envelope == null) return;
@@ -390,54 +423,18 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
-  Future<String?> _requestCurrentMasterPassword() async {
-    final controller = TextEditingController();
-    try {
-      return await showDialog<String>(
+  Future<String?> _requestCurrentMasterPassword() => showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Authenticate local vault'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text(
-                'Enter the master password for the EXISTING local vault. '
-                'Your source Bitwarden JSON is plaintext, and migration will '
-                'only proceed after the destination vault is authenticated.'),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              maxLength: 1024,
-              decoration: const InputDecoration(
-                  labelText: 'Local vault master password'),
-              onSubmitted: (_) {
-                if (controller.text.isNotEmpty) {
-                  Navigator.pop(ctx, controller.text);
-                }
-              },
-            )
-          ]),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () {
-                  if (controller.text.isNotEmpty) {
-                    Navigator.pop(ctx, controller.text);
-                  }
-                },
-                child: const Text('Authenticate')),
-          ],
+        builder: (_) => const _MasterPasswordPrompt(
+          title: 'Authenticate local vault',
+          description:
+              'Enter the master password for the EXISTING local vault. '
+              'The selected source may be plaintext and migration proceeds '
+              'only after authenticating the destination vault.',
+          fieldLabel: 'Local vault master password',
+          confirmLabel: 'Authenticate',
         ),
       );
-    } finally {
-      controller.clear();
-      controller.dispose();
-    }
-  }
 
   Future<void> _importBitwarden() async {
     if (_busy || _envelope == null || !mounted) return;
@@ -449,7 +446,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     try {
       // The system picker may background the app; the lifecycle observer then
       // LOCKS it, so re-authentication is mandatory after the picker returns.
-      plaintext = await VaultBackupFiles.selectLocalJsonBytes();
+      plaintext = await (widget.selectJsonBytes ??
+          VaultBackupFiles.selectLocalJsonBytes)();
       if (!mounted || plaintext == null) return;
       // The file picker may already have locked the vault. Capture the
       // resulting epoch only AFTER it closes and reject any later lifecycle
@@ -526,7 +524,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     try {
       // The system picker may background the app; the lifecycle observer then
       // LOCKS it, so re-authentication is mandatory after the picker returns.
-      plaintext = await VaultBackupFiles.selectLocalJsonBytes();
+      plaintext = await (widget.selectJsonBytes ??
+          VaultBackupFiles.selectLocalJsonBytes)();
       if (!mounted || plaintext == null) return;
       // The file picker may already have locked the vault. Capture the
       // resulting epoch only AFTER it closes and reject any later lifecycle
