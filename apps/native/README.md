@@ -23,3 +23,15 @@ Source: first-party code under root AGPL-3.0-only; Flutter and `cryptography` ar
 ### Untrusted system document providers
 
 User-selected JSON is read in bounded chunks rather than through an unbounded whole-file read. The 5 MB cap is checked against both reported metadata and every incoming chunk; inconsistent lengths fail closed. The source still requires cryptographic backup validation or strict Bitwarden migration parsing. Tests cover inaccurate sizes and read faults. Physical-device document-provider acceptance remains outstanding.
+
+
+## Authoritative encrypted storage on unlock
+
+Each local native unlock reads the latest validated encrypted envelope from
+app-private storage before deriving a key. A previously observed vault that
+disappears fails closed, rather than being replaced with a new empty vault.
+Writes check the last observed encrypted snapshot before committing, and
+lifecycle lock epochs invalidate pending unlocks and saves. These are
+best-effort checks; there is no cross-process file locking, directory fsync
+or independent crash-consistency proof. Use encrypted backups before testing
+other writers or migrations.

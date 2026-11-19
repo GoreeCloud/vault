@@ -161,8 +161,19 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     });
     try {
       final password = _master.text;
-      if (_envelope == null) {
+      // Never decrypt a stale in-memory envelope after a queued write, file
+      // picker, background lock, or authorized external encrypted replacement.
+      final current = await _store.loadForUnlock(previouslyObserved: _envelope);
+      if (!mounted || epoch != _lockEpoch) return;
+      if (current == null) {
         final (key, env) = await VaultCrypto.initialize(password);
+        if (!mounted || epoch != _lockEpoch) return;
+        // Protect first-run creation from a file appearing during KDF. This
+        // is best-effort TOCTOU protection, NOT an interprocess transaction.
+        if (await _store.load() != null) {
+          throw const FormatException('Encrypted vault appeared during setup');
+        }
+        if (!mounted || epoch != _lockEpoch) return;
         await _store.save(env);
         _master.clear();
         if (mounted) {
@@ -176,11 +187,13 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
           });
         }
       } else {
-        final key = await VaultCrypto.derive(password, _envelope!.salt);
-        final items = await VaultCrypto.decrypt(key, _envelope!);
+        final key = await VaultCrypto.derive(password, current.salt);
+        if (!mounted || epoch != _lockEpoch) return;
+        final items = await VaultCrypto.decrypt(key, current);
         _master.clear();
         if (mounted && epoch == _lockEpoch) {
           setState(() {
+            _envelope = current;
             _key = key;
             _entries = items;
             _idle.start();
@@ -188,7 +201,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
         }
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && epoch == _lockEpoch) {
         setState(() {
           _error = 'Unable to unlock. Check your password or vault integrity.';
         });
@@ -209,8 +222,14 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       _busy = true;
       _error = null;
     });
+    final original = _envelope!;
+    final sessionKey = _key!;
     try {
-      final sealed = await VaultCrypto.seal(next, _key!, _envelope!.salt);
+      final sealed = await VaultCrypto.seal(next, sessionKey, original.salt);
+      if (epoch != _lockEpoch || !mounted) return false;
+      // Never knowingly overwrite ciphertext that changed since unlock or
+      // the preceding save. This is NOT an interprocess compare-and-swap.
+      await _store.ensureUnchanged(original);
       if (epoch != _lockEpoch || !mounted) return false;
       await _store.save(sealed);
       if (mounted) {
@@ -224,9 +243,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       }
       return true;
     } catch (_) {
-      if (mounted) {
+      if (mounted && epoch == _lockEpoch) {
         setState(() {
-          _error = 'Save failed. The previous encrypted vault was retained.';
+          _error =
+              'Save refused or interrupted. Verify the encrypted vault before retrying.';
         });
       }
       return false;
