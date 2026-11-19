@@ -4,6 +4,7 @@ import {encryptEntries, initialize, parseEnvelope, randomId, unlock, generatePas
   type Entry, type VaultEnvelope, type VaultKind} from '../../web/src/crypto';
 import {parseOtp, generateOtp} from '../../web/src/otp';
 import {matchingHttpsOrigin, fillActiveDocument} from './autofill';
+import {bitwardenImportWarning,parseBitwardenPlaintextJson} from '../../web/src/import_bitwarden';
 import './style.css';
 
 type BrowserTab = {id?: number; url?: string};
@@ -111,6 +112,31 @@ function Extension() {
     }catch{setError('Import rejected. Wrong password or invalid encrypted backup. Original data retained.');}
     finally{setBusy(false);}
   }
+  async function importBitwarden(event:React.ChangeEvent<HTMLInputElement>) {
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file || items===null || !key.current || !envelope || busy)return;
+    if(file.size===0 || file.size>5_000_000){
+      setError('Bitwarden plaintext JSON must be between 1 byte and 5 MB.');return;
+    }
+    setBusy(true);setError('');
+    try {
+      const text=await file.text();
+      const preview=parseBitwardenPlaintextJson(text,randomId);
+      if(items.length+preview.entries.length>20_000)throw Error('Too many items');
+      if(!window.confirm(bitwardenImportWarning(preview)))return;
+      // Encrypt before the one explicit extension-storage write.
+      const next=[...items,...preview.entries];
+      if(!key.current) return;
+      const encrypted=await encryptEntries(next,key.current,envelope.kdf.salt);
+      if(!key.current)return;
+      await browser.storage.local.set({[STORAGE_KEY]:encrypted});
+      setEnvelope(encrypted);setItems(next);setSelected(null);setEdit(null);
+      setError('Bitwarden login/note items encrypted locally. Review imported records.');
+    }catch{
+      setError('Bitwarden import rejected. Unsupported or invalid format; old vault retained.');
+    }finally{setBusy(false);}
+  }
   async function fill(item:Entry) {
     if(item.kind&&item.kind!=='login')return;
     if(tab?.id===undefined||!tab.url){setError('No active website tab.');return;}
@@ -190,6 +216,10 @@ function Extension() {
         </button>):<p className="empty">No items. Add one or import an encrypted backup.</p>}</div>
         <div className="bottom-actions"><button onClick={exportFile}>↓ Encrypted backup</button>
           <label className="import-button">↑ Import<input type="file" accept=".json" hidden onChange={e=>void restore(e)}/></label></div>
+        <p className="muted">Migration: Bitwarden plaintext JSON only. Review omissions. Delete the plaintext export when safe.</p>
+        <label className="secondary import-button">↑ Import Bitwarden JSON
+          <input type="file" aria-label="Bitwarden plaintext JSON file" accept=".json" hidden disabled={busy}
+            onChange={e=>void importBitwarden(e)}/></label>
       </>:selected?<><button className="back" onClick={()=>setSelected(null)}>← Back</button>
         <h2>{selected.title}</h2><p className="muted">{kindName[selected.kind??'login']}</p>
         {selected.kind==='note'?<p className="note-content">{selected.notes}</p>:<>

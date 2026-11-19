@@ -139,3 +139,51 @@ test('Firefox popup encrypted backup restore rejects wrong password and relocks'
   await expect(page.getByRole('button',{name:/Synthetic alpha/})).toBeVisible();
   await expect(page.getByRole('button',{name:/Synthetic beta/})).toHaveCount(0);
 });
+
+test('Firefox popup imports Bitwarden personal login and note and never persists plaintext',async({page})=>{
+  await page.addInitScript(()=>{
+    const storage:Record<string,unknown>={};
+    Object.defineProperty(window,'__bitwardenSyntheticStorage',{value:storage});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:storage[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(storage,values),
+      }},
+      tabs:{query:async()=>[{id:77,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-firefox-bitwarden-master');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  const source=JSON.stringify({
+    encrypted:false,
+    items:[
+      {type:1,name:'Synthetic migrated login',login:{
+        username:'fake',password:'NO-REAL-SECRET',uris:[{uri:'https://example.invalid'}]
+      }},
+      {type:2,name:'Synthetic migrated note',notes:'NOT-PRIVATE-NOTES',secureNote:{}}
+    ]
+  });
+  let confirmed=false;
+  page.on('dialog',dialog=>{
+    expect(dialog.message()).toContain('2 login/note items');
+    confirmed=true;
+    return dialog.accept();
+  });
+  await page.getByLabel('Bitwarden plaintext JSON file').setInputFiles({
+    name:'synthetic.json',mimeType:'application/json',buffer:Buffer.from(source)
+  });
+  await expect(page.getByRole('button',{name:/Synthetic migrated login/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Synthetic migrated note/})).toBeVisible();
+  expect(confirmed).toBe(true);
+  const encrypted=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {__bitwardenSyntheticStorage:Record<string,unknown>}).__bitwardenSyntheticStorage
+  ));
+  expect(encrypted).not.toContain('NO-REAL-SECRET');
+  expect(encrypted).not.toContain('NOT-PRIVATE-NOTES');
+  await page.getByTitle('Lock extension vault').click();
+  await page.getByLabel('Master password').fill('synthetic-firefox-bitwarden-master');
+  await page.getByRole('button',{name:'Unlock'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic migrated note/})).toBeVisible();
+});

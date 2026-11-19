@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { encryptEntries, generatePassword, initialize, parseEnvelope, randomId, STORAGE_KEY, unlock,
   type Entry, type VaultEnvelope, type VaultKind, type CustomField } from './crypto';
 import { generateOtp, parseOtp } from './otp';
+import { bitwardenImportWarning, parseBitwardenPlaintextJson } from './import_bitwarden';
 import './style.css';
 
 const blank = (kind: VaultKind): Entry =>
@@ -141,6 +142,40 @@ function App() {
     } finally { setBusy(false); }
   }
 
+  async function importBitwarden(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || entries === null || !key.current || busy) return;
+    if (file.size === 0 || file.size > 5_000_000) {
+      setNotice('Bitwarden plaintext JSON must be 1 byte to 5 MB.');
+      return;
+    }
+    const epoch = lockEpoch.current;
+    setBusy(true); setNotice('');
+    try {
+      // In-memory parse. No external migration service, network or plaintext
+      // downloads. The user-supplied source file stays on the user's disk.
+      const text = await file.text();
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
+      const preview = parseBitwardenPlaintextJson(text, randomId);
+      if (entries.length + preview.entries.length > 20_000) {
+        throw Error('Vault would exceed item limit');
+      }
+      if (!window.confirm(bitwardenImportWarning(preview))) return;
+      if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
+      // persist encrypts and commits atomically. No plaintext export data is
+      // saved in localStorage, and existing items are retained on rejection.
+      const added = await persist([...entries, ...preview.entries]);
+      if (added && epoch === lockEpoch.current) {
+        setNotice('Bitwarden login/note items encrypted and added locally. Review imported records.');
+      }
+    } catch {
+      if (epoch === lockEpoch.current) {
+        setNotice('Bitwarden import rejected. Unsupported format or invalid data; existing vault retained.');
+      }
+    } finally { setBusy(false); }
+  }
+
   async function saveEditor(event: React.FormEvent) {
     event.preventDefault();
     if (!edit || !entries) return;
@@ -238,6 +273,11 @@ function App() {
         <button className="quiet backup" onClick={downloadBackup}>↓ Export encrypted backup</button>
         <label className="quiet backup import-label">↑ Restore encrypted backup
           <input type="file" accept=".json,application/json" onChange={e=>void importBackup(e)} hidden /></label>
+        <div className="side-heading second">IMPORT FROM OTHER MANAGERS</div>
+        <p className="sidebar-note">Bitwarden plaintext JSON only. The source stays on your disk; review the omissions before importing and delete the plaintext copy when safe.</p>
+        <label className="quiet backup import-label">↑ Import Bitwarden plaintext JSON
+          <input type="file" aria-label="Bitwarden plaintext JSON file" accept=".json,application/json"
+            disabled={busy} onChange={e=>void importBitwarden(e)} hidden /></label>
       </aside>
       <section className="workspace">
         <div className="workspace-head"><div><span className="eyebrow">YOUR PRIVATE LIBRARY</span>

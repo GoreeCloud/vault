@@ -59,3 +59,8 @@ message. This is **not** end-to-end verification of live in-tab injection,
 browser permission handling, autofill phishing resistance, popup on-screen
 rendering, or a signed AMO distribution. Treat the mocked test and temporary
 add-on installation as separate evidence categories.
+
+
+## Bitwarden migration
+
+When unlocked, the popup supports a local, user-confirmed Bitwarden **plaintext JSON** login/note import using the same bounded parser as the web client. No plaintext is stored by the extension; the result is immediately encrypted under the current local vault. Unsupported data, including real passkey private keys, attachments and identities, is **not** migrated. See [migration details](IMPORTING-BITWARDEN.md). The Firefox extension still has only the three minimal existing permissions.

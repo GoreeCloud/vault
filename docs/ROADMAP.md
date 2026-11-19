@@ -15,3 +15,8 @@ Offline encrypted vault format; React browser UI; native Flutter Linux/Android U
 7. Document GoreeShield, Wardveil, Mesh, Identity and GoreeCloud UI integrations with real tests and privacy boundaries.
 
 No delivery dates, stable-release status, production host or ongoing unattended work is implied.
+
+
+## Migration integrity
+
+Implement full capability-aware migration from supported password-manager exports in deliberately limited stages. First-party web and Firefox clients implement bounded, user-confirmed **Bitwarden plaintext JSON personal login/note** import with omission counters and encrypted append. Remaining work: support more Bitwarden field types, add explicit collision review/deduplication, preserve multi-URI rules, consider safe encrypted Bitwarden/Proton imports after source and license review, verify device migration and recoverability, and maintain original data until tests demonstrate coverage. Never claim passkey credentials have migrated based on metadata alone.
