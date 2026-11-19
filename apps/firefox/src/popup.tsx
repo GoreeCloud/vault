@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {encryptEntries, initialize, parseEnvelope, randomId, unlock, generatePassword,
   type Entry, type VaultEnvelope, type VaultKind} from '../../web/src/crypto';
 import {parseOtp, generateOtp} from '../../web/src/otp';
+import {normalizePasskeyRpId} from './passkey_rp';
 import {matchingHttpsOrigin, fillActiveDocument} from './autofill';
 import {bitwardenImportWarning,parseBitwardenPlaintextJson} from '../../web/src/import_bitwarden';
 import './style.css';
@@ -236,6 +237,12 @@ function Extension() {
     e.preventDefault();if(!edit||!items)return;
     let next={...edit};
     if(!next.title.trim()){setError('Title is required.');return;}
+    if(next.kind==='passkey'){
+      const rpId=normalizePasskeyRpId(next.passkey?.rpId??'');
+      if(!rpId){setError('Enter a registrable RP domain, not a URL or public suffix. Metadata only.');return;}
+      next.passkey={rpId,credentialId:next.passkey?.credentialId??'',
+        userHandle:next.passkey?.userHandle??''};
+    }
     if(next.kind==='otp'||otpText.trim()){
       try{next.otp=edit.otp?.secret===otpText.trim()?edit.otp:parseOtp(otpText.trim());}
       catch{setError('Invalid OTP secret or otpauth URI.');return;}
@@ -326,7 +333,7 @@ function Extension() {
         {(edit!.kind==='otp'||edit!.kind==='login')&&
           <label>OTP secret or otpauth URI<input type="password" autoComplete="off" value={otpText}
             onChange={e=>setOtpText(e.target.value)}/></label>}
-        {edit!.kind==='passkey'&&<><p className="notice">Metadata only; no passkey registration or private key storage.</p>
+        {edit!.kind==='passkey'&&<><p className="notice">Metadata only; no passkey registration or private key storage. Enter a registrable RP domain (not URL or public suffix).</p>
           <label>RP domain<input value={edit!.passkey?.rpId??''}
             onChange={e=>setEdit({...edit!,passkey:{rpId:e.target.value,credentialId:'',userHandle:''}})}/></label></>}
         <label>Encrypted notes<textarea rows={4} value={edit!.notes} onChange={e=>setEdit({...edit!,notes:e.target.value})}/></label>

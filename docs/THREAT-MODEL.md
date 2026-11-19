@@ -31,7 +31,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 | Export/import | Encrypted JSON import/export source exists for web, Firefox, Linux and Android; native import bounds each streamed chunk independently of provider metadata. Independent device restore rehearsal, power-loss tests, safe original-vault retention, corrupt backup handling and rollback remain mandatory |
 | One-time codes | Secrets encrypted but copying introduces clipboard exposure; TOTP clock skew, malformed URIs, replay, HOTP counter durability, and QR provisioning require review |
 | Firefox extension | Popup and injected content security boundaries, lock-epoch protection against delayed cryptographic/storage operations, malicious login pages, tab navigation races, compromised browser profile, third-party dependencies and unsigned distribution; no independent extension audit |
-| Passkeys | Reference metadata does not create or authenticate with passkeys. Browser/OS credential manager, WebAuthn RP binding, native authenticator control, key protection and recovery require design/verification |
+| Passkeys | Web/Firefox reference metadata editors reject public suffixes with tldts and expose a unit-tested origin/RP-suffix preflight, but they do not create or authenticate credentials. Real WebAuthn integration needs caller-origin and challenge verification, consent/UV, OS-backed credential protection, anti-replay and recovery |
 | Release pipeline | No independent source/dependency audit, provenance/attestation, code signing, physical-device tests, or audited update channel |
 | Compliance | GoreeShield privacy, Wardveil cybersecurity, Identity and Mesh contracts not verified or enforced end-to-end |
 

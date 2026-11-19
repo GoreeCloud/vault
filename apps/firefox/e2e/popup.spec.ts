@@ -209,6 +209,34 @@ test('Firefox popup automatically locks after five minutes of inactivity',async(
   await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
 });
 
+test('Firefox passkey reference editor refuses public suffix and accepts scoped domain',async({page})=>{
+  await page.addInitScript(()=>{
+    const storage:Record<string,unknown>={};
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:storage[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(storage,values),
+      }},
+      tabs:{query:async()=>[{id:22,url:'https://foo.github.io'}]},
+      scripting:{executeScript:async()=>[{result:true}]},
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-rp-creation-master-password');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await page.getByRole('button',{name:'+ Passkey reference'}).click();
+  await page.getByLabel('Title').fill('Synthetic RP reference');
+  await page.getByLabel('RP domain').fill('github.io');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('status')).toContainText('registrable RP domain');
+  await page.getByLabel('RP domain').fill('FOO.GITHUB.IO');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic RP reference/})).toBeVisible();
+  await page.getByRole('button',{name:/Synthetic RP reference/}).click();
+  await expect(page.getByText('foo.github.io',{exact:true})).toBeVisible();
+  await expect(page.getByText('Passkey reference only',{exact:false})).toBeVisible();
+});
+
 test('a delayed encrypted save never reopens a popup after its inactivity lock', async({page})=>{
   await page.clock.install();
   await page.addInitScript(()=>{
