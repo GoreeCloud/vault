@@ -21,7 +21,7 @@ The Android native channel receives bounded encrypted bytes via Base64 and does 
 2. Choose an encrypted JSON file. Selection is capped at 5,000,000 bytes.
 3. Enter the **password for that backup**. Invalid format, incorrect password and altered authenticated ciphertext are rejected *before* local state is changed.
 4. Review the number of authenticated items and explicitly confirm **Replace local vault**.
-5. The app writes the encrypted envelope through its existing temp-file-and-rename store. Only after the write succeeds does it replace the unlocked in-memory key and items.
+5. The app writes the encrypted envelope through its existing temp-file-and-rename store. Only after the write succeeds does it replace the current encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
 
 Restore **replaces** local data. It does not merge or synchronize items, automatically retain a history, change the master password on existing files, recover a forgotten password, or detect rollback of a valid older encrypted backup. Back up current encrypted data first.
 

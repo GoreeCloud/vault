@@ -306,8 +306,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       _search.clear();
       setState(() {
         _envelope = candidate.envelope;
-        _key = candidate.key;
-        _entries = candidate.entries;
+        // A restore ends in the LOCKED state, even if Android foreground
+        // transitions occurred while its system picker was open.
+        _key = null;
+        _entries = null;
         _error = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
