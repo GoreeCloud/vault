@@ -65,6 +65,36 @@ void main() {
     }
   });
 
+  test('detects stale encrypted snapshots without replacing the current file',
+      () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-store-stale-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (key, original) =
+          await VaultCrypto.initialize('synthetic-stale-test-password');
+      await store.save(original);
+      await expectLater(store.ensureUnchanged(original), completes);
+      // Another successful save changes the authenticated envelope and nonce.
+      final newest = await VaultCrypto.seal([
+        const VaultEntry(
+            id: 'newer',
+            title: 'Newer synthetic entry',
+            username: '',
+            password: 'NOT-A-REAL-SECRET',
+            website: '',
+            notes: '')
+      ], key, original.salt);
+      await store.save(newest);
+      final file = File('${temp.path}/vault.enc.json');
+      final unchangedBytes = await file.readAsBytes();
+      await expectLater(store.ensureUnchanged(original), throwsFormatException);
+      expect(await file.readAsBytes(), unchangedBytes);
+      await expectLater(store.ensureUnchanged(newest), completes);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
   test('refuses symlink as local ciphertext target', () async {
     if (!Platform.isLinux) return;
     final temp = await Directory.systemTemp.createTemp('gcv-store-symlink-');
