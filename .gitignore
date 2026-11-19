@@ -1,0 +1,33 @@
+# Local secrets and development environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.enc.json
+!tests/interop/sample-v1.json
+.DS_Store
+# Web
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+# Dart/Flutter
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/android/local.properties
+**/android/key.properties
+**/android/.gradle/
+**/android/captures/
+**/ios/Flutter/ephemeral/
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/*.iml
+**/.idea/

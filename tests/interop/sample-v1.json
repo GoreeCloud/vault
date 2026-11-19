@@ -1,0 +1,14 @@
+{
+  "format": "goreecloud-vault",
+  "version": 1,
+  "kdf": {
+    "name": "pbkdf2-sha256",
+    "iterations": 600000,
+    "salt": "AAECAwQFBgcICQoLDA0ODw=="
+  },
+  "cipher": {
+    "name": "aes-256-gcm",
+    "nonce": "EBESExQVFhcYGRob",
+    "data": "cMj6fKILz1FMoDqxaUHQV0sBqSNvTY/GJ9kqImgM891/g0GK7gGWDgdg33Y+pDK+bQbm/cKYveLsnD0TGqPoUV0beCBa8Np0Fd+wgVeHFg8amhQMVNjQbWC113+TZpkzZ+JLfQA7lN2vU9FsE70z4eb6wl0pjYNPyf0Sobh2K++/KrEObSLONbud706JawlkV+rih7KUxWni7hGlyjxPlUgnKLRRJM2s/v6k327xVq35yR4jc5gz+yK1IczhvoEN"
+  }
+}
