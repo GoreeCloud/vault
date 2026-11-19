@@ -20,3 +20,13 @@ A new web/Firefox passkey reference RP ID must be an ASCII registrable domain un
 The tested origin/RP helper accepts only the same effective host or an RP registrable-domain suffix on HTTPS, with a localhost HTTP exception. It **is not connected to any signing operation**, cannot verify actual site ownership, and must not be used alone for authorization. Ordinary password autofill continues to require an exact HTTPS origin, never WebAuthn's broader RP suffix rule.
 
 The PSL snapshot and dependencies must be kept current; future functional WebAuthn sign-in needs real server challenge validation, allowed-origin enforcement, user consent/UV and credential private-key lifecycle. Normative reference: https://www.w3.org/TR/webauthn-3/#relying-party-identifier .
+
+
+## Disposable localhost WebAuthn protocol test
+
+A **separate test-only relying party** under tests/webauthn-rp/ uses a browser
+virtual authenticator, valid one-use server challenges and verified
+registration/assertion signatures. It never stores private keys in GoreeCloud
+Vault or registers a credential on behalf of an unrelated website. See
+[disposable test RP boundaries](WEBAUTHN-TEST-RP.md). These tests are
+necessary protocol research, not completion of a passkey-manager milestone.
