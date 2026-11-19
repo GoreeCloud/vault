@@ -35,3 +35,19 @@ lifecycle lock epochs invalidate pending unlocks and saves. These are
 best-effort checks; there is no cross-process file locking, directory fsync
 or independent crash-consistency proof. Use encrypted backups before testing
 other writers or migrations.
+
+
+## Limited local Proton Pass migration (development preview)
+
+Linux and Android sources now expose **Import Proton Pass data.json** using the
+same OS document picker and explicit destination master-password validation as
+the Bitwarden import. Choose only manually extracted **plaintext data.json**
+from a Proton Pass unencrypted ZIP; ZIP, PGP, CSV, attachments, alias forwarding
+and usable passkey credentials are not imported. The bounded parser presents
+count-only omission warnings and appends supported active personal logins/notes
+only after explicit user confirmation. Imported records are encrypted before
+local storage; the current encrypted envelope is compared before replacement,
+and unlock is required to inspect results. See
+[import boundaries](../../docs/IMPORTING-PROTON-PASS.md). The real Linux/Android
+file-picker experience and actual Proton exports have **not** been verified;
+the test suite uses fake fixtures only. Keep independently recoverable backups.

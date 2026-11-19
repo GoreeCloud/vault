@@ -14,10 +14,19 @@
 | Cross-platform encrypted fixture | Node-generated synthetic multi-item fixture tested by web and Flutter | Browser restoration/relock and hidden-tab KDF race tested in Chromium and Firefox; device tests pending |
 | TOTP SHA1/SHA256/SHA512 and HOTP | Implemented in web, native and Firefox code | RFC test vectors and parser tests; physical app acceptance pending |
 | Secure notes, custom fields, favorites, tags | Implemented in web/native and interoperable encrypted schema | Firefox popup can create/edit encrypted custom fields, tags and favorites; runtime extension interaction pending |
-| Proton Pass extracted plaintext data.json import | Web and Firefox source / synthetic tests | Active personal logins/notes, first URL, TOTP, basic custom fields; explicit counts of unsupported items, aliases, passkeys, files and deleted entries. No ZIP/PGP/CSV decryption or passkey transfer |
+| Proton Pass extracted plaintext data.json import | Web, Firefox and Flutter native source / synthetic tests; real native picker acceptance pending | Active personal logins/notes, first URL, TOTP, basic custom fields; explicit counts of unsupported items, aliases, passkeys, files and deleted entries. No ZIP/PGP/CSV decryption or passkey transfer |
 | Bitwarden plaintext JSON import | Web + Firefox browser tests; Flutter native parser and encrypted-append source with synthetic tests | Explicit user action; personal logins/notes, basic custom fields, folder tags and TOTP; preview counts skipped passkeys, unsupported item types, organization items, history, attachments, extra URLs and reprompt policies; not lossless |
 | Firefox WebExtension | Implemented / compiled and linted | MV3 popup, encrypted storage, explicit origin-scoped fill; unsigned; installed temporarily in Firefox 159 headless, popup mocked-WebExtensions testing; real tab autofill pending |
 | Passkey reference records | Implemented with web/Firefox RP-domain preflight | Metadata **only**. Web/Firefox editors reject public suffixes and malformed domains. Not registration, private keys, or authentication |
 | Usable WebAuthn/passkey authenticator | Not implemented | Requires browser/OS integration, credential lifecycle and RP-bound authorization |
 | Cloud sync, sharing, broad autofill, aliases | Not implemented | Requires separately reviewed security architecture |
 | Signed release and deployment | Not verified | Do not treat development builds as production |
+
+
+### Limited Proton Pass migration in native Linux/Android source
+
+The native client can select extracted plaintext Proton Pass data.json, parse
+bounded supported logins and notes, present a count-only omission preview,
+reauthenticate the destination, append and encrypt, then relock. Unsupported
+Proton items (including passkey private keys, aliases, ZIP and attachments) do
+not transfer. Acceptance on physical devices and real exports is not complete.
