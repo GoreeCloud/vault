@@ -13,6 +13,14 @@ The portable backup uses the exact [encrypted version 1 JSON envelope](CRYPTO-FO
 3. Choose a location using the OS picker. Linux uses the system save dialog; Android uses **ACTION_CREATE_DOCUMENT** with the system Documents provider.
 4. The export contains ciphertext only. Keep the master password separately and protect the destination and its copies.
 
+Before opening the destination picker, the native app rechecks that the
+encrypted on-disk vault matches the last observed in-memory ciphertext.
+If another writer replaced the file, export refuses rather than silently
+producing an outdated recovery checkpoint. The check is **not** an interprocess
+transaction and cannot guarantee the file will remain unchanged after the
+comparison. If the app locks while the picker is open, it does not announce
+a successful export on the old unlocked session.
+
 The Android backup channel receives bounded ciphertext and does not request broad storage or Internet permissions itself. The Flutter debug manifest requests Internet for development tooling; the main manifest does not. The channel wipes its transient byte array after save/cancellation. This cannot guarantee that other process copies are zeroized.
 
 ## Restore
