@@ -208,3 +208,70 @@ test('Firefox popup automatically locks after five minutes of inactivity',async(
   await page.clock.fastForward(301_000);
   await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
 });
+
+test('a delayed encrypted save never reopens a popup after its inactivity lock', async({page})=>{
+  await page.clock.install();
+  await page.addInitScript(()=>{
+    const ciphertext:Record<string,unknown>={};
+    const gate:{
+      blocked:boolean;
+      waiting:boolean;
+      release: (()=>void)|null;
+    }={blocked:false,waiting:false,release:null};
+    Object.defineProperty(window,'__vaultSaveGate',{value:gate});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:ciphertext[key]}),
+        set:async(values:Record<string,unknown>)=>{
+          if(gate.blocked){
+            gate.waiting=true;
+            await new Promise<void>(resolve=>{gate.release=resolve;});
+            gate.waiting=false;
+          }
+          Object.assign(ciphertext,values);
+        },
+      }},
+      tabs:{query:async()=>[{id:1,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+
+  await page.goto('/popup.html');
+  const master='synthetic-epoch-gated-test-password-long';
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:/My vault/})).toBeVisible();
+
+  await page.getByRole('button',{name:'+ Secure note'}).click();
+  await page.getByLabel('Title').fill('Synthetic delayed item');
+  await page.getByLabel('Encrypted notes').fill('NON-SECRET-DELAY-TEST');
+  await page.evaluate(()=>{
+    (window as unknown as {__vaultSaveGate:{blocked:boolean}}).__vaultSaveGate.blocked=true;
+  });
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await page.waitForFunction(()=>(
+    window as unknown as {__vaultSaveGate:{waiting:boolean}}
+  ).__vaultSaveGate.waiting);
+
+  // An OS/storage stall must not prolong an unlocked session indefinitely.
+  await page.clock.fastForward(5*60*1000+1);
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  // A write already dispatched before locking must settle before another
+  // unlock can read an authoritative encrypted snapshot.
+  // The action label becomes 'Working…' while a pending write is blocked.
+  await expect(page.getByRole('button',{name:'Working…'})).toBeDisabled();
+  await page.evaluate(()=>{
+    (window as unknown as {__vaultSaveGate:{release:(()=>void)|null}}
+    ).__vaultSaveGate.release?.();
+  });
+  await page.waitForFunction(()=>!(
+    window as unknown as {__vaultSaveGate:{waiting:boolean}}
+  ).__vaultSaveGate.waiting);
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Synthetic delayed item/})).toHaveCount(0);
+
+  // A new, deliberate unlock fetches the authoritative encrypted storage.
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic delayed item/})).toBeVisible();
+});

@@ -30,6 +30,9 @@ const kindName:Record<VaultKind,string>={login:'Login',note:'Secure note',otp:'A
 
 function Extension() {
   const key=useRef<CryptoKey|null>(null);
+  const lockEpoch=useRef(0);
+  // Never re-open a locked popup after a pending KDF/storage/tab promise resolves.
+  const active=(epoch:number)=>lockEpoch.current===epoch&&document.visibilityState==='visible';
   const [loaded,setLoaded]=useState(false);
   const [envelope,setEnvelope]=useState<VaultEnvelope|null>(null);
   const [corrupt,setCorrupt]=useState(false);
@@ -61,32 +64,53 @@ function Extension() {
   async function open(event:React.FormEvent) {
     event.preventDefault();
     if(corrupt||busy)return;
+    const epoch=lockEpoch.current;
     setBusy(true);setError('');
     try{
       if(envelope){
-        const opened=await unlock(master,envelope);
-        key.current=opened.key;setItems(opened.entries);
+        // Re-read ciphertext after a potentially stale/aborted storage write.
+        const stored=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+        if(!active(epoch))return;
+        const current=parseEnvelope(JSON.stringify(stored));
+        const opened=await unlock(master,current);
+        if(!active(epoch))return;
+        key.current=opened.key;setEnvelope(current);setItems(opened.entries);
       }else{
         const result=await initialize(master);
+        if(!active(epoch))return;
         await browser.storage.local.set({[STORAGE_KEY]:result.envelope});
+        if(!active(epoch))return;
         key.current=result.key;setEnvelope(result.envelope);setItems([]);
       }
       setMaster('');
-    }catch{setError('Could not open vault. Verify password and storage integrity.');}
-    finally{setBusy(false);}
+    }catch{
+      if(active(epoch))setError('Could not open vault. Verify password and storage integrity.');
+    }finally{setBusy(false);}
   }
   async function save(next:Entry[]):Promise<boolean>{
     if(!key.current||!envelope||busy)return false;
+    const epoch=lockEpoch.current;
+    const sessionKey=key.current;
     setBusy(true);setError('');
     try{
-      const value=await encryptEntries(next,key.current,envelope.kdf.salt);
+      const value=await encryptEntries(next,sessionKey,envelope.kdf.salt);
+      if(!active(epoch))return false;
       await browser.storage.local.set({[STORAGE_KEY]:value});
+      if(!active(epoch))return false;
       setEnvelope(value);setItems(next);setEdit(null);setSelected(null);
       return true;
-    }catch{setError('Save failed; original encrypted data retained.');return false;}
-    finally{setBusy(false);}
+    }catch{
+      if(active(epoch))setError('Save failed. Check the encrypted vault before retrying.');
+      return false;
+    }finally{setBusy(false);}
   }
-  function lock() {key.current=null;setItems(null);setSelected(null);setEdit(null);setCode('');}
+  function lock() {
+    lockEpoch.current++;
+    key.current=null;setItems(null);setSelected(null);setEdit(null);
+    // Keep busy while any already-dispatched ciphertext write is pending.
+    // An explicit unlock must wait for it, then re-read authoritative storage.
+    setMaster('');setCode('');
+  }
 
   useEffect(()=>{
     if(items===null)return;
@@ -116,20 +140,26 @@ function Extension() {
   }
   async function restore(event:React.ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
-    event.target.value='';if(!file)return;
+    event.target.value='';if(!file||busy)return;
     const password=window.prompt('Master password of encrypted backup:');
     if(password===null)return;
+    const epoch=lockEpoch.current;
     setBusy(true);setError('');
     try{
       if(file.size>5_000_000)throw Error('too large');
       const value=parseEnvelope(await file.text());
+      if(!active(epoch))return;
       await unlock(password,value);
+      if(!active(epoch))return;
       if(!window.confirm('Replace all encrypted items in this Firefox profile? Export a backup first.'))return;
+      if(!active(epoch))return;
       await browser.storage.local.set({[STORAGE_KEY]:value});
+      if(!active(epoch))return;
       lock();setEnvelope(value);setCorrupt(false);
       setError('Encrypted backup restored. Unlock with its master password.');
-    }catch{setError('Import rejected. Wrong password or invalid encrypted backup. Original data retained.');}
-    finally{setBusy(false);}
+    }catch{
+      if(active(epoch))setError('Import rejected. Wrong password or invalid encrypted backup. Existing vault should be checked.');
+    }finally{setBusy(false);}
   }
   async function importBitwarden(event:React.ChangeEvent<HTMLInputElement>) {
     const file=event.target.files?.[0];
@@ -138,22 +168,26 @@ function Extension() {
     if(file.size===0 || file.size>5_000_000){
       setError('Bitwarden plaintext JSON must be between 1 byte and 5 MB.');return;
     }
+    const epoch=lockEpoch.current;
+    const sessionKey=key.current;
     setBusy(true);setError('');
     try {
       const text=await file.text();
+      if(!active(epoch))return;
       const preview=parseBitwardenPlaintextJson(text,randomId);
       if(items.length+preview.entries.length>20_000)throw Error('Too many items');
       if(!window.confirm(bitwardenImportWarning(preview)))return;
+      if(!active(epoch))return;
       // Encrypt before the one explicit extension-storage write.
       const next=[...items,...preview.entries];
-      if(!key.current) return;
-      const encrypted=await encryptEntries(next,key.current,envelope.kdf.salt);
-      if(!key.current)return;
+      const encrypted=await encryptEntries(next,sessionKey,envelope.kdf.salt);
+      if(!active(epoch))return;
       await browser.storage.local.set({[STORAGE_KEY]:encrypted});
+      if(!active(epoch))return;
       setEnvelope(encrypted);setItems(next);setSelected(null);setEdit(null);
       setError('Bitwarden login/note items encrypted locally. Review imported records.');
     }catch{
-      setError('Bitwarden import rejected. Unsupported or invalid format; old vault retained.');
+      if(active(epoch))setError('Bitwarden import rejected. Inspect the encrypted vault before retrying.');
     }finally{setBusy(false);}
   }
   async function fill(item:Entry) {
@@ -161,30 +195,42 @@ function Extension() {
     if(tab?.id===undefined||!tab.url){setError('No active website tab.');return;}
     const origin=matchingHttpsOrigin(item.website,tab.url);
     if(!origin){setError('Autofill blocked: saved site must match this HTTPS origin exactly.');return;}
+    const epoch=lockEpoch.current;
     try{
       // Re-read the active tab before injecting secrets, and check inside the tab as well.
-      const active=(await browser.tabs.query({active:true,currentWindow:true}))[0];
-      if(active.id!==tab.id||!active.url||matchingHttpsOrigin(item.website,active.url)!==origin)
+      const currentTab=(await browser.tabs.query({active:true,currentWindow:true}))[0];
+      if(!active(epoch)||!key.current)return;
+      if(currentTab.id!==tab.id||!currentTab.url||matchingHttpsOrigin(item.website,currentTab.url)!==origin)
         throw Error('Tab changed');
       const results=await browser.scripting.executeScript({
         target:{tabId:tab.id},func:fillActiveDocument,args:[origin,item.username,item.password]
       });
+      if(!active(epoch))return;
       setError(results[0]?.result?'Credentials filled. Review before submitting.':
         'No safe password field found. Nothing was submitted.');
-    }catch{setError('Autofill unavailable in this tab. Nothing was submitted.');}
+    }catch{
+      if(active(epoch))setError('Autofill unavailable in this tab. Nothing was submitted.');
+    }
   }
   async function showOtp(item:Entry,copy=false) {
-    if(!item.otp)return;
+    if(!item.otp||!key.current||!items)return;
+    const epoch=lockEpoch.current;
     try{
       const value=await generateOtp(item.otp);
+      if(!active(epoch))return;
       if(item.otp.type==='hotp'){
         if(!window.confirm('Use this HOTP? Its encrypted counter will advance.'))return;
-        const updated=items!.map(x=>x.id===item.id?{...x,otp:{...item.otp!,counter:item.otp!.counter+1}}:x);
-        if(!await save(updated))return;
+        if(!active(epoch))return;
+        const updated=items.map(x=>x.id===item.id?{...x,otp:{...item.otp!,counter:item.otp!.counter+1}}:x);
+        if(!await save(updated)||!active(epoch))return;
       }
+      if(!active(epoch))return;
       setCode(value);
-      if(copy){await navigator.clipboard.writeText(value);setError('OTP copied to clipboard.');}
-    }catch{setError('Unable to generate or copy OTP.');}
+      if(copy){
+        await navigator.clipboard.writeText(value);
+        if(active(epoch))setError('OTP copied. Clipboard contents may persist.');
+      }
+    }catch{if(active(epoch))setError('Unable to generate or copy OTP.');}
   }
   async function submitEdit(e:React.FormEvent){
     e.preventDefault();if(!edit||!items)return;
