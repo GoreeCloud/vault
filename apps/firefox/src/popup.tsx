@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {encryptEntries, initialize, parseEnvelope, randomId, unlock, generatePassword,
   type Entry, type VaultEnvelope, type VaultKind} from '../../web/src/crypto';
 import {parseOtp, generateOtp} from '../../web/src/otp';
-import {normalizePasskeyRpId} from '../../web/src/passkey_rp';
+import {normalizePasskeyRpId} from './passkey_rp';
 import {matchingHttpsOrigin, fillActiveDocument} from './autofill';
 import {bitwardenImportWarning,parseBitwardenPlaintextJson} from '../../web/src/import_bitwarden';
 import './style.css';
