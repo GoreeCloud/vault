@@ -51,3 +51,17 @@ and unlock is required to inspect results. See
 [import boundaries](../../docs/IMPORTING-PROTON-PASS.md). The real Linux/Android
 file-picker experience and actual Proton exports have **not** been verified;
 the test suite uses fake fixtures only. Keep independently recoverable backups.
+
+
+## Synthetic picker lifecycle regression
+
+The Flutter widget regression injects an in-memory, bounded synthetic JSON
+picker and in-memory encrypted storage. It simulates app inactivity while a
+Proton import picker is pending, asserts that a fresh destination password is
+required before the omission-confirmation dialog, and verifies encrypted append
+plus locked completion. Master-password dialog text controllers are owned by
+their dialog widget states and cleared only on actual route disposal, preventing
+use-after-dispose while the pop animation still renders. These are test-only
+injection points; production continues to call the existing OS document picker
+and app-private encrypted store. **This is not real Android SAF or Linux GTK
+picker acceptance**, nor proof of renderer accessibility or crash recovery.
