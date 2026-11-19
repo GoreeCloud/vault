@@ -51,6 +51,29 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onHide);
   }, []);
   useEffect(() => {
+    if (entries === null) return;
+    // Deliberate auto-lock after 5 minutes without a local user gesture.
+    // Keep this client-side; do not record activity or vault contents remotely.
+    const idleMs = 5 * 60 * 1000;
+    let timer = window.setTimeout(lock, idleMs);
+    const onActivity = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(lock, idleMs);
+    };
+    document.addEventListener('pointerdown', onActivity, true);
+    document.addEventListener('keydown', onActivity, true);
+    document.addEventListener('input', onActivity, true);
+    window.addEventListener('focus', onActivity);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('pointerdown', onActivity, true);
+      document.removeEventListener('keydown', onActivity, true);
+      document.removeEventListener('input', onActivity, true);
+      window.removeEventListener('focus', onActivity);
+    };
+  }, [entries]);
+
+  useEffect(() => {
     if (!entries) return;
     let cancelled = false;
     const refresh = async () => {
@@ -227,7 +250,7 @@ function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><div className="brand-icon" aria-hidden="true">◇</div>
-        <div><strong>GoreeCloud Vault</strong><small>PRIVATE BY DESIGN · OFFLINE PREVIEW</small></div></div>
+        <div><strong>GoreeCloud Vault</strong><small>PRIVATE BY DESIGN · AUTO-LOCK 5 MIN</small></div></div>
       <span className="status"><span className="status-dot" />Local-only encryption</span>
       {entries !== null && <button className="quiet" onClick={lock}>Lock vault</button>}
     </header>
