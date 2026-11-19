@@ -1,9 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { encryptEntries, generatePassword, initialize, parseEnvelope, randomId, STORAGE_KEY, unlock, type Entry, type VaultEnvelope } from './crypto';
+import { encryptEntries, generatePassword, initialize, parseEnvelope, randomId, STORAGE_KEY, unlock,
+  type Entry, type VaultEnvelope, type VaultKind, type CustomField } from './crypto';
+import { generateOtp, parseOtp } from './otp';
 import './style.css';
 
-const BLANK: Entry = { id: '', title: '', username: '', password: '', website: '', notes: '' };
+const blank = (kind: VaultKind): Entry =>
+  ({ id: randomId(), title: '', username: '', password: '', website: '', notes: '', kind,
+     customFields: [], tags: [], favorite: false });
+const kindLabel: Record<VaultKind,string> = { login:'Logins', note:'Secure notes', otp:'Authenticators', passkey:'Passkey references' };
+const kindIcon: Record<VaultKind,string> = { login:'◈', note:'▤', otp:'◷', passkey:'✧' };
+const itemKind = (e: Entry): VaultKind => e.kind ?? 'login';
 
 function App() {
   const [envelope, setEnvelope] = useState<VaultEnvelope | null>(() => {
@@ -11,7 +18,6 @@ function App() {
     if (!raw) return null;
     try { return parseEnvelope(raw); } catch { return null; }
   });
-  // A malformed existing vault must never be silently replaced by a new one.
   const [corruptedAtLoad] = useState(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
@@ -23,15 +29,41 @@ function App() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | VaultKind | 'favorite'>('all');
   const [edit, setEdit] = useState<Entry | null>(null);
   const [showSecret, setShowSecret] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpCodes, setOtpCodes] = useState<Record<string,string>>({});
+  const [nowSeconds, setNowSeconds] = useState(Math.floor(Date.now()/1000));
 
-  const lock = () => { key.current = null; setEntries(null); setMaster(''); setEdit(null); setShowSecret(false); };
+  const lock = () => {
+    key.current = null; setEntries(null); setMaster(''); setEdit(null);
+    setShowSecret(false); setOtpCodes({});
+  };
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === 'hidden') lock(); };
     document.addEventListener('visibilitychange', onHide);
     return () => document.removeEventListener('visibilitychange', onHide);
   }, []);
+  useEffect(() => {
+    if (!entries) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const codes: Record<string,string> = {};
+      const now = Date.now();
+      for (const entry of entries) {
+        if (entry.otp?.type === 'totp') {
+          try { codes[entry.id] = await generateOtp(entry.otp, now); }
+          catch { codes[entry.id] = 'Invalid OTP'; }
+        }
+      }
+      if (!cancelled) { setOtpCodes(codes); setNowSeconds(Math.floor(now / 1000)); }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 1000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [entries]);
+
   async function submitMaster(event: React.FormEvent) {
     event.preventDefault(); if (corruptedAtLoad) return; setBusy(true); setNotice('');
     try {
@@ -44,68 +76,240 @@ function App() {
         key.current = result.key; setEnvelope(result.envelope); setEntries([]);
       }
       setMaster('');
-    } catch { setNotice('Could not open vault. Check your password, browser storage, and vault integrity.'); }
+    } catch { setNotice('Unable to unlock. Check your password and vault integrity.'); }
     finally { setBusy(false); }
   }
-  async function persist(next: Entry[]) {
-    if (!key.current || !envelope) return;
+
+  async function persist(next: Entry[]): Promise<boolean> {
+    if (!key.current || !envelope) return false;
     setBusy(true); setNotice('');
     try {
       const sealed = await encryptEntries(next, key.current, envelope.kdf.salt);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
       setEnvelope(sealed); setEntries(next); setEdit(null);
-    } catch { setNotice('Save failed. Existing encrypted data was retained.'); }
-    finally { setBusy(false); }
+      return true;
+    } catch {
+      setNotice('Save failed. Your existing encrypted vault was retained.');
+      return false;
+    } finally { setBusy(false); }
   }
+
   function downloadBackup() {
     if (!envelope) return;
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
     const href = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = href; a.download = 'goreecloud-vault-encrypted.json'; a.click();
+    const a = document.createElement('a');
+    a.href = href; a.download = 'goreecloud-vault-encrypted.json'; a.click();
     setTimeout(() => URL.revokeObjectURL(href), 1000);
   }
-  const visible = entries?.filter(item =>
-    [item.title, item.username, item.website].some(v => v.toLocaleLowerCase().includes(query.toLocaleLowerCase()))) ?? [];
+
+  async function importBackup(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > 5_000_000) { setNotice('Backup is too large.'); return; }
+    const password = window.prompt('Enter the MASTER PASSWORD of this encrypted backup:');
+    if (password == null) return;
+    setBusy(true); setNotice('');
+    try {
+      const parsed = parseEnvelope(await file.text());
+      const restored = await unlock(password, parsed);
+      if (!window.confirm('Replace this device\'s encrypted vault? Export a backup first. This does not merge items.')) return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      key.current = restored.key; setEnvelope(parsed); setEntries(restored.entries); setEdit(null);
+      setNotice('Encrypted backup restored locally. Export a fresh backup for recovery.');
+    } catch { setNotice('Restore failed. File is invalid or the backup password is wrong. Existing data is unchanged.'); }
+    finally { setBusy(false); }
+  }
+
+  async function saveEditor(event: React.FormEvent) {
+    event.preventDefault();
+    if (!edit || !entries) return;
+    let next: Entry = {...edit, title: edit.title.trim()};
+    if (!next.title) { setNotice('Title is required.'); return; }
+    if (next.kind === 'otp' || otpInput.trim()) {
+      try {
+        next = {...next, otp: edit.otp && edit.otp.secret === otpInput.trim() ? edit.otp : parseOtp(otpInput.trim())};
+      } catch { setNotice('Invalid OTP secret or otpauth URI.'); return; }
+    }
+    const exists = entries.some(item => item.id === next.id);
+    await persist(exists ? entries.map(item => item.id === next.id ? next : item) : [...entries, next]);
+  }
+
+  async function copyOtp(entry: Entry) {
+    if (!entry.otp || !entries) return;
+    try {
+      const code = await generateOtp(entry.otp);
+      if (entry.otp.type === 'hotp') {
+        const updated = entries.map(x => x.id === entry.id ?
+          {...x, otp: {...entry.otp!, counter: entry.otp!.counter + 1}} : x);
+        if (!await persist(updated)) return;
+      }
+      await navigator.clipboard.writeText(code);
+      setNotice(entry.otp.type === 'hotp' ? 'HOTP copied; counter advanced in encrypted storage.' : 'Current OTP copied.');
+    } catch { setNotice('Could not copy the OTP. Check clipboard permissions.'); }
+  }
+
+  const visible = (entries ?? []).filter(item => {
+    const category = itemKind(item);
+    return (filter === 'all' || (filter === 'favorite' ? item.favorite === true : category === filter)) &&
+      [item.title, item.username, item.website, ...(item.tags??[])].some(v =>
+        v.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  });
+  const startEdit = (value: Entry) => {
+    setEdit({...value, customFields: [...(value.customFields??[])], tags:[...(value.tags??[])]});
+    setOtpInput(value.otp?.secret ?? ''); setShowSecret(false); setNotice('');
+  };
+  const openNew = (kind: VaultKind) => startEdit(blank(kind));
+
   return <div className="app">
     <header className="topbar">
-      <div className="brand"><div className="brand-icon" aria-hidden="true">◇</div><div><strong>GoreeCloud Vault</strong><small>PRIVATE BY DESIGN · OFFLINE PREVIEW</small></div></div>
-      <span className="status"><span className="status-dot" />No server connection</span>
-      {entries && <button className="quiet" onClick={lock}>Lock vault</button>}
+      <div className="brand"><div className="brand-icon" aria-hidden="true">◇</div>
+        <div><strong>GoreeCloud Vault</strong><small>PRIVATE BY DESIGN · OFFLINE PREVIEW</small></div></div>
+      <span className="status"><span className="status-dot" />Local-only encryption</span>
+      {entries !== null && <button className="quiet" onClick={lock}>Lock vault</button>}
     </header>
     {corruptedAtLoad ? <main className="onboarding"><div className="intro">
       <span className="eyebrow">RECOVERY REQUIRED</span><h1>Encrypted data needs attention.</h1>
-      <p>Stored vault data is damaged or uses an unsupported format. It has not been overwritten. Restore a known-good backup using a future recovery tool.</p>
+      <p>Stored vault data is damaged or unsupported. It has not been overwritten.
+        Export and preserve the damaged storage before attempting recovery.</p>
     </div></main> : entries === null ? <main className="onboarding">
-      <div className="intro"><span className="eyebrow">YOUR SECRETS. YOUR DEVICE.</span><h1>Security that feels <em>effortless.</em></h1>
-        <p>Your passwords stay encrypted on this device. No accounts, telemetry or synchronization in this development preview.</p>
+      <div className="intro"><span className="eyebrow">YOUR SECRETS. YOUR DEVICE.</span>
+        <h1>Security that feels <em>effortless.</em></h1>
+        <p>Passwords, secure notes and authenticators encrypted on your device.
+          No account or cloud connection required.</p>
         <div className="trust"><span>◉ AES-256-GCM</span><span>◉ Offline first</span><span>◉ Open source</span></div>
       </div>
       <form className="surface unlock" onSubmit={submitMaster}>
-        <div className="icon-tile">⌑</div>
-        <h2>{envelope ? 'Unlock your vault' : 'Create an encrypted vault'}</h2>
-        <p>{envelope ? 'Enter the master password you set on this device.' : 'Choose a unique master password of at least 12 characters. It cannot be recovered.'}</p>
+        <div className="icon-tile">⌑</div><h2>{envelope ? 'Unlock your vault' : 'Create an encrypted vault'}</h2>
+        <p>{envelope ? 'Enter the master password you set on this device.' :
+          'Choose a unique master password of at least 12 characters. It cannot be recovered.'}</p>
         <label htmlFor="master">Master password</label>
-        <input id="master" type="password" value={master} minLength={envelope ? 1 : 12} maxLength={1024} autoComplete={envelope ? 'current-password' : 'new-password'} onChange={e => setMaster(e.target.value)} required autoFocus />
+        <input id="master" type="password" value={master} minLength={envelope ? 1 : 12}
+          maxLength={1024} autoComplete={envelope ? 'current-password' : 'new-password'}
+          onChange={e => setMaster(e.target.value)} required autoFocus />
         <button className="primary" disabled={busy}>{busy ? 'Working…' : envelope ? 'Unlock securely' : 'Create vault'}</button>
-        <span className="field-note">Encryption runs in your browser. We cannot restore a forgotten password.</span>
+        <span className="field-note">No account recovery or synced storage is configured.</span>
         {notice && <p className="error" role="alert">{notice}</p>}
+        <label className="quiet import-label">Import encrypted backup
+          <input type="file" accept=".json,application/json" disabled={busy}
+            onChange={e => void importBackup(e)} hidden /></label>
       </form>
     </main> : <main className="dashboard">
-      <aside className="sidebar surface"><div className="side-heading">WORKSPACE</div><div className="nav-selected">▣ &nbsp; All items <b>{entries.length}</b></div><div className="side-heading second">SECURITY</div><div className="sidebar-note">Locked automatically when this tab is hidden. Export an encrypted backup regularly.</div><button className="quiet backup" onClick={downloadBackup}>↓ &nbsp; Export encrypted backup</button></aside>
-      <section className="workspace"><div className="workspace-head"><div><span className="eyebrow">ENCRYPTED LIBRARY</span><h1>All items <span className="count">{entries.length}</span></h1><p>Your private credentials, available offline.</p></div><button className="primary" onClick={() => { setEdit({ ...BLANK, id: randomId() }); setShowSecret(false); }}>+ &nbsp; New login</button></div>
-        <input aria-label="Search encrypted items" className="search" placeholder="Search by title, username or website" value={query} onChange={e => setQuery(e.target.value)} />
-        <div className="item-list">{visible.length === 0 ? <div className="empty"><div className="empty-icon">⌘</div><h3>{query ? 'No matching entries' : 'Your vault starts here'}</h3><p>{query ? 'Try a different search.' : 'Add your first login and it will be encrypted before storage.'}</p></div> :
-        visible.map(item => <button className="item" key={item.id} onClick={() => { setEdit({ ...item }); setShowSecret(false); }}><span className="item-glyph">{item.title.slice(0,1).toUpperCase() || '•'}</span><span className="item-copy"><strong>{item.title || 'Untitled login'}</strong><small>{item.username || item.website || 'No username'}</small></span><span className="item-chevron">›</span></button>)}</div>
-        {notice && <p className="error" role="alert">{notice}</p>}
+      <aside className="sidebar surface">
+        <div className="side-heading">WORKSPACE</div>
+        <button className={'sidebar-link '+(filter==='all'?'active':'')} onClick={()=>setFilter('all')}>
+          All items <b>{entries.length}</b></button>
+        {(['login','note','otp','passkey'] as const).map(kind =>
+          <button key={kind} className={'sidebar-link '+(filter===kind?'active':'')}
+            onClick={()=>setFilter(kind)}>{kindIcon[kind]} &nbsp; {kindLabel[kind]}
+            <b>{entries.filter(x=>itemKind(x)===kind).length}</b></button>)}
+        <button className={'sidebar-link '+(filter==='favorite'?'active':'')}
+          onClick={()=>setFilter('favorite')}>☆ &nbsp; Favorites</button>
+        <div className="side-heading second">ENCRYPTED BACKUPS</div>
+        <p className="sidebar-note">Keep an encrypted backup outside browser storage. The master password cannot be recovered.</p>
+        <button className="quiet backup" onClick={downloadBackup}>↓ Export encrypted backup</button>
+        <label className="quiet backup import-label">↑ Restore encrypted backup
+          <input type="file" accept=".json,application/json" onChange={e=>void importBackup(e)} hidden /></label>
+      </aside>
+      <section className="workspace">
+        <div className="workspace-head"><div><span className="eyebrow">YOUR PRIVATE LIBRARY</span>
+          <h1>{filter==='all'?'All items':filter==='favorite'?'Favorites':kindLabel[filter]}
+            <span className="count">{visible.length}</span></h1>
+          <p>Local only · encrypted before storage</p></div>
+          <button className="primary" onClick={()=>openNew(filter==='all'||filter==='favorite'?'login':filter)}>+ New item</button>
+        </div>
+        <div className="quick-create">
+          <button onClick={()=>openNew('login')}>+ Login</button><button onClick={()=>openNew('note')}>+ Secure note</button>
+          <button onClick={()=>openNew('otp')}>+ Authenticator</button>
+          <button onClick={()=>openNew('passkey')}>+ Passkey reference</button>
+        </div>
+        <input aria-label="Search encrypted items" className="search"
+          placeholder="Search titles, usernames and tags" value={query} onChange={e=>setQuery(e.target.value)} />
+        <div className="item-list">{visible.length===0 ?
+          <div className="empty"><div className="empty-icon">⌘</div><h3>{query?'No matching entries':'Your vault starts here'}</h3>
+            <p>{query?'Try a different search.':'Create a login, secure note or authenticator to get started.'}</p></div> :
+          visible.map(item=><div className="vault-item" key={item.id}>
+            <button className="item" onClick={()=>startEdit(item)}>
+              <span className="item-glyph">{kindIcon[itemKind(item)]}</span>
+              <span className="item-copy"><strong>{item.title || 'Untitled item'}</strong>
+                <small>{kindLabel[itemKind(item)]} · {item.username || item.website || (item.tags??[]).join(', ') || 'Encrypted'}</small></span>
+              <span className="item-chevron">›</span></button>
+            {item.otp && <button className="otp-pill" onClick={()=>void copyOtp(item)}
+              title={item.otp.type==='hotp'?'Copy and advance HOTP counter':'Copy time-based code'}>
+              {item.otp.type==='totp' ? (otpCodes[item.id] ?? '••••••') : 'Use HOTP'}
+              <small>{item.otp.type==='totp'?(item.otp.period - nowSeconds % item.otp.period)+'s':'counter +1'}</small></button>}
+          </div>)}</div>
+        {notice && <p className="status-note" role="status">{notice}</p>}
       </section>
     </main>}
-    {edit && entries && <div className="modal-backdrop" onMouseDown={e => { if(e.target === e.currentTarget) setEdit(null); }}><form className="surface editor" onSubmit={e => { e.preventDefault(); void persist(entries.some(x=>x.id===edit.id) ? entries.map(x=>x.id===edit.id?edit:x) : [...entries,edit]); }}>
-      <div className="editor-head"><div><span className="eyebrow">SECURE ITEM</span><h2>{entries.some(x=>x.id===edit.id) ? 'Edit login' : 'New login'}</h2></div><button className="quiet" type="button" onClick={() => setEdit(null)}>Close</button></div>
-      {(['title','username','password','website','notes'] as const).map(field => <label className="edit-field" key={field}><span>{field[0].toUpperCase()+field.slice(1)}</span><div className="input-row">{field==='notes' ? <textarea value={edit[field]} maxLength={20000} onChange={e=>setEdit({...edit,[field]:e.target.value})}/> : <input type={field === 'password' && !showSecret ? 'password' : 'text'} value={edit[field]} maxLength={20000} required={field==='title'} onChange={e=>setEdit({...edit,[field]:e.target.value})} autoComplete="off" />}{field === 'password' && <><button type="button" className="field-button" onClick={()=>setShowSecret(!showSecret)}>{showSecret?'Hide':'Reveal'}</button><button type="button" className="field-button" onClick={()=>setEdit({...edit,password:generatePassword()})}>Generate</button></>}</div></label>)}
-      <div className="editor-actions">{entries.some(x=>x.id===edit.id) && <button type="button" className="danger" disabled={busy} onClick={()=>{ if(window.confirm('Permanently delete this login?')) void persist(entries.filter(x=>x.id!==edit.id)); }}>Delete</button>}<button className="primary" disabled={busy}>{busy?'Saving…':'Save encrypted'}</button></div>
-    </form></div>}
-    <footer><span>GoreeCloud UI · development preview</span><span>No cloud sync · No autofill · Not security audited</span></footer>
+    {edit && entries && <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEdit(null);}}>
+      <form className="surface editor" onSubmit={e=>void saveEditor(e)}>
+        <div className="editor-head"><div><span className="eyebrow">ENCRYPTED ITEM</span>
+          <h2>{entries.some(x=>x.id===edit.id)?'Edit':'New'} {kindLabel[itemKind(edit)].toLowerCase()}</h2></div>
+          <button className="quiet" type="button" onClick={()=>setEdit(null)}>Close</button></div>
+        <label className="edit-field"><span>Item type</span>
+          <select value={itemKind(edit)} onChange={e=>setEdit({...edit,kind:e.target.value as VaultKind})}>
+            {(['login','note','otp','passkey'] as const).map(kind=><option key={kind} value={kind}>{kindLabel[kind]}</option>)}
+          </select></label>
+        <label className="edit-field"><span>Title</span><input required maxLength={20000}
+          value={edit.title} onChange={e=>setEdit({...edit,title:e.target.value})} /></label>
+        {itemKind(edit)==='login' && <>
+          <label className="edit-field"><span>Username / email</span><input maxLength={20000} autoComplete="off"
+            value={edit.username} onChange={e=>setEdit({...edit,username:e.target.value})}/></label>
+          <label className="edit-field"><span>Password</span><div className="input-row">
+            <input maxLength={20000} autoComplete="off" type={showSecret?'text':'password'}
+              value={edit.password} onChange={e=>setEdit({...edit,password:e.target.value})}/>
+            <button type="button" className="field-button" onClick={()=>setShowSecret(!showSecret)}>{showSecret?'Hide':'Reveal'}</button>
+            <button type="button" className="field-button" onClick={()=>setEdit({...edit,password:generatePassword()})}>Generate</button>
+          </div></label>
+          <label className="edit-field"><span>Website</span><input maxLength={20000} type="url"
+            placeholder="https://example.org" value={edit.website} onChange={e=>setEdit({...edit,website:e.target.value})}/></label>
+        </>}
+        {(itemKind(edit)==='otp'||itemKind(edit)==='login') && <>
+          <label className="edit-field"><span>Authenticator (Base32 secret or otpauth:// URI)</span>
+            <input autoComplete="off" type={showSecret?'text':'password'}
+              placeholder="Optional for logins" value={otpInput} maxLength={2500}
+              onChange={e=>setOtpInput(e.target.value)}/></label>
+          <p className="field-note">Supports RFC 6238 TOTP (SHA-1/256/512) and HOTP. Secrets are encrypted in your vault.</p>
+        </>}
+        {itemKind(edit)==='passkey' && <>
+          <p className="field-note">This records a passkey reference only, not an authenticator or portable private key.
+            Your browser or device manages actual passkey sign-in.</p>
+          <label className="edit-field"><span>Relying-party domain</span><input maxLength={253}
+            placeholder="example.org" value={edit.passkey?.rpId??''}
+            onChange={e=>setEdit({...edit,passkey:{rpId:e.target.value,credentialId:edit.passkey?.credentialId??'',userHandle:edit.passkey?.userHandle??''}})}/></label>
+          <label className="edit-field"><span>Credential ID (optional)</span><input maxLength={4096}
+            value={edit.passkey?.credentialId??''}
+            onChange={e=>setEdit({...edit,passkey:{rpId:edit.passkey?.rpId??'',credentialId:e.target.value,userHandle:edit.passkey?.userHandle??''}})}/></label>
+        </>}
+        <label className="edit-field"><span>{itemKind(edit)==='note'?'Secure note':'Notes'}</span>
+          <textarea value={edit.notes} rows={itemKind(edit)==='note'?8:3} maxLength={20000}
+            onChange={e=>setEdit({...edit,notes:e.target.value})}/></label>
+        <label className="edit-field"><span>Tags (comma-separated)</span><input maxLength={3500}
+          value={(edit.tags??[]).join(', ')}
+          onChange={e=>setEdit({...edit,tags:e.target.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,30)})}/></label>
+        <label className="check-field"><input type="checkbox" checked={edit.favorite??false}
+          onChange={e=>setEdit({...edit,favorite:e.target.checked})}/> Favorite</label>
+        <div className="edit-field"><span>Custom encrypted fields</span>
+          {(edit.customFields??[]).map((field,index)=><div className="custom-row" key={index}>
+            <input aria-label={'Field '+(index+1)+' name'} placeholder="Field name" value={field.name}
+              maxLength={150} onChange={e=>setEdit({...edit,customFields:(edit.customFields??[]).map((f,i)=>i===index?{...f,name:e.target.value}:f)})}/>
+            <input aria-label={'Field '+(index+1)+' value'} placeholder="Value"
+              type={field.concealed&&!showSecret?'password':'text'} maxLength={20000} value={field.value}
+              onChange={e=>setEdit({...edit,customFields:(edit.customFields??[]).map((f,i)=>i===index?{...f,value:e.target.value}:f)})}/>
+            <button type="button" className="field-button" title="Remove custom field"
+              onClick={()=>setEdit({...edit,customFields:edit.customFields?.filter((_,i)=>i!==index)})}>×</button>
+          </div>)}
+          <button type="button" className="quiet add-field" disabled={(edit.customFields??[]).length>=30}
+            onClick={()=>setEdit({...edit,customFields:[...(edit.customFields??[]),{name:'',value:'',concealed:true} as CustomField]})}>+ Add custom field</button></div>
+        {notice && <p className="error" role="alert">{notice}</p>}
+        <div className="editor-actions">{entries.some(x=>x.id===edit.id) && <button type="button"
+          className="danger" disabled={busy}
+          onClick={()=>{if(window.confirm('Permanently delete this encrypted item?'))void persist(entries.filter(x=>x.id!==edit.id));}}>Delete</button>}
+          <button type="submit" className="primary" disabled={busy}>{busy?'Saving…':'Save encrypted'}</button></div>
+      </form></div>}
+    <footer><span>GoreeCloud UI · development preview</span><span>No cloud sync · No passkey authenticator · Not audited</span></footer>
   </div>;
 }
-
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

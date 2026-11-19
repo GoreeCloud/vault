@@ -31,3 +31,6 @@
 **/macos/Flutter/ephemeral/
 **/*.iml
 **/.idea/
+
+# Unsigned development extension packages
+apps/firefox/artifacts/

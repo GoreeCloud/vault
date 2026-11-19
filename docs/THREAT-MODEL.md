@@ -14,7 +14,8 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 - Native app storage in platform application support directory; Android backup disabled in the Android manifest, and Android FLAG_SECURE screenshot/recents blocking in MainActivity (runtime acceptance pending).
 - Web application CSP and lock-on-tab-hidden behavior; native client locks on paused/hidden lifecycle.
 - Encryption before writing, and native temporary-file-then-rename storage; no plaintext export.
-- Synthetic tests exercising authentication rejection, nonce randomness and a cross-runtime fixture.
+- Synthetic tests exercising authentication rejection, nonce randomness, multi-type cross-runtime fixtures and RFC 4226/6238 OTP vectors.
+- Firefox extension uses explicit user action and exact HTTPS origin checks to constrain form filling; no broad host permissions or background listener.
 
 ## Critical outstanding risks
 
@@ -27,10 +28,13 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 | Sync and identity | No sync or account service exists; authenticated enrollment, malicious-server model, tampering/replay/rollback, key rotations, authorization and recovery required |
 | Autofill | Not implemented; requires origin-matching anti-phishing tests, user gesture, safe accessibility/Autofill framework integration |
 | Export/import | Browser encrypted backup export is implemented. Native backup export and safe import/restore are not; high data-loss risk without rehearsed recovery |
+| One-time codes | Secrets encrypted but copying introduces clipboard exposure; TOTP clock skew, malformed URIs, replay, HOTP counter durability, and QR provisioning require review |
+| Firefox extension | Popup and injected content security boundaries, malicious login pages, tab navigation races, compromised browser profile, third-party dependencies and unsigned distribution; no independent extension audit |
+| Passkeys | Reference metadata does not create or authenticate with passkeys. Browser/OS credential manager, WebAuthn RP binding, native authenticator control, key protection and recovery require design/verification |
 | Release pipeline | No independent source/dependency audit, provenance/attestation, code signing, physical-device tests, or audited update channel |
 | Compliance | GoreeShield privacy, Wardveil cybersecurity, Identity and Mesh contracts not verified or enforced end-to-end |
 
-Do not describe the product as zero-knowledge cloud sync, security audited, password-recovery capable, secure against a malicious local device, or a drop-in Bitwarden/Proton replacement.
+Do not describe the product as zero-knowledge cloud sync, security audited, password-recovery capable, secure against a malicious local device, a usable passkey authenticator, or a drop-in Bitwarden/Proton replacement.
 
 ## Acceptance before real-password use
 

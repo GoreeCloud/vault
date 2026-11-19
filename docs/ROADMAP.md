@@ -2,16 +2,16 @@
 
 ## Development preview (initial source)
 
-Offline encrypted vault format; React browser UI; Flutter Linux/Android UI; native local encrypted file storage; browser encrypted JSON backup export; static tests and CI. Source presence alone is not platform acceptance.
+Offline encrypted vault format; React browser UI; native Flutter Linux/Android UI; native encrypted file storage; web encrypted backup import/export; notes, tags, favorites, custom encrypted fields, TOTP/HOTP; Firefox encrypted popup, backup and explicit exact-origin autofill; synthetic tests and CI. Source presence alone is not platform acceptance.
 
 ## Next highest priorities
 
-1. Validate web/native cross-format interoperability and damage/rollback behavior; extend synthetic protocol tests.
-2. Add native backup/export/import and web backup import with explicit integrity checks, confirmation, rollback and tested recovery.
+1. Complete security review for new item types, OTP input parsing, extension messaging/DOM injection and backup/rollback handling; extend cross-client runtime tests.
+2. Add native encrypted backup/export/import with explicit integrity, confirmation, rollback and tested restore.
 3. Design Argon2id versioned migration, vetted OS key/secret-storage integration and independent cryptographic/security review.
-4. Validate Linux release bundle, Android APK installation, lifecycle/security behavior and accessibility on authorized real devices.
+4. Validate native Linux bundle, Android install/upgrade/lifecycle, Firefox extension sideload, UI and accessibility on authorized real devices.
 5. Threat-model and build a self-hosted encrypted-blob sync service with proven identity/session protection and rollback-aware sync; no server-side plaintext.
-6. Add secure origin-scoped Android autofill, optional browser extension, passkeys/TOTP and interoperable import formats only after safety review.
+6. Implement usable passkey creation/assertion via verified browser/OS authenticator integrations, Android Credential Manager, safe credential import/export contracts, additional structured item types, and secure origin-scoped Android autofill.
 7. Document GoreeShield, Wardveil, Mesh, Identity and GoreeCloud UI integrations with real tests and privacy boundaries.
 
 No delivery dates, stable-release status, production host or ongoing unattended work is implied.

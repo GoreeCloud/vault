@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "GoreeCloud Vault",
+  "version": "0.1.0",
+  "description": "An offline encrypted credential vault with deliberately permission-limited, user-triggered Firefox autofill.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "vault@goreecloud.com",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_title": "GoreeCloud Vault",
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  }
+}

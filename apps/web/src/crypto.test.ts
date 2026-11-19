@@ -21,6 +21,10 @@ describe('encrypted local vault format', () => {
   test('Node.js synthetic fixture decrypts in WebCrypto', async () => {
     const result = await unlock('interop test password only', parseEnvelope(JSON.stringify(sample)));
     expect(result.entries[0].password).toEqual('NOT-A-REAL-PASSWORD');
+    expect(result.entries[0].customFields?.[0].concealed).toBe(true);
+    expect(result.entries[0].otp?.issuer).toBe('Example');
+    expect(result.entries[1].kind).toBe('note');
+    expect(result.entries[2].passkey?.rpId).toBe('example.invalid');
   });
   test('password generator', () => {
     expect(generatePassword(24)).toHaveLength(24);

@@ -1,8 +1,9 @@
-import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'vault_crypto.dart';
 import 'vault_store.dart';
+import 'vault_editor.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -160,8 +161,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _persist(List<VaultEntry> next) async {
-    if (_key == null || _envelope == null || _busy) return;
+  Future<bool> _persist(List<VaultEntry> next) async {
+    if (_key == null || _envelope == null || _busy) return false;
     setState(() {
       _busy = true;
       _error = null;
@@ -175,12 +176,14 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
           _entries = next;
         });
       }
+      return true;
     } catch (_) {
       if (mounted) {
         setState(() {
           _error = 'Save failed. The previous encrypted vault was retained.';
         });
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -229,10 +232,32 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                 : _vaultScreen(),
         floatingActionButton: _entries == null
             ? null
-            : FloatingActionButton.extended(
-                onPressed: _busy ? null : () => _openEditor(),
-                icon: const Icon(Icons.add),
-                label: const Text('New login')),
+            : PopupMenuButton<String>(
+                tooltip: 'Create encrypted item',
+                onSelected: (kind) => _openEditor(null, kind),
+                itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'login', child: Text('New login')),
+                      PopupMenuItem(
+                          value: 'note', child: Text('New secure note')),
+                      PopupMenuItem(
+                          value: 'otp', child: Text('New authenticator')),
+                      PopupMenuItem(
+                          value: 'passkey',
+                          child: Text('New passkey reference'))
+                    ],
+                child: Container(
+                    decoration: BoxDecoration(
+                        color: iris, borderRadius: BorderRadius.circular(18)),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 15, horizontal: 18),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.add, color: Color(0xFF272057)),
+                      SizedBox(width: 8),
+                      Text('New item',
+                          style: TextStyle(
+                              color: Color(0xFF272057),
+                              fontWeight: FontWeight.bold))
+                    ]))),
       );
   Widget _lockScreen() => Center(
       child: SingleChildScrollView(
@@ -313,7 +338,8 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                       Text('All items  ${entries.length}',
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
-                      const Text('Encrypted locally · no sync configured',
+                      const Text(
+                          'Logins · Notes · OTP · Passkey references · Local only',
                           style: TextStyle(color: textSoft)),
                       const SizedBox(height: 25),
                       TextField(
@@ -365,153 +391,135 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
                                             leading: CircleAvatar(
                                                 backgroundColor:
                                                     const Color(0xFF413974),
-                                                child: Text(
-                                                    e.title.isNotEmpty
-                                                        ? e.title[0]
-                                                            .toUpperCase()
-                                                        : '•',
-                                                    style: const TextStyle(
-                                                        color: iris))),
+                                                child: Icon(
+                                                    e.kind == 'note'
+                                                        ? Icons.note_outlined
+                                                        : e.kind == 'otp'
+                                                            ? Icons
+                                                                .timer_outlined
+                                                            : e.kind ==
+                                                                    'passkey'
+                                                                ? Icons
+                                                                    .fingerprint
+                                                                : Icons
+                                                                    .key_outlined,
+                                                    color: iris)),
                                             title: Text(e.title.isEmpty
                                                 ? 'Untitled login'
                                                 : e.title),
                                             subtitle: Text(e.username.isEmpty
                                                 ? e.website
                                                 : e.username),
-                                            trailing:
-                                                const Icon(Icons.chevron_right),
+                                            trailing: e.otp == null
+                                                ? const Icon(
+                                                    Icons.chevron_right)
+                                                : IconButton(
+                                                    icon: const Icon(
+                                                        Icons.timer_outlined),
+                                                    tooltip:
+                                                        'Use one-time code',
+                                                    onPressed: () =>
+                                                        _copyOtp(e)),
                                             onTap: () => _openEditor(e)));
                                   }))
                     ]))));
   }
 
-  Future<void> _openEditor([VaultEntry? original]) async {
-    final title = TextEditingController(text: original?.title ?? '');
-    final username = TextEditingController(text: original?.username ?? '');
-    final password = TextEditingController(text: original?.password ?? '');
-    final website = TextEditingController(text: original?.website ?? '');
-    final notes = TextEditingController(text: original?.notes ?? '');
-    var reveal = false;
+  Future<void> _copyOtp(VaultEntry entry) async {
+    final otp = entry.otp;
+    if (otp == null) return;
     try {
+      if (otp.type == 'hotp') {
+        final yes = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+                    title: const Text('Use HOTP code?'),
+                    content: const Text(
+                        'The HOTP counter will advance in encrypted storage before copy.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Use code'))
+                    ]));
+        if (yes != true) return;
+      }
+      final code = await otp.generate();
+      if (otp.type == 'hotp') {
+        final next = _entries!
+            .map((x) => x.id == entry.id
+                ? VaultEntry(
+                    id: x.id,
+                    title: x.title,
+                    username: x.username,
+                    password: x.password,
+                    website: x.website,
+                    notes: x.notes,
+                    kind: x.kind,
+                    favorite: x.favorite,
+                    tags: x.tags,
+                    customFields: x.customFields,
+                    passkey: x.passkey,
+                    otp: otp.advance())
+                : x)
+            .toList();
+        if (!await _persist(next)) return;
+      }
+      if (!mounted) return;
       await showDialog<void>(
           context: context,
-          builder: (ctx) => StatefulBuilder(
-              builder: (ctx, refresh) => AlertDialog(
-                      backgroundColor: surface,
-                      title:
-                          Text(original == null ? 'New login' : 'Edit login'),
-                      content: SizedBox(
-                          width: min(MediaQuery.sizeOf(ctx).width * 0.85, 480),
-                          child: SingleChildScrollView(
-                              child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                _input(title, 'Title', required: true),
-                                _input(username, 'Username'),
-                                Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: TextField(
-                                        controller: password,
-                                        obscureText: !reveal,
-                                        enableSuggestions: false,
-                                        autocorrect: false,
-                                        maxLength: 20000,
-                                        decoration: InputDecoration(
-                                            labelText: 'Password',
-                                            suffixIcon: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                      tooltip: reveal
-                                                          ? 'Hide password'
-                                                          : 'Reveal password',
-                                                      onPressed: () => refresh(
-                                                          () =>
-                                                              reveal = !reveal),
-                                                      icon: Icon(reveal
-                                                          ? Icons.visibility_off
-                                                          : Icons.visibility)),
-                                                  IconButton(
-                                                      tooltip:
-                                                          'Generate a secure password',
-                                                      onPressed: () => refresh(
-                                                          () => password.text =
-                                                              generatePassword()),
-                                                      icon: const Icon(
-                                                          Icons.autorenew))
-                                                ])))),
-                                _input(website, 'Website'),
-                                _input(notes, 'Notes', lines: 3),
-                              ]))),
-                      actions: [
-                        if (original != null)
-                          TextButton(
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                    context: ctx,
-                                    builder: (c) => AlertDialog(
-                                            title: const Text('Delete login?'),
-                                            content: const Text(
-                                                'This will remove the item from your local vault.'),
-                                            actions: [
-                                              TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(c, false),
-                                                  child: const Text('Cancel')),
-                                              TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(c, true),
-                                                  child: const Text('Delete'))
-                                            ]));
-                                if (confirm == true && ctx.mounted) {
-                                  Navigator.pop(ctx);
-                                  await _persist(_entries!
-                                      .where((x) => x.id != original.id)
-                                      .toList());
-                                }
-                              },
-                              child: const Text('Delete')),
-                        TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancel')),
-                        FilledButton(
-                            onPressed: () => () async {
-                                  if (title.text.trim().isEmpty) return;
-                                  final e = VaultEntry(
-                                      id: original?.id ?? _newId(),
-                                      title: title.text,
-                                      username: username.text,
-                                      password: password.text,
-                                      website: website.text,
-                                      notes: notes.text);
-                                  Navigator.pop(ctx);
-                                  await _persist(original == null
-                                      ? [..._entries!, e]
-                                      : _entries!
-                                          .map((x) => x.id == e.id ? e : x)
-                                          .toList());
-                                }(),
-                            child: const Text('Save encrypted')),
-                      ])));
-    } finally {
-      title.dispose();
-      username.dispose();
-      password.dispose();
-      website.dispose();
-      notes.dispose();
+          builder: (ctx) => AlertDialog(
+                  title:
+                      Text(otp.type == 'totp' ? 'Current TOTP' : 'Used HOTP'),
+                  content: SelectableText(code,
+                      style: const TextStyle(
+                          fontSize: 32, letterSpacing: 3, color: iris)),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close')),
+                    FilledButton(
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: code));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('Copy'))
+                  ]));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not generate one-time code.');
+    }
+  }
+
+  Future<void> _openEditor(
+      [VaultEntry? original, String kind = 'login']) async {
+    final result = await showVaultEditor(context, original, kind, _newId());
+    if (result == null || !mounted) return;
+    if (result.delete && original != null) {
+      final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+                  title: const Text('Delete encrypted item?'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete'))
+                  ]));
+      if (confirmed == true) {
+        await _persist(_entries!.where((x) => x.id != original.id).toList());
+      }
+    } else if (result.entry != null) {
+      final e = result.entry!;
+      await _persist(original == null
+          ? [..._entries!, e]
+          : _entries!.map((x) => x.id == e.id ? e : x).toList());
     }
   }
 
   String _newId() =>
       randomBytes(16).map((n) => n.toRadixString(16).padLeft(2, '0')).join();
-  Widget _input(TextEditingController controller, String label,
-          {int lines = 1, bool required = false}) =>
-      Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: TextField(
-              controller: controller,
-              maxLines: lines,
-              maxLength: 20000,
-              decoration:
-                  InputDecoration(labelText: required ? '$label *' : label)));
 }
