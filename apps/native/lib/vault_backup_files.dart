@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'vault_backup.dart';
+import 'vault_file_limit.dart';
 
 /// The OS picker runs only after a visible user action. The external file
 /// contains the authenticated ciphertext envelope, NEVER a plaintext vault.
@@ -28,14 +29,9 @@ class VaultBackupFiles {
     if (length == 0 || length > maxEncryptedBackupBytes) {
       throw const FormatException('Selected JSON file size is invalid');
     }
-    final bytes = await file.readAsBytes();
-    if (bytes.length != length ||
-        bytes.isEmpty ||
-        bytes.length > maxEncryptedBackupBytes) {
-      throw const FormatException(
-          'Selected JSON file changed or exceeds size limit');
-    }
-    return bytes;
+    // Stream with a hard cap independent of untrusted document metadata;
+    // do not allow a provider to cause an unbounded readAsBytes allocation.
+    return readBoundedJsonFile(file.openRead(), expectedLength: length);
   }
 
   /// Returns false on user cancellation, and throws if a platform save failed.
