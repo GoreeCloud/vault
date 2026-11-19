@@ -5,6 +5,7 @@
 | Browser app | Source implemented / build and tests | React 19 + TypeScript; encrypted login, note, OTP, custom fields and metadata |
 | Linux graphical application | Source implemented / analyzer, tests and local Linux build | Flutter native UI; current device and release packaging acceptance pending |
 | Android application | Limited Android 16 physical-device smoke test | Debug APK installed/launched, synthetic empty vault created, note editor exposed and screenshot protection observed; full device/backup acceptance pending |
+| Automatic idle lock | Five-minute inactivity timer added in web, Flutter native and Firefox popup | Web/Firefox virtual-clock tests and native deterministic-timer tests; device lifecycle and accessibility acceptance pending |
 | Local authenticated encryption | Implemented / synthetic tests | AES-256-GCM; PBKDF2-HMAC-SHA-256; no cryptographic audit |
 | Master password create/unlock | Implemented in source | No password recovery |
 | Login CRUD, search, random password generation | Implemented in source | User interaction, accessibility and persistence not yet fully runtime-tested |

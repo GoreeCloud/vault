@@ -2,7 +2,7 @@
 
 This folder is the **native Flutter** Linux/Android implementation of GoreeCloud Vault. Its approved Flutter UI is separate from the React browser app and Firefox extension.
 
-Currently available in source: encrypted local vault create/unlock, login CRUD, secure-note and authenticator editors, OTP generation (TOTP/HOTP), tags, favorites, custom encrypted fields, and passkey **reference metadata**. No credential sign-in via passkeys, cloud sync, authenticated autofill, or production release is implemented.
+Currently available in source: encrypted local vault create/unlock with a five-minute inactivity lock (local pointer/keyboard gestures reset the timer), login CRUD, secure-note and authenticator editors, OTP generation (TOTP/HOTP), tags, favorites, custom encrypted fields, and passkey **reference metadata**. No credential sign-in via passkeys, cloud sync, authenticated autofill, or production release is implemented.
 
 Build and test using Flutter 3.27.4 / Dart 3.6.2:
 

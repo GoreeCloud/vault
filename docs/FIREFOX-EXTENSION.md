@@ -24,7 +24,7 @@ To temporarily test locally, visit Firefox `about:debugging` → **This Firefox*
 
 Manifest permissions: `storage` for an **encrypted** envelope in Firefox extension storage, `activeTab` for current-user-initiated access to one active tab, and `scripting` for isolated-world credential filling after explicit button click. **No `<all_urls>` permission, permanent content scripts, background listeners, analytics, or remote API calls.** The extension declares `data_collection_permissions.required=["none"]`.
 
-All key derivation and AES-GCM encryption happen locally inside the popup. The master password and derived key exist only while the popup is open; closing the popup locks it. No plaintext secrets are persisted. The web app's localStorage and the extension's storage.local are intentionally separate: import an **encrypted** JSON export to transfer data between the two after confirming the destination and password. Do not import secrets on shared devices or untrusted profiles.
+All key derivation and AES-GCM encryption happen locally inside the popup. The master password and derived key exist only while the popup is open; closing the popup locks it. An open popup also locks after five minutes of inactivity; local pointer/keyboard/input events reset the timer. No plaintext secrets are persisted. The web app's localStorage and the extension's storage.local are intentionally separate: import an **encrypted** JSON export to transfer data between the two after confirming the destination and password. Do not import secrets on shared devices or untrusted profiles.
 
 ## Credential filling
 
