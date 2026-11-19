@@ -89,6 +89,25 @@ function Extension() {
   }
   function lock() {key.current=null;setItems(null);setSelected(null);setEdit(null);setCode('');}
 
+  useEffect(()=>{
+    if(items===null)return;
+    const maxIdleMs=5*60*1000;
+    let timer=window.setTimeout(lock,maxIdleMs);
+    const refresh=()=>{
+      window.clearTimeout(timer);
+      timer=window.setTimeout(lock,maxIdleMs);
+    };
+    document.addEventListener('pointerdown',refresh,true);
+    document.addEventListener('keydown',refresh,true);
+    document.addEventListener('input',refresh,true);
+    return()=>{
+      window.clearTimeout(timer);
+      document.removeEventListener('pointerdown',refresh,true);
+      document.removeEventListener('keydown',refresh,true);
+      document.removeEventListener('input',refresh,true);
+    };
+  },[items]);
+
   function exportFile(){
     if(!envelope)return;
     const blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'});

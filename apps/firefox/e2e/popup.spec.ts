@@ -188,6 +188,27 @@ test('Firefox popup imports Bitwarden personal login and note and never persists
   await expect(page.getByRole('button',{name:/Synthetic migrated note/})).toBeVisible();
 });
 
+test('Firefox popup automatically locks after five minutes of inactivity',async({page})=>{
+  await page.clock.install();
+  await page.addInitScript(()=>{
+    const storage:Record<string,unknown>={};
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:storage[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(storage,values),
+      }},
+      tabs:{query:async()=>[{id:77,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]}
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-firefox-idle-password');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:/My vault/})).toBeVisible();
+  await page.clock.fastForward(301_000);
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+});
+
 test('Firefox passkey reference editor refuses public suffix and accepts scoped domain',async({page})=>{
   await page.addInitScript(()=>{
     const storage:Record<string,unknown>={};

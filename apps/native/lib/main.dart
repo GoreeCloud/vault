@@ -1,4 +1,5 @@
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'vault_crypto.dart';
@@ -7,6 +8,7 @@ import 'vault_editor.dart';
 import 'vault_backup.dart';
 import 'vault_backup_files.dart';
 import 'vault_bitwarden.dart';
+import 'vault_idle.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +65,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
   // Asynchronous KDF/encryption operations must never reopen the vault after
   // lock, background, or a system document-picker lifecycle transition.
   int _lockEpoch = 0;
+  late final VaultIdleTimer _idle = VaultIdleTimer(onExpired: _onIdleExpired);
   final _master = TextEditingController(), _search = TextEditingController();
   VaultEnvelope? _envelope;
   SecretKey? _key;
@@ -74,12 +77,17 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+    HardwareKeyboard.instance.addHandler(_onKey);
     _load();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _idle.stop();
     _master.dispose();
     _search.dispose();
     super.dispose();
@@ -95,6 +103,21 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       // Dismiss decrypted editor/password dialogs as well as locking state.
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     }
+  }
+
+  void _onPointer(PointerEvent event) {
+    if (event is PointerDownEvent) _idle.touch();
+  }
+
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent || event is KeyRepeatEvent) _idle.touch();
+    return false;
+  }
+
+  void _onIdleExpired() {
+    if (!mounted || _entries == null) return;
+    _lock();
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Future<void> _load() async {
@@ -118,6 +141,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
   }
 
   void _lock() {
+    _idle.stop();
     _lockEpoch++;
     _key = null;
     _master.clear();
@@ -147,6 +171,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
             if (epoch == _lockEpoch) {
               _key = key;
               _entries = [];
+              _idle.start();
             }
           });
         }
@@ -158,6 +183,7 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
           setState(() {
             _key = key;
             _entries = items;
+            _idle.start();
           });
         }
       }
@@ -190,7 +216,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _envelope = sealed;
-          if (epoch == _lockEpoch) _entries = next;
+          if (epoch == _lockEpoch) {
+            _entries = next;
+            _idle.touch();
+          }
         });
       }
       return true;

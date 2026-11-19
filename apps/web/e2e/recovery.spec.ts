@@ -96,3 +96,23 @@ test('hiding browser while unlocking cannot expose the decrypted dashboard',asyn
   await expect(page.getByRole('button',{name:'Unlock securely'})).toBeEnabled({timeout:10000});
   await expect(page.getByRole('heading',{name:/All items/})).toHaveCount(0);
 });
+
+
+test('five minutes without interaction automatically locks the unlocked vault', async({page})=>{
+  await page.clock.install();
+  await initialize(page);
+  await page.clock.fastForward(301_000);
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:/All items/})).toHaveCount(0);
+});
+
+test('explicit interaction resets the inactivity timer',async({page})=>{
+  await page.clock.install();
+  await initialize(page);
+  await page.clock.fastForward(240_000);
+  await page.getByRole('textbox',{name:'Search encrypted items'}).fill('synthetic');
+  await page.clock.fastForward(120_000);
+  await expect(page.getByRole('heading',{name:/All items/})).toBeVisible();
+  await page.clock.fastForward(181_000);
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+});

@@ -12,7 +12,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 - PBKDF2-HMAC-SHA-256 with fixed 600,000-iteration policy and per-vault random salt.
 - No intentional app telemetry, advertising, synchronization, external vault API or secret logging.
 - Native app storage in platform application support directory; Android backup disabled in the Android manifest, and Android FLAG_SECURE screenshot/recents blocking in MainActivity (screen capture blocked in an Android 16 device smoke test).
-- Web CSP, lock-on-tab-hidden and cancellation of in-flight KDF; native app locks on inactive/paused/hidden and invalidates pending decryptions, dismissing sensitive editor dialogs.
+- Web CSP, lock-on-tab-hidden and cancellation of in-flight KDF; native app locks on inactive/paused/hidden, and web, native and Firefox popup clients automatically lock after five minutes without local activity. Pending native decryptions are invalidated and sensitive editor dialogs are dismissed.
 - Encryption before writing; native bounded ciphertext, exclusive random temporary files with Linux mode 0600 set before writing, symlink refusal and rename; no plaintext export.
 - Synthetic tests exercising authentication rejection, nonce randomness, multi-type cross-runtime fixtures and RFC 4226/6238 OTP vectors.
 - Firefox extension uses explicit user action and exact HTTPS origin checks to constrain form filling; no broad host permissions or background listener.
@@ -23,7 +23,7 @@ Assets are master passwords, derived vault keys, plaintext credentials, encrypte
 | --- | --- |
 | Master password | Password-strength UX, throttling where defensible, KDF selection/migration, stronger Argon2id memory-hard alternative, UX for unrecoverable passwords |
 | JavaScript runtime | XSS, malicious extensions, browser compromise, dependency injection, CSP audit, trusted HTTPS distribution, browser storage quota/clearing |
-| Native runtime | Secure-memory erasure limits, OS account compromise, screenshots/recents, Android accessibility misuse, Linux file permissions, device-keystore use |
+| Native runtime | Idle lock is not secure-memory zeroization; secure-memory erasure limits, OS account compromise, screenshots/recents, Android accessibility misuse, Linux file permissions, device-keystore use |
 | Data integrity | Valid older encrypted backups can roll back later data; atomic rename and file flush do not prove directory fsync or device crash durability. Device recovery rehearsals remain required |
 | Sync and identity | No sync or account service exists; authenticated enrollment, malicious-server model, tampering/replay/rollback, key rotations, authorization and recovery required |
 | Autofill | Not implemented; requires origin-matching anti-phishing tests, user gesture, safe accessibility/Autofill framework integration |
