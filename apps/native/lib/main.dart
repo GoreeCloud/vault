@@ -91,10 +91,16 @@ class _MasterPasswordPromptState extends State<_MasterPasswordPrompt> {
 }
 
 class VaultApp extends StatelessWidget {
-  const VaultApp({super.key, this.store, this.selectJsonBytes});
+  const VaultApp({
+    super.key,
+    this.store,
+    this.selectJsonBytes,
+    this.exportEncryptedBytes,
+  });
   final VaultStore? store;
-  // Test seam only; production defaults to OS picker with bounded reads.
+  // Test seams only; production defaults to bounded OS picker and exporter.
   final Future<Uint8List?> Function()? selectJsonBytes;
+  final Future<bool> Function(Uint8List)? exportEncryptedBytes;
   @override
   Widget build(BuildContext context) => MaterialApp(
       title: 'GoreeCloud Vault',
@@ -120,13 +126,22 @@ class VaultApp extends StatelessWidget {
                   OutlineInputBorder(borderRadius: BorderRadius.circular(14))),
           appBarTheme:
               const AppBarTheme(backgroundColor: canvas, foregroundColor: ink)),
-      home: VaultHome(store: store, selectJsonBytes: selectJsonBytes));
+      home: VaultHome(
+          store: store,
+          selectJsonBytes: selectJsonBytes,
+          exportEncryptedBytes: exportEncryptedBytes));
 }
 
 class VaultHome extends StatefulWidget {
-  const VaultHome({super.key, this.store, this.selectJsonBytes});
+  const VaultHome({
+    super.key,
+    this.store,
+    this.selectJsonBytes,
+    this.exportEncryptedBytes,
+  });
   final VaultStore? store;
   final Future<Uint8List?> Function()? selectJsonBytes;
+  final Future<bool> Function(Uint8List)? exportEncryptedBytes;
   @override
   State<VaultHome> createState() => _VaultHomeState();
 }
@@ -343,25 +358,39 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
 
   Future<void> _exportBackup() async {
     if (_busy || _entries == null || _envelope == null) return;
+    final epoch = _lockEpoch;
+    final original = _envelope!;
     setState(() {
       _busy = true;
       _error = null;
     });
+    Uint8List? ciphertext;
     try {
-      final ciphertext = VaultBackupCodec.exportEncrypted(_envelope!);
-      final saved = await VaultBackupFiles.exportEncrypted(ciphertext);
-      if (!mounted) return;
+      // Never export an outdated in-memory envelope if a different encrypted
+      // vault file has replaced it. An export is a recovery checkpoint, and
+      // users must not mistake a stale copy for their latest saved entries.
+      // This is a comparison, not a cross-process transaction.
+      await _store.ensureUnchanged(original);
+      if (!mounted || epoch != _lockEpoch) return;
+      ciphertext = VaultBackupCodec.exportEncrypted(original);
+      final saved = await (widget.exportEncryptedBytes ??
+          VaultBackupFiles.exportEncrypted)(ciphertext);
+      if (!mounted || epoch != _lockEpoch) return;
       if (saved) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text(
                 'Encrypted backup saved. Keep the master password safe.')));
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && epoch == _lockEpoch) {
         setState(() => _error =
-            'Could not export encrypted backup. No vault data changed.');
+            'Backup export refused or failed. Reopen and verify the current '
+                'encrypted vault before retrying.');
       }
     } finally {
+      // Export buffer contains only authenticated ciphertext. Best-effort
+      // clearing does not zeroize any OS document-provider copies.
+      ciphertext?.fillRange(0, ciphertext.length, 0);
       if (mounted) setState(() => _busy = false);
     }
   }
