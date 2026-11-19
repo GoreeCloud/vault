@@ -430,14 +430,18 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       // LOCKS it, so re-authentication is mandatory after the picker returns.
       plaintext = await VaultBackupFiles.selectLocalJsonBytes();
       if (!mounted || plaintext == null) return;
+      // The file picker may already have locked the vault. Capture the
+      // resulting epoch only AFTER it closes and reject any later lifecycle
+      // changes throughout password entry, preview and encryption.
+      final epoch = _lockEpoch;
       final preview = VaultBitwarden.parse(plaintext);
-      if (!mounted) return;
+      if (!mounted || epoch != _lockEpoch) return;
       final master = await _requestCurrentMasterPassword();
-      if (!mounted || master == null) return;
+      if (!mounted || master == null || epoch != _lockEpoch) return;
       final original = _envelope!;
       final key = await VaultCrypto.derive(master, original.salt);
       final existing = await VaultCrypto.decrypt(key, original);
-      if (!mounted) return;
+      if (!mounted || epoch != _lockEpoch) return;
       if (existing.length + preview.entries.length > 20000) {
         throw const FormatException('Too many items');
       }
@@ -456,9 +460,14 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
           ],
         ),
       );
-      if (confirm != true || !mounted) return;
+      if (confirm != true || !mounted || epoch != _lockEpoch) return;
       final next = await VaultCrypto.seal(
           [...existing, ...preview.entries], key, original.salt);
+      if (!mounted || epoch != _lockEpoch) return;
+      // Reject imports when the ciphertext changed while the user reviewed
+      // the migration. This is a comparison, not a cross-process lock.
+      await _store.ensureUnchanged(original);
+      if (!mounted || epoch != _lockEpoch) return;
       await _store.save(next);
       if (!mounted) return;
       _master.clear();
