@@ -41,6 +41,8 @@ After encrypted backup import, the popup returns to the locked state and require
 
 The extension can create and read logins, secure notes, TOTP/HOTP authenticators and passkey **references**, and read custom encrypted fields from imported vaults. The popup editor supports tags, favorites, and encrypted custom field names/values with explicit conceal/reveal controls. Its feature coverage still requires real-browser review. The OTP secret, like every other record field, remains encrypted at rest.
 
+New passkey-reference metadata is checked against a Public Suffix List-aware domain parser. It does not establish site ownership, private key custody, or WebAuthn authentication.
+
 **Passkey references are not passkey sign-in.** Firefox's WebAuthn/passkey integration is a separate browser/OS authenticator boundary; full management must not be claimed until WebAuthn registration and assertion are explicitly tested against real relying parties.
 
 ## Security and release acceptance

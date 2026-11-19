@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { encryptEntries, generatePassword, initialize, parseEnvelope, randomId, STORAGE_KEY, unlock,
   type Entry, type VaultEnvelope, type VaultKind, type CustomField } from './crypto';
 import { generateOtp, parseOtp } from './otp';
+import {normalizePasskeyRpId} from './passkey_rp';
 import { bitwardenImportWarning, parseBitwardenPlaintextJson } from './import_bitwarden';
 import './style.css';
 
@@ -181,6 +182,15 @@ function App() {
     if (!edit || !entries) return;
     let next: Entry = {...edit, title: edit.title.trim()};
     if (!next.title) { setNotice('Title is required.'); return; }
+    if (next.kind === 'passkey') {
+      const rpId = normalizePasskeyRpId(next.passkey?.rpId ?? '');
+      if (!rpId) {
+        setNotice('Enter a registrable RP domain, not a URL or public suffix. This is metadata only.');
+        return;
+      }
+      next = {...next, passkey: {rpId,
+        credentialId: next.passkey?.credentialId ?? '', userHandle: next.passkey?.userHandle ?? ''}};
+    }
     if (next.kind === 'otp' || otpInput.trim()) {
       try {
         next = {...next, otp: edit.otp && edit.otp.secret === otpInput.trim() ? edit.otp : parseOtp(otpInput.trim())};
@@ -342,7 +352,7 @@ function App() {
         </>}
         {itemKind(edit)==='passkey' && <>
           <p className="field-note">This records a passkey reference only, not an authenticator or portable private key.
-            Your browser or device manages actual passkey sign-in.</p>
+            Your browser or device manages actual passkey sign-in. Use the registrable domain (not a URL or public suffix); localhost is for local tests only.</p>
           <label className="edit-field"><span>Relying-party domain</span><input maxLength={253}
             placeholder="example.org" value={edit.passkey?.rpId??''}
             onChange={e=>setEdit({...edit,passkey:{rpId:e.target.value,credentialId:edit.passkey?.credentialId??'',userHandle:edit.passkey?.userHandle??''}})}/></label>

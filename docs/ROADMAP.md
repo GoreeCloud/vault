@@ -20,3 +20,8 @@ No delivery dates, stable-release status, production host or ongoing unattended 
 ## Migration integrity
 
 Implement full capability-aware migration from supported password-manager exports in deliberately limited stages. First-party web and Firefox clients, plus Flutter native clients in source, implement bounded, user-confirmed **Bitwarden plaintext JSON personal login/note** import with omission counters and encrypted append. Remaining work: support more Bitwarden field types, add explicit collision review/deduplication, preserve multi-URI rules, consider safe encrypted Bitwarden/Proton imports after source and license review, verify device migration and recoverability, and maintain original data until tests demonstrate coverage. Never claim passkey credentials have migrated based on metadata alone.
+
+
+## WebAuthn domain-scoping foundation
+
+Web and Firefox metadata editors validate newly entered RP domains using a Public Suffix List-aware parser, with pure RP-domain/origin-suffix tests. This does **not** implement passkey registration or sign-in. Next engineering phases are test-RP challenge verification, secure authenticator lifecycle and recovery, user consent and UV, permission-minimized browser integration, Android Credential Provider, security review and signed distribution. Do not relax password autofill exact-origin constraints.
