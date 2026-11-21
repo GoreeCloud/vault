@@ -24,6 +24,16 @@ class _MemoryVaultStore extends VaultStore {
   }
 
   @override
+  Future<void> saveIfUnchanged(VaultEnvelope? expected, VaultEnvelope next,
+      {bool Function()? canCommit}) async {
+    await ensureSnapshot(expected);
+    if (canCommit != null && !canCommit()) {
+      throw StateError('Synthetic test session invalidated');
+    }
+    value = next;
+  }
+
+  @override
   Future<void> save(VaultEnvelope envelope) async {
     value = envelope;
   }

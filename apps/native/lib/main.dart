@@ -254,13 +254,13 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       if (current == null) {
         final (key, env) = await VaultCrypto.initialize(password);
         if (!mounted || epoch != _lockEpoch) return;
-        // Protect first-run creation from a file appearing during KDF. This
-        // is best-effort TOCTOU protection, NOT an interprocess transaction.
-        if (await _store.load() != null) {
-          throw const FormatException('Encrypted vault appeared during setup');
-        }
+        // Cooperating native writers serialize the first-run absent-file
+        // check with encrypted creation; do not overwrite a new vault.
+        await _store.saveIfUnchanged(null, env,
+            canCommit: () => mounted && epoch == _lockEpoch);
+        // A lock can also arrive in the brief interval after disk commit;
+        // do not reopen or mutate the dismissed initialization session.
         if (!mounted || epoch != _lockEpoch) return;
-        await _store.save(env);
         _master.clear();
         if (mounted) {
           setState(() {
@@ -313,11 +313,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
     try {
       final sealed = await VaultCrypto.seal(next, sessionKey, original.salt);
       if (epoch != _lockEpoch || !mounted) return false;
-      // Never knowingly overwrite ciphertext that changed since unlock or
-      // the preceding save. This is NOT an interprocess compare-and-swap.
-      await _store.ensureUnchanged(original);
-      if (epoch != _lockEpoch || !mounted) return false;
-      await _store.save(sealed);
+      // Serialize encrypted freshness comparison and atomic replacement
+      // across cooperating native writers in the same local vault folder.
+      await _store.saveIfUnchanged(original, sealed,
+          canCommit: () => mounted && epoch == _lockEpoch);
       if (mounted) {
         setState(() {
           _envelope = sealed;
@@ -444,11 +443,11 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       );
       if (confirm != true || !mounted || epoch != _lockEpoch) return;
 
-      // Detect stale destinations immediately before commit. This check is
-      // NOT an atomic compare-and-swap and does not guarantee crash durability.
-      await _store.ensureSnapshot(original);
-      if (!mounted || epoch != _lockEpoch) return;
-      await _store.save(candidate.envelope);
+      // Repeat the destination freshness check UNDER the cooperative
+      // filesystem lock. No unrelated writer may race past this operation
+      // if it respects the same lockfile convention.
+      await _store.saveIfUnchanged(original, candidate.envelope,
+          canCommit: () => mounted && epoch == _lockEpoch);
       if (!mounted) return;
 
       // Even if app lifecycle changed while a save was already in progress,
@@ -542,11 +541,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       final next = await VaultCrypto.seal(
           [...existing, ...preview.entries], key, original.salt);
       if (!mounted || epoch != _lockEpoch) return;
-      // Reject imports when the ciphertext changed while the user reviewed
-      // the migration. This is a comparison, not a cross-process lock.
-      await _store.ensureUnchanged(original);
-      if (!mounted || epoch != _lockEpoch) return;
-      await _store.save(next);
+      // Preserve the authenticated destination with a cooperative locked
+      // compare-and-replace, even after slow user confirmation.
+      await _store.saveIfUnchanged(original, next,
+          canCommit: () => mounted && epoch == _lockEpoch);
       if (!mounted) return;
       _master.clear();
       _search.clear();
@@ -621,11 +619,10 @@ class _VaultHomeState extends State<VaultHome> with WidgetsBindingObserver {
       final next = await VaultCrypto.seal(
           [...existing, ...preview.entries], key, original.salt);
       if (!mounted || epoch != _lockEpoch) return;
-      // Reject imports when the ciphertext changed while the user reviewed
-      // the migration. This is a comparison, not a cross-process lock.
-      await _store.ensureUnchanged(original);
-      if (!mounted || epoch != _lockEpoch) return;
-      await _store.save(next);
+      // Preserve the authenticated destination with a cooperative locked
+      // compare-and-replace, even after slow user confirmation.
+      await _store.saveIfUnchanged(original, next,
+          canCommit: () => mounted && epoch == _lockEpoch);
       if (!mounted) return;
       _master.clear();
       _search.clear();

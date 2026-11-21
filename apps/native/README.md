@@ -30,11 +30,16 @@ User-selected JSON is read in bounded chunks rather than through an unbounded wh
 Each local native unlock reads the latest validated encrypted envelope from
 app-private storage before deriving a key. A previously observed vault that
 disappears fails closed, rather than being replaced with a new empty vault.
-Writes check the last observed encrypted snapshot before committing, and
-lifecycle lock epochs invalidate pending unlocks and saves. These are
-best-effort checks; there is no cross-process file locking, directory fsync
-or independent crash-consistency proof. Use encrypted backups before testing
-other writers or migrations.
+All GoreeCloud Vault native writers now acquire a stable app-private advisory
+encrypted lockfile (0600 on Linux), serializing an original-ciphertext
+comparison and encrypted temp-file/rename. An in-isolate FIFO additionally
+serializes concurrent Dart callers, and lock-epoch callbacks refuse writes
+invalidated while awaiting that lock or before encrypted temp-file rename. These safeguards protect against
+cooperating native writers, not filesystem operations that ignore the lock,
+another isolate bypassing the app's protocol, external sync tools, OS
+compromise, directory fsync failure or device power-loss/rollback. Real Android
+lock behavior and cross-process recovery acceptance remain unverified. Use
+independently recoverable encrypted backups before migrations.
 
 
 ## Limited local Proton Pass migration (development preview)
