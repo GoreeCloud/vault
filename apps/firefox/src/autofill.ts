@@ -10,26 +10,46 @@ export function matchingHttpsOrigin(storedWebsite: string, tabUrl: string): stri
 }
 
 /**
- * Execute ONLY in the active tab with browser.scripting.executeScript on user action.
- * Check again inside isolated world for navigation races. Never submit a form.
+ * Only fill one visible, editable, active password field after explicit user
+ * action and exact-origin verification. Do not select hidden template fields,
+ * signup/new-password controls, cross-origin frames or ambiguous multi-form
+ * pages. Never submit, focus a different form or send data to remote APIs.
+ *
+ * A malicious same-origin website can still observe input values; origin
+ * matching and visible-field heuristics do not make autofill phishing-proof.
  */
 export function fillActiveDocument(expectedOrigin: string, username: string, password: string): boolean {
   if (globalThis.location.origin !== expectedOrigin) return false;
-  const pwd = document.querySelector<HTMLInputElement>('input[type="password"]');
-  if (!pwd || pwd.disabled || pwd.readOnly || !pwd.isConnected) return false;
-  const form = pwd.form ?? document;
-  const name = form.querySelector<HTMLInputElement>(
-    'input[autocomplete="username"],input[type="email"],input[name="username"],input[name="email"]'
-  );
-  function fill(node: HTMLInputElement, value: string) {
-    if (node.disabled || node.readOnly || !node.isConnected) return;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
-    if (!setter) return;
-    setter.call(node,value);
+
+  function usable(node: HTMLInputElement): boolean {
+    if (!node.isConnected || node.disabled || node.readOnly ||
+        node.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
+    // Hidden CSS templates and zero-size credential honeypots are not targets.
+    return Array.from(node.getClientRects()).some(r => r.width > 0 && r.height > 0);
+  }
+
+  const passwords = Array.from(document.querySelectorAll<HTMLInputElement>(
+    'input[type="password"]'
+  )).filter(usable);
+  // Multiple current/new password fields are ambiguous. Fail closed.
+  if (passwords.length !== 1) return false;
+  const pwd = passwords[0];
+  if (pwd.autocomplete.toLowerCase().split(/\s+/).includes('new-password')) return false;
+  const container = pwd.form ?? document;
+  const usernames = Array.from(container.querySelectorAll<HTMLInputElement>(
+    'input[autocomplete~="username"],input[type="email"],input[name="username"],input[name="email"]'
+  )).filter(n => n.type !== 'password' && usable(n));
+  if (usernames.length > 1) return false;
+
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
+  if (!setter) return false;
+  function fill(node: HTMLInputElement, value: string): boolean {
+    if (!usable(node) || globalThis.location.origin !== expectedOrigin) return false;
+    setter!.call(node,value);
     node.dispatchEvent(new Event('input',{bubbles:true}));
     node.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
   }
-  if (name) fill(name,username);
-  fill(pwd,password);
-  return true;
+  if (usernames[0] && !fill(usernames[0],username)) return false;
+  return fill(pwd,password);
 }
