@@ -98,6 +98,8 @@ jobs:
         with:
           flutter-version: '3.27.4'
           channel: stable
+      - name: Enforce Android release signing and privacy source boundaries
+        run: python3 scripts/test_android_release_security.py
       - name: Resolve Dart dependencies
         working-directory: apps/native
         run: flutter pub get
