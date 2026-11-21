@@ -89,6 +89,17 @@ zeroization, or protection against malicious privileged extensions.
 
 The popup can also parse a manually extracted **plaintext Proton Pass data.json** file into encrypted personal login/note records after user consent and a count-only omission preview. It does not import ZIP archives, PGP ciphertext, CSV, alias forwarding, attachments or usable passkeys. A source plaintext file remains on the user's disk. See [Proton import boundaries](IMPORTING-PROTON-PASS.md) and do not assume user exports are fully portable.
 
+## Visible-field and form-ambiguity safety
+
+The manually initiated in-tab fill helper refuses invisible, inert,
+disabled, read-only, disconnected, or zero-area password fields and pages
+with multiple visible password controls. It excludes signup/new-password
+controls and refuses multiple candidate usernames in the selected password
+form. It never submits or fills cross-origin frames. This protects against
+accidental template/honeypot selection but cannot prevent a malicious
+same-origin website from observing a password after an intentional fill.
+Automated DOM fixture tests are not a signed Firefox add-on acceptance test.
+
 ## Encrypted storage freshness guards
 
 Before an existing popup changes an encrypted record, imports a plaintext

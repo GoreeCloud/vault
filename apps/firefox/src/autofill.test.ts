@@ -29,20 +29,25 @@ test('injected function fills only active form fields and never submits',()=>{
     disabled=false;
     readOnly=false;
     isConnected=true;
-    form:{querySelector:()=>FakeInput}|null=null;
+    type='text';
+    autocomplete='';
+    form:{querySelectorAll:()=>FakeInput[]}|null=null;
+    closest(){return null;}
+    getClientRects(){return [{width:200,height:20}];}
     get value(){return this.current;}
     set value(next:string){this.current=next;}
     dispatchEvent(event:{type:string}){events.push(event.type);return true;}
   }
   const username=new FakeInput();
   const password=new FakeInput();
-  password.form={querySelector:()=>username};
+  password.type='password';
+  password.form={querySelectorAll:()=>[username]};
   let queried=0;
   vi.stubGlobal('HTMLInputElement',FakeInput);
   vi.stubGlobal('Event',class{constructor(public type:string){}});
   vi.stubGlobal('location',{origin:'https://example.invalid'});
-  vi.stubGlobal('document',{querySelector:()=>{
-    queried++;return password;
+  vi.stubGlobal('document',{querySelectorAll:()=>{
+    queried++;return [password];
   }});
   expect(fillActiveDocument('https://example.invalid','fake-user','SYNTHETIC-ONLY')).toBe(true);
   expect(username.value).toBe('fake-user');
