@@ -7,8 +7,10 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run src",
+    "verify:bundle": "node --test scripts/check_release.test.mjs && node scripts/check_release.mjs",
     "audit": "npm audit --omit=dev",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:prod": "playwright test --config playwright.production.config.ts"
   },
   "dependencies": {
     "react": "19.2.0",
