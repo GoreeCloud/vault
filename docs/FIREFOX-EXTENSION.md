@@ -112,3 +112,20 @@ are separate asynchronous operations, not a transactional compare-and-swap,
 and malicious privileged extensions or filesystem-level tampering are not
 covered. Separate extension popups must not be used as a synchronization
 mechanism. Protected backups and an actual restore rehearsal remain necessary.
+
+## Single-popup operation serialization
+
+A synchronous in-memory mutation gate now begins before each popup unlock,
+initialization, save, plaintext migration, encrypted backup export and
+replacement restore. Pending asynchronous actions hold that gate through
+cryptography, file validation and extension-storage completion. A rapid second
+submit does not start a second ciphertext write using stale React state.
+Cancellation or failure releases the gate through a finally block. An
+automated synthetic Firefox test blocks extension storage and tries two
+consecutive form submissions, verifying only one encrypted commit.
+
+This protects only actions within the SAME popup instance. Separate popup
+windows, browser restarts, malicious extensions and asynchronous Firefox
+storage.local read+write across contexts are not a transactional compare-and-
+swap. External ciphertext freshness checks, encrypted backups and device
+recovery testing are still needed. No extension permissions were added.
