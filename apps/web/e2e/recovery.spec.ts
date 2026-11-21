@@ -172,3 +172,57 @@ test('conflicting OTP issuer URI cannot alter encrypted web vault',async({page})
   const encrypted=await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'));
   expect(encrypted).not.toContain('JBSWY3DPEHPK3PXP');
 });
+
+test('corrupt local vault preserves raw bytes and recovers after verified encrypted restore',async({page})=>{
+  await initialize(page);
+  await createNote(page,'Synthetic recovered note','RECOVERY-FIXTURE-NOT-PRIVATE');
+  const validBackup=await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'));
+  expect(validBackup).toContain('goreecloud-vault');
+  expect(validBackup).not.toContain('RECOVERY-FIXTURE-NOT-PRIVATE');
+
+  const corrupted='MALFORMED-LOCAL-SYNTHETIC-ENVELOPE-DO-NOT-USE';
+  await page.evaluate(value=>
+    localStorage.setItem('goreecloud.vault.encrypted.v1',value),corrupted);
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Encrypted data needs attention.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Create vault'})).toHaveCount(0);
+
+  page.once('dialog',dialog=>dialog.accept());
+  const [download]=await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button',{name:'Preserve unverified storage'}).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('goreecloud-vault-damaged-unverified.txt');
+  expect((await readFile(await download.path())).toString()).toBe(corrupted);
+  const input=page.getByLabel('Recovery encrypted backup JSON file');
+
+  page.once('dialog',dialog=>dialog.dismiss());
+  await input.setInputFiles({
+    name:backupName,mimeType:'application/json',buffer:Buffer.from(validBackup!),
+  });
+  await expect(page.getByRole('heading',{name:'Encrypted data needs attention.'})).toBeVisible();
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'))).toBe(corrupted);
+
+  page.once('dialog',dialog=>dialog.accept('incorrect-backup-password'));
+  await input.setInputFiles({
+    name:backupName,mimeType:'application/json',buffer:Buffer.from(validBackup!),
+  });
+  await expect(page.getByRole('alert')).toContainText('Restore failed');
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'))).toBe(corrupted);
+
+  page.on('dialog',dialog=>{
+    if(dialog.type()==='prompt')return dialog.accept(master);
+    if(dialog.type()==='confirm')return dialog.accept();
+    return dialog.dismiss();
+  });
+  await input.setInputFiles({
+    name:backupName,mimeType:'application/json',buffer:Buffer.from(validBackup!),
+  });
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Encrypted backup restored');
+  await page.getByLabel('Master password').fill(master);
+  await page.getByRole('button',{name:'Unlock securely'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic recovered note/})).toBeVisible();
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1')))
+    .not.toBe(corrupted);
+});

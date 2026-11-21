@@ -55,3 +55,17 @@ backup restore pins the original raw destination even if it is malformed, and
 refuses to replace ciphertext that changes during validation. These checks
 are local best-effort protection, not a multi-device transaction, anti-rollback
 protocol, or defense against a compromised browser or operating system.
+
+## Corrupt web-storage recovery acceptance
+
+When localStorage contains malformed or unsupported vault ciphertext, the web
+client remains fail-closed and does not silently create a new vault. A user
+can deliberately download the original UNVERIFIED raw storage (which might
+contain private data; never upload/share it), then select a trusted
+authenticated encrypted backup. Cancellation, incorrect passwords, invalid
+backups and unexpected destination changes preserve the original storage.
+Only a fully validated, user-confirmed and successfully persisted replacement
+clears recovery-only mode, allowing unlock without reloading. A synchronous
+per-document restore gate prevents overlapping replacement dialogs/writes.
+Synthetic Chromium/Firefox acceptance is not proof of recovery after disk
+corruption, browser profile compromise, power loss or authentic rollback.
