@@ -43,6 +43,20 @@ function Extension() {
   const [master,setMaster]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  // React state is not an operation mutex: consecutive submit events can
+  // observe the same stale busy=false render before an async storage write.
+  // This ref is acquired synchronously, shared across ALL popup operations.
+  const operationInFlight=useRef(false);
+  function beginOperation():boolean {
+    if(operationInFlight.current)return false;
+    operationInFlight.current=true;
+    setBusy(true);
+    return true;
+  }
+  function endOperation(){
+    operationInFlight.current=false;
+    setBusy(false);
+  }
   const [search,setSearch]=useState('');
   const [selected,setSelected]=useState<Entry|null>(null);
   const [edit,setEdit]=useState<Entry|null>(null);
@@ -66,9 +80,9 @@ function Extension() {
 
   async function open(event:React.FormEvent) {
     event.preventDefault();
-    if(corrupt||busy)return;
+    if(corrupt||!beginOperation())return;
     const epoch=lockEpoch.current;
-    setBusy(true);setError('');
+    setError('');
     try{
       if(envelope){
         // Re-read ciphertext after a potentially stale/aborted storage write.
@@ -91,13 +105,13 @@ function Extension() {
       setMaster('');
     }catch{
       if(active(epoch))setError('Could not open vault. Verify password and storage integrity.');
-    }finally{setBusy(false);}
+    }finally{endOperation();}
   }
   async function save(next:Entry[]):Promise<boolean>{
-    if(!key.current||!envelope||busy)return false;
+    if(!key.current||!envelope||!beginOperation())return false;
     const epoch=lockEpoch.current;
     const sessionKey=key.current;
-    setBusy(true);setError('');
+    setError('');
     try{
       const value=await encryptEntries(next,sessionKey,envelope.kdf.salt);
       if(!active(epoch))return false;
@@ -114,7 +128,7 @@ function Extension() {
     }catch{
       if(active(epoch))setError('Save failed. Check the encrypted vault before retrying.');
       return false;
-    }finally{setBusy(false);}
+    }finally{endOperation();}
   }
   function lock() {
     lockEpoch.current++;
@@ -144,8 +158,9 @@ function Extension() {
   },[items]);
 
   async function exportFile(){
-    if(!envelope||busy)return;
+    if(!envelope||!beginOperation())return;
     const epoch=lockEpoch.current;
+    setError('');
     try{
       const current=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
       if(!active(epoch))return;
@@ -153,25 +168,27 @@ function Extension() {
         lock();setError('Encrypted vault changed. Reopen before exporting a recovery backup.');
         return;
       }
-    }catch{if(active(epoch))setError('Could not validate encrypted backup freshness.');return;}
-    const blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'});
-    const link=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=link;a.download='goreecloud-vault-firefox-encrypted.json';a.click();
-    setTimeout(()=>URL.revokeObjectURL(link),1000);
+      const blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'});
+      const link=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=link;a.download='goreecloud-vault-firefox-encrypted.json';a.click();
+      setTimeout(()=>URL.revokeObjectURL(link),1000);
+    }catch{
+      if(active(epoch))setError('Could not validate encrypted backup freshness.');
+    }finally{endOperation();}
   }
   async function restore(event:React.ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
-    event.target.value='';if(!file||busy)return;
-    // Capture an exact snapshot even if stored ciphertext is malformed.
-    let destinationBefore:unknown;
-    try{
-      destinationBefore=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
-    }catch{setError('Cannot read destination vault. No changes were made.');return;}
-    const password=window.prompt('Master password of encrypted backup:');
-    if(password===null)return;
+    event.target.value='';
+    if(!file||!beginOperation())return;
     const epoch=lockEpoch.current;
-    setBusy(true);setError('');
+    setError('');
     try{
+      // Pin even malformed storage before prompting or reading a backup.
+      const destinationBefore=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return;
+      const password=window.prompt('Master password of encrypted backup:');
+      if(password===null)return;
       if(file.size>5_000_000)throw Error('too large');
       const value=parseEnvelope(await file.text());
       if(!active(epoch))return;
@@ -188,19 +205,20 @@ function Extension() {
       lock();setEnvelope(value);setCorrupt(false);
       setError('Encrypted backup restored. Unlock with its master password.');
     }catch{
-      if(active(epoch))setError('Import rejected. Wrong password or invalid encrypted backup. Existing vault should be checked.');
-    }finally{setBusy(false);}
+      if(active(epoch))setError('Import rejected. Wrong password, invalid backup, or unavailable storage. Existing vault should be checked.');
+    }finally{endOperation();}
   }
   async function importBitwarden(event:React.ChangeEvent<HTMLInputElement>) {
     const file=event.target.files?.[0];
     event.target.value='';
-    if(!file || items===null || !key.current || !envelope || busy)return;
+    if(!file || items===null || !key.current || !envelope || operationInFlight.current)return;
     if(file.size===0 || file.size>5_000_000){
       setError('Bitwarden plaintext JSON must be between 1 byte and 5 MB.');return;
     }
+    if(!beginOperation())return;
     const epoch=lockEpoch.current;
     const sessionKey=key.current;
-    setBusy(true);setError('');
+    setError('');
     try {
       const text=await file.text();
       if(!active(epoch))return;
@@ -224,20 +242,21 @@ function Extension() {
       setError('Bitwarden login/note items encrypted locally. Review imported records.');
     }catch{
       if(active(epoch))setError('Bitwarden import rejected. Inspect the encrypted vault before retrying.');
-    }finally{setBusy(false);}
+    }finally{endOperation();}
   }
   async function importProton(event:React.ChangeEvent<HTMLInputElement>) {
     const file=event.target.files?.[0];
     event.target.value='';
-    if(!file||items===null||!key.current||!envelope||busy)return;
+    if(!file||items===null||!key.current||!envelope||operationInFlight.current)return;
     if(file.size===0||file.size>5_000_000){
       setError('Select extracted Proton Pass plaintext data.json (max 5 MB); no ZIP/PGP support.');
       return;
     }
+    if(!beginOperation())return;
     const epoch=lockEpoch.current;
     const activeKey=key.current;
     const activeEnvelope=envelope;
-    setBusy(true);setError('');
+    setError('');
     try{
       const source=await file.text();
       if(!active(epoch))return;
@@ -261,7 +280,7 @@ function Extension() {
     }catch{
       if(active(epoch))setError(
         'Proton Pass import rejected. Inspect the current encrypted vault before retrying.');
-    }finally{setBusy(false);}
+    }finally{endOperation();}
   }
   async function fill(item:Entry) {
     if(item.kind&&item.kind!=='login')return;
