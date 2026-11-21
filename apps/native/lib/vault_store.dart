@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +13,11 @@ class VaultStore {
       : _supportDirectory = supportDirectory ?? getApplicationSupportDirectory;
 
   final Future<Directory> Function() _supportDirectory;
+
+  // Per-isolate FIFO synchronization complements OS advisory file locking:
+  // POSIX record locks can be process-scoped rather than file-descriptor
+  // scoped. Separate isolates/processes must also cooperate with the OS lock.
+  static final Map<String, Future<void>> _localQueues = {};
 
   Future<File> _location() async {
     final directory = await _supportDirectory();
@@ -86,8 +92,65 @@ class VaultStore {
   Future<void> ensureUnchanged(VaultEnvelope expected) =>
       ensureSnapshot(expected);
 
+  Future<T> _withEncryptedFileLock<T>(
+      Future<T> Function(File destination) operation) async {
+    final destination = await _location();
+    final lockFile = File('${destination.path}.lock');
+    final lockPath = lockFile.path;
+    final predecessor = _localQueues[lockPath] ?? Future<void>.value();
+    final release = Completer<void>();
+    _localQueues[lockPath] = release.future;
+    try {
+      await predecessor;
+      await _verifyPath(lockFile);
+      // This empty lockfile has no secrets. Restrict permissions before any
+      // sensitive operation; keep it stable across ciphertext atomic renames.
+      final channel = await lockFile.open(mode: FileMode.append);
+      try {
+        await _restrictLinuxPermissions(lockPath);
+        await channel.lock(FileLock.exclusive);
+        try {
+          return await operation(destination);
+        } finally {
+          await channel.unlock();
+        }
+      } finally {
+        await channel.close();
+      }
+    } finally {
+      release.complete();
+      if (identical(_localQueues[lockPath], release.future)) {
+        _localQueues.remove(lockPath);
+      }
+    }
+  }
+
+  /// All native encrypted writers must use the same lockfile, including
+  /// vault initialization. This method is kept for compatibility/tests;
+  /// user-visible operations must use the compare-and-replace method below.
   Future<void> save(VaultEnvelope envelope) async {
-    final file = await _location();
+    await _withEncryptedFileLock((file) => _writeUnderLock(file, envelope));
+  }
+
+  /// Serializes check and ciphertext replacement for cooperating native
+  /// writers. A null expected value means no previous encrypted file.
+  /// canCommit checks a caller's lock epoch after any lock wait AND again
+  /// after the temporary ciphertext file is flushed, before rename. Advisory
+  /// locks cannot defend against a noncooperating filesystem writer or
+  /// guarantee crash durability or ciphertext antirollback.
+  Future<void> saveIfUnchanged(VaultEnvelope? expected, VaultEnvelope next,
+      {bool Function()? canCommit}) async {
+    await _withEncryptedFileLock((file) async {
+      await ensureSnapshot(expected);
+      if (canCommit != null && !canCommit()) {
+        throw StateError('Native vault session invalidated before commit');
+      }
+      await _writeUnderLock(file, next, canCommit: canCommit);
+    });
+  }
+
+  Future<void> _writeUnderLock(File file, VaultEnvelope envelope,
+      {bool Function()? canCommit}) async {
     await _verifyPath(file);
     // Reject invalid/oversized output BEFORE touching the old file.
     final bytes = VaultBackupCodec.exportEncrypted(envelope);
@@ -102,6 +165,11 @@ class VaultStore {
       await temp.create(exclusive: true);
       await _restrictLinuxPermissions(temp.path);
       await temp.writeAsBytes(bytes, flush: true);
+      // Invalidate a stale in-flight operation before its atomic rename.
+      // There remains a small race between this callback and the OS rename.
+      if (canCommit != null && !canCommit()) {
+        throw StateError('Native vault session invalidated before rename');
+      }
       await temp.rename(file.path);
     } catch (_) {
       if (await FileSystemEntity.type(temp.path, followLinks: false) !=

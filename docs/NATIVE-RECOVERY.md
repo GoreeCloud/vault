@@ -33,13 +33,24 @@ The Android backup channel receives bounded ciphertext and does not request broa
 matches the previously observed snapshot, including an originally missing
 vault. The restore also rejects newly invalidated app lock sessions after
 the OS picker returns; changing apps during password validation or confirmation
-aborts the operation. These are best-effort safeguards, not cross-process
-atomic compare-and-swap or verified power-loss durability. Only after the
-write succeeds does it replace the current encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
+aborts the operation. The final authenticated snapshot comparison and
+encrypted temp-file/rename now execute under a stable app-private advisory
+lockfile with an in-isolate FIFO. The native lock-epoch is checked after
+lock acquisition and after writing the temporary ciphertext, before rename.
+This protects against cooperating native writers on the same local vault path. It does not stop noncooperating writers,
+malicious filesystem actors, OS compromise, concurrent non-Dart tools or
+prove directory fsync, power-loss durability, or valid-old-backup rollback
+detection. Only after the write succeeds does it replace the current
+encrypted envelope. It **remains locked** and requires the backup's master password for a fresh unlock. This prevents Android file-picker lifecycle transitions from inadvertently reopening a vault.
 
 Restore **replaces** local data. It does not merge or synchronize items, automatically retain a history, change the master password on existing files, recover a forgotten password, or detect rollback of a valid older encrypted backup. Back up current encrypted data first.
 
 ## Tested and untested scope
+
+New synthetic store tests also exercise racing cooperative encrypted writers,
+a rejected second first-run creation, lockfile symlink refusal, and permission
+checks on the empty 0600 Linux lockfile. These tests do not prove Android
+provider behavior or true multi-process crash recovery.
 
 Synthetic Dart tests cover bounded provider-stream reads (misreported size, overrun, underrun, read failures), Linux 0600 mode, random exclusive temp files, symlink and oversized-file rejection, and multi-type export/inspect/re-encryption, authenticated decryption, rejection of tampered GCM ciphertext, wrong-password failures, unsupported envelope, and oversized input. Native Flutter analyzer/tests and Linux release compilation verify source compatibility. Android debug APK CI compilation tests the Kotlin bridge at build time.
 
