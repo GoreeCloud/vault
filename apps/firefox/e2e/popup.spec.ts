@@ -422,3 +422,45 @@ test('Proton import waiting on encrypted storage cannot reopen a locked Firefox 
   await page.getByRole('button',{name:'Unlock'}).click();
   await expect(page.getByRole('button',{name:/Synthetic delayed Proton note/})).toBeVisible();
 });
+
+test('Firefox refuses a stale encrypted edit instead of overwriting another popup',async({page})=>{
+  await page.addInitScript(()=>{
+    const vault:Record<string,unknown>={};
+    Object.defineProperty(window,'__staleVaultState',{value:vault});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:vault[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(vault,values),
+      }},
+      tabs:{query:async()=>[{id:91,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]},
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-fox-stale-master-password');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:/My vault/})).toBeVisible();
+  await page.getByRole('button',{name:'+ Secure note'}).click();
+  await page.getByLabel('Title').fill('Synthetic unsaved note');
+  await page.getByLabel('Encrypted notes').fill('FAKE-NOTE-NOT-A-SECRET');
+  const replaced=await page.evaluate(()=>{
+    const storage=(window as unknown as {
+      __staleVaultState:Record<string,unknown>
+    }).__staleVaultState;
+    const key='goreecloud.vault.encrypted.v1';
+    const envelope=structuredClone(storage[key]) as {cipher:{nonce:string}};
+    envelope.cipher.nonce='AQAAAAAAAAAAAAAA';
+    storage[key]=envelope;
+    return JSON.stringify(envelope);
+  });
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('heading',{name:'Unlock vault'})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Encrypted vault changed');
+  const stored=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {
+      __staleVaultState:Record<string,unknown>
+    }).__staleVaultState['goreecloud.vault.encrypted.v1']
+  ));
+  expect(stored).toBe(replaced);
+  expect(stored).not.toContain('FAKE-NOTE-NOT-A-SECRET');
+});

@@ -88,3 +88,16 @@ zeroization, or protection against malicious privileged extensions.
 ## Proton Pass migration (limited)
 
 The popup can also parse a manually extracted **plaintext Proton Pass data.json** file into encrypted personal login/note records after user consent and a count-only omission preview. It does not import ZIP archives, PGP ciphertext, CSV, alias forwarding, attachments or usable passkeys. A source plaintext file remains on the user's disk. See [Proton import boundaries](IMPORTING-PROTON-PASS.md) and do not assume user exports are fully portable.
+
+## Encrypted storage freshness guards
+
+Before an existing popup changes an encrypted record, imports a plaintext
+migration, exports a recovery backup, or replaces the vault from a backup, it
+reads extension storage again and rejects an unexpectedly changed ciphertext.
+Creating a first vault also checks the store is still empty after key
+derivation. A mismatch never silently overwrites a different popup's stored
+envelope. These are best-effort checks: Firefox storage.local reads and writes
+are separate asynchronous operations, not a transactional compare-and-swap,
+and malicious privileged extensions or filesystem-level tampering are not
+covered. Separate extension popups must not be used as a synchronization
+mechanism. Protected backups and an actual restore rehearsal remain necessary.

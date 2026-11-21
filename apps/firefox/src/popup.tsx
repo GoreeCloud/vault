@@ -7,6 +7,7 @@ import {normalizePasskeyRpId} from './passkey_rp';
 import {matchingHttpsOrigin, fillActiveDocument} from './autofill';
 import {bitwardenImportWarning,parseBitwardenPlaintextJson} from '../../web/src/import_bitwarden';
 import {parseProtonPassPlaintextJson,protonImportWarning} from '../../web/src/import_proton';
+import {sameStoredVault} from '../../web/src/storage_guard';
 import './style.css';
 
 type BrowserTab = {id?: number; url?: string};
@@ -80,6 +81,9 @@ function Extension() {
       }else{
         const result=await initialize(master);
         if(!active(epoch))return;
+        const existing=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+        if(!active(epoch))return;
+        if(!sameStoredVault(null,existing))throw Error('Encrypted vault already exists');
         await browser.storage.local.set({[STORAGE_KEY]:result.envelope});
         if(!active(epoch))return;
         key.current=result.key;setEnvelope(result.envelope);setItems([]);
@@ -97,6 +101,12 @@ function Extension() {
     try{
       const value=await encryptEntries(next,sessionKey,envelope.kdf.salt);
       if(!active(epoch))return false;
+      const current=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return false;
+      if(!sameStoredVault(envelope,current)){
+        lock();setError('Encrypted vault changed in another popup. Reopen before editing.');
+        return false;
+      }
       await browser.storage.local.set({[STORAGE_KEY]:value});
       if(!active(epoch))return false;
       setEnvelope(value);setItems(next);setEdit(null);setSelected(null);
@@ -133,8 +143,17 @@ function Extension() {
     };
   },[items]);
 
-  function exportFile(){
-    if(!envelope)return;
+  async function exportFile(){
+    if(!envelope||busy)return;
+    const epoch=lockEpoch.current;
+    try{
+      const current=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return;
+      if(!sameStoredVault(envelope,current)){
+        lock();setError('Encrypted vault changed. Reopen before exporting a recovery backup.');
+        return;
+      }
+    }catch{if(active(epoch))setError('Could not validate encrypted backup freshness.');return;}
     const blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'});
     const link=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=link;a.download='goreecloud-vault-firefox-encrypted.json';a.click();
@@ -143,6 +162,11 @@ function Extension() {
   async function restore(event:React.ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     event.target.value='';if(!file||busy)return;
+    // Capture an exact snapshot even if stored ciphertext is malformed.
+    let destinationBefore:unknown;
+    try{
+      destinationBefore=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+    }catch{setError('Cannot read destination vault. No changes were made.');return;}
     const password=window.prompt('Master password of encrypted backup:');
     if(password===null)return;
     const epoch=lockEpoch.current;
@@ -155,6 +179,10 @@ function Extension() {
       if(!active(epoch))return;
       if(!window.confirm('Replace all encrypted items in this Firefox profile? Export a backup first.'))return;
       if(!active(epoch))return;
+      const destinationNow=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return;
+      if(JSON.stringify(destinationNow)!==JSON.stringify(destinationBefore))
+        throw Error('Encrypted destination changed during restore');
       await browser.storage.local.set({[STORAGE_KEY]:value});
       if(!active(epoch))return;
       lock();setEnvelope(value);setCorrupt(false);
@@ -184,6 +212,12 @@ function Extension() {
       const next=[...items,...preview.entries];
       const encrypted=await encryptEntries(next,sessionKey,envelope.kdf.salt);
       if(!active(epoch))return;
+      const current=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return;
+      if(!sameStoredVault(envelope,current)){
+        lock();setError('Encrypted vault changed in another popup. Reopen before importing.');
+        return;
+      }
       await browser.storage.local.set({[STORAGE_KEY]:encrypted});
       if(!active(epoch))return;
       setEnvelope(encrypted);setItems(next);setSelected(null);setEdit(null);
@@ -214,6 +248,12 @@ function Extension() {
       const next=[...items,...preview.entries];
       const encrypted=await encryptEntries(next,activeKey,activeEnvelope.kdf.salt);
       if(!active(epoch))return;
+      const current=(await browser.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      if(!active(epoch))return;
+      if(!sameStoredVault(activeEnvelope,current)){
+        lock();setError('Encrypted vault changed in another popup. Reopen before importing.');
+        return;
+      }
       await browser.storage.local.set({[STORAGE_KEY]:encrypted});
       if(!active(epoch))return;
       setEnvelope(encrypted);setItems(next);setSelected(null);setEdit(null);
