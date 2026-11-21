@@ -40,4 +40,44 @@ void main() {
             'otpauth://totp/Test?secret=JBSWY3DPEHPK3PXP&algorithm=MD5'),
         throwsFormatException);
   });
+
+  test('canonical issuer/account label and explicit HOTP counter', () {
+    const secret = 'JBSWY3DPEHPK3PXP';
+    final full = VaultOtp.parse(
+        'otpauth://totp/GoreeCloud:fake%40example.invalid?secret=$secret&issuer=GoreeCloud');
+    expect(full.issuer, 'GoreeCloud');
+    expect(full.account, 'fake@example.invalid');
+    expect(
+        VaultOtp.parse('otpauth://totp/GoreeCloud:fake?secret=$secret').issuer,
+        'GoreeCloud');
+    final hotp = VaultOtp.parse(
+        'otpauth://hotp/Trusted:fake?secret=$secret&issuer=Trusted&counter=0007&digits=8');
+    expect(hotp.counter, 7);
+    expect(hotp.digits, 8);
+    expect(hotp.account, 'fake');
+  });
+
+  test('refuses duplicated, conflicting, or ambiguous OTP provisioning', () {
+    const secret = 'JBSWY3DPEHPK3PXP';
+    final rejected = [
+      'otpauth://totp/Fake?secret=$secret&secret=$secret',
+      'otpauth://totp/Fake?secret=$secret&issuer=A&issuer=B',
+      'otpauth://totp/Trusted:fake?secret=$secret&issuer=Other',
+      'otpauth://hotp/Fake?secret=$secret',
+      'otpauth://totp/:fake?secret=$secret',
+      'otpauth://totp/Trusted:?secret=$secret',
+      'otpauth://totp/foo/bar?secret=$secret',
+      'otpauth://totp/fake?secret=$secret#fragment',
+      'otpauth://totp/fake?secret=$secret#',
+      'otpauth://user@totp/fake?secret=$secret',
+      'otpauth://totp:444/fake?secret=$secret',
+      'otpauth://totp/fake?secret=$secret&digits=6.0',
+      'otpauth://totp/fake?secret=$secret&period=-30',
+      'otpauth://totp/fake?secret=$secret&counter=NaN',
+    ];
+    for (final source in rejected) {
+      expect(() => VaultOtp.parse(source), throwsFormatException,
+          reason: 'Reject potentially ambiguous synthetic provisioning URI');
+    }
+  });
 }
