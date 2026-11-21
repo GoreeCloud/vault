@@ -35,3 +35,44 @@ describe('RFC 6238 cross-browser one-time codes', () => {
     expect(()=>parseOtp('otpauth://totp/a?secret=JBSWY3DPEHPK3PXP&period=0')).toThrow();
   });
 });
+
+
+describe('provisioning URI issuer and ambiguity safety', () => {
+  const secret='JBSWY3DPEHPK3PXP';
+  const valid='otpauth://totp/GoreeCloud:fake%40example.invalid?secret='+secret+'&issuer=GoreeCloud';
+  test('normalizes issuer/account consistently while preserving a valid OTP', () => {
+    const value=parseOtp(valid);
+    expect(value.issuer).toBe('GoreeCloud');
+    expect(value.account).toBe('fake@example.invalid');
+    expect(value.type).toBe('totp');
+    expect(parseOtp('otpauth://totp/GoreeCloud:fake?secret='+secret).issuer).toBe('GoreeCloud');
+    expect(parseOtp('otpauth://totp/fake?secret='+secret+'&issuer=GoreeCloud').account).toBe('fake');
+  });
+  test('refuses ambiguous or conflicting provisioning before storing an OTP seed', () => {
+    const rejected=[
+      valid+'&secret='+secret,
+      valid+'&issuer=GoreeCloud',
+      'otpauth://totp/Trusted:fake?secret='+secret+'&issuer=Other',
+      'otpauth://hotp/fake?secret='+secret,
+      'otpauth://totp/:fake?secret='+secret,
+      'otpauth://totp/Trusted:?secret='+secret,
+      'otpauth://totp/foo/bar?secret='+secret,
+      'otpauth://totp/fake?secret='+secret+'#fragment',
+      'otpauth://totp/fake?secret='+secret+'#',
+      'otpauth://user@totp/fake?secret='+secret,
+      'otpauth://totp:444/fake?secret='+secret,
+      'otpauth://totp/fake?secret='+secret+'&digits=6.0',
+      'otpauth://totp/fake?secret='+secret+'&period=-30',
+      'otpauth://totp/fake?secret='+secret+'&counter=NaN',
+    ];
+    for (const bad of rejected) expect(()=>parseOtp(bad)).toThrow();
+  });
+  test('preserves explicit HOTP counter and 8-digit OTP settings', () => {
+    const value=parseOtp('otpauth://hotp/Trusted:fake?secret='+secret+
+      '&issuer=Trusted&counter=0007&digits=8');
+    expect(value.counter).toBe(7);
+    expect(value.digits).toBe(8);
+    expect(value.issuer).toBe('Trusted');
+    expect(value.account).toBe('fake');
+  });
+});
