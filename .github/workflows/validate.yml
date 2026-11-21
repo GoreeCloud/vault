@@ -124,6 +124,8 @@ jobs:
         run: npm run build
       - name: Run extension origin protection tests
         run: npm test
+      - name: Verify unsigned extension permissions and packaged bundle boundary
+        run: npm run verify:bundle
       - name: Mozilla WebExtensions lint
         run: npm run lint:extension
       - name: Audit all extension dependencies
