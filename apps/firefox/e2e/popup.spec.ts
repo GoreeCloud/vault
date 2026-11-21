@@ -464,3 +464,40 @@ test('Firefox refuses a stale encrypted edit instead of overwriting another popu
   expect(stored).toBe(replaced);
   expect(stored).not.toContain('FAKE-NOTE-NOT-A-SECRET');
 });
+
+test('Firefox rejects a contradictory OTP issuer without writing plaintext',async({page})=>{
+  await page.addInitScript(()=>{
+    const vault:Record<string,unknown>={};
+    Object.defineProperty(window,'__syntheticOtpVault',{value:vault});
+    Object.defineProperty(window,'browser',{value:{
+      storage:{local:{
+        get:async(key:string)=>({[key]:vault[key]}),
+        set:async(values:Record<string,unknown>)=>Object.assign(vault,values),
+      }},
+      tabs:{query:async()=>[{id:91,url:'https://example.invalid/login'}]},
+      scripting:{executeScript:async()=>[{result:true}]},
+    }});
+  });
+  await page.goto('/popup.html');
+  await page.getByLabel('Master password').fill('synthetic-otp-parsing-master-password');
+  await page.getByRole('button',{name:'Create encrypted vault'}).click();
+  await expect(page.getByRole('heading',{name:/My vault/})).toBeVisible();
+  const before=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {__syntheticOtpVault:Record<string,unknown>}).__syntheticOtpVault));
+  await page.getByRole('button',{name:'+ Authenticator'}).click();
+  await page.getByLabel('Title').fill('Synthetic contradictory OTP');
+  await page.getByLabel('OTP secret or otpauth URI').fill(
+    'otpauth://totp/Trusted:fake?secret=JBSWY3DPEHPK3PXP&issuer=Other');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('status')).toContainText('Invalid OTP');
+  const after=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {__syntheticOtpVault:Record<string,unknown>}).__syntheticOtpVault));
+  expect(after).toBe(before);
+  await page.getByLabel('OTP secret or otpauth URI').fill(
+    'otpauth://totp/Trusted:fake?secret=JBSWY3DPEHPK3PXP&issuer=Trusted');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic contradictory OTP/})).toBeVisible();
+  const encrypted=await page.evaluate(()=>JSON.stringify(
+    (window as unknown as {__syntheticOtpVault:Record<string,unknown>}).__syntheticOtpVault));
+  expect(encrypted).not.toContain('JBSWY3DPEHPK3PXP');
+});

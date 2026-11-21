@@ -153,3 +153,22 @@ test('storage changes from a different tab immediately lock an unlocked web vaul
   await expect(page.getByRole('alert')).toContainText('Encrypted vault changed in another tab');
   await other.close();
 });
+
+test('conflicting OTP issuer URI cannot alter encrypted web vault',async({page})=>{
+  await initialize(page);
+  const before=await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'));
+  await page.locator('.quick-create').getByRole('button',{name:/Authenticator/}).click();
+  await page.locator('.editor input[required]').fill('Synthetic rejected OTP');
+  await page.getByLabel('Authenticator (Base32 secret or otpauth:// URI)').fill(
+    'otpauth://totp/Trusted:fake?secret=JBSWY3DPEHPK3PXP&issuer=Other');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('alert')).toContainText('Invalid OTP');
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1')))
+    .toBe(before);
+  await page.getByLabel('Authenticator (Base32 secret or otpauth:// URI)').fill(
+    'otpauth://totp/Trusted:fake?secret=JBSWY3DPEHPK3PXP&issuer=Trusted');
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('button',{name:/Synthetic rejected OTP/})).toBeVisible();
+  const encrypted=await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1'));
+  expect(encrypted).not.toContain('JBSWY3DPEHPK3PXP');
+});
