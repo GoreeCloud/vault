@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     id "com.android.application"
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
+
+// Release keys and passwords are supplied only from an ignored local file.
+// Debug builds require no production keys; release packaging does.
+def releaseKeyProperties = new Properties()
+def releaseKeyFile = rootProject.file('key.properties')
+if (releaseKeyFile.isFile()) {
+    releaseKeyFile.withInputStream { input -> releaseKeyProperties.load(input) }
+}
+def releaseKeyFields = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+def releaseKeyConfigured = releaseKeyFields.every {
+    releaseKeyProperties.getProperty(it)?.trim()
+} && file(releaseKeyProperties.getProperty('storeFile') ?: '.').isFile()
 
 android {
     namespace = "com.goreecloud.goreecloud_vault"
@@ -30,12 +44,38 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseKeyConfigured) {
+            release {
+                keyAlias = releaseKeyProperties.getProperty('keyAlias')
+                keyPassword = releaseKeyProperties.getProperty('keyPassword')
+                storeFile = file(releaseKeyProperties.getProperty('storeFile'))
+                storePassword = releaseKeyProperties.getProperty('storePassword')
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            // Never substitute the debug key or silently distribute unsigned.
+            signingConfig = releaseKeyConfigured ? signingConfigs.release : null
         }
+    }
+}
+
+// Fail closed on release APK/AAB packaging without explicit signing material.
+// This does not sign, deploy, create keys or publish an application.
+gradle.taskGraph.whenReady { graph ->
+    if (!releaseKeyConfigured && graph.allTasks.any { task ->
+        task.project.path == ':app' && task.name in [
+            'assembleRelease', 'bundleRelease', 'packageRelease',
+            'signReleaseBundle', 'packageReleaseBundle'
+        ]
+    }) {
+        throw new GradleException(
+            'GoreeCloud Vault release signing requires private android/key.properties ' +
+            'and a real existing keystore. Debug builds remain available.'
+        )
     }
 }
 
