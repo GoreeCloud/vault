@@ -4,7 +4,9 @@
 not a passed audit, independent security assessment or product certification.
 
 The version-pinned GitHub CodeQL Action checks JavaScript/TypeScript (web and
-Firefox), Python source and GitHub Actions workflows using source-only build
+Firefox) and GitHub Actions workflows. Python is automatically included only
+when the checked-out repository contains tracked Python source. All use
+source-only build
 mode without running project build scripts or package lifecycle hooks.
 It runs on pushes to main, pull requests targeting main, explicit dispatch,
 and a weekly schedule after the workflow has been merged and enabled.
@@ -16,6 +18,13 @@ verified commit; analysis engines remain external to this repository. No
 production user data, signing keys, keystores or private vault material are
 needed or uploaded by these workflows. These scripts live in the repository;
 GitHub Actions must be authorized and functioning for scans to occur.
+
+The initial pull request did not yet contain tracked Python files because
+the native Android release guard introducing Python tests was still in a
+separate PR. Its CodeQL Python job correctly reported no source to analyze.
+The language-detection job prevents that spurious failure and automatically
+activates Python analysis once that other PR is actually merged. Detection
+inspects tracked filenames only; it never executes the source.
 
 ## Coverage boundaries
 

@@ -13,7 +13,29 @@ permissions:
   contents: read
 
 jobs:
+  detect-languages:
+    name: detect-codeql-source-languages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      languages: ${{ steps.detect.outputs.languages }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+        with:
+          persist-credentials: false
+      - name: Include Python only when Python source is tracked
+        id: detect
+        shell: bash
+        run: |
+          if git ls-files -- '*.py' | grep -q .; then
+            echo 'languages=["javascript-typescript","actions","python"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'languages=["javascript-typescript","actions"]' >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
+    needs: detect-languages
     name: codeql-${{ matrix.language }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -24,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript, python, actions]
+        language: ${{ fromJSON(needs.detect-languages.outputs.languages) }}
     steps:
       - name: Checkout repository without persisting credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
