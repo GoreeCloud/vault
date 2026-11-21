@@ -38,3 +38,18 @@ user-verified registration and assertion signatures using a browser virtual
 authenticator. The next passkey workstream must establish safe browser-extension
 and Android platform credential-provider contracts, user consent and device
 key custody, not merely attach the test-RP code to production routes.
+
+## One-time-code provisioning consistency gate
+
+The web, Firefox (shared TypeScript OTP parser) and native Flutter OTP parsers
+reject repeated security-relevant provisioning parameters, conflicting
+issuer prefixes/query issuers, missing explicit HOTP start counters, ambiguous
+userinfo/port/fragment URL components, malformed numeric settings and
+multi-segment account labels. Supported issuer/account values are parsed
+consistently for **newly added** TOTP/HOTP records. Existing encrypted OTP
+record data and RFC 4226/6238 code generation formats remain unchanged.
+
+This is defensive input parsing and synthetic test coverage, **not** validation
+of QR provisioning authenticity, site ownership, clock correctness, HOTP
+counter recovery or device-level acceptance. Real issuer imports should be
+tested with disposable secrets before broad compatibility is claimed.

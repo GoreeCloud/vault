@@ -57,19 +57,50 @@ export function parseOtp(input: string): Otp {
   }
   if (input.length > 2500) throw Error('OTP URI too large');
   const uri = new URL(input);
-  if (uri.protocol !== 'otpauth:' || !['totp', 'hotp'].includes(uri.hostname))
-    throw Error('Unsupported OTP type');
-  const name = decodeURIComponent(uri.pathname.replace(/^\//, ''));
+  if (uri.protocol !== 'otpauth:' || !['totp', 'hotp'].includes(uri.hostname) ||
+      uri.username || uri.password || uri.port || input.includes('#')) {
+    throw Error('Unsupported or ambiguous OTP URI authority');
+  }
+  const path = uri.pathname.startsWith('/') ? uri.pathname.slice(1) : '';
+  if (!path || path.includes('/')) throw Error('Invalid OTP account label');
+  const label = decodeURIComponent(path);
+  if (!label.trim() || Array.from(label).some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) throw Error('Invalid OTP account label');
+
+  // Duplicated provisioning keys can be interpreted differently by OTP apps.
+  // Refuse conflicting or repeated essential parameters rather than relying
+  // on URLSearchParams.get() returning whichever copy comes first.
+  const essential = ['secret', 'issuer', 'algorithm', 'digits', 'period', 'counter'];
+  for (const name of essential) {
+    if (uri.searchParams.getAll(name).length > 1)
+      throw Error('Duplicate OTP configuration parameter');
+  }
+  if (uri.hostname === 'hotp' && !uri.searchParams.has('counter'))
+    throw Error('HOTP provisioning requires an explicit initial counter');
+
+  const queryIssuer = (uri.searchParams.get('issuer') ?? '').trim();
+  const colon = label.indexOf(':');
+  const prefix = colon < 0 ? '' : label.slice(0,colon).trim();
+  const account = colon < 0 ? label.trim() : label.slice(colon+1).trim();
+  if (!account || (colon >= 0 && !prefix) ||
+      (prefix && queryIssuer && prefix !== queryIssuer)) {
+    throw Error('Conflicting or empty OTP issuer/account');
+  }
+  const issuer = queryIssuer || prefix;
+  const decimal = (name: string, fallback: string): number => {
+    const raw = uri.searchParams.get(name) ?? fallback;
+    if (!/^[0-9]+$/.test(raw)) throw Error('Invalid OTP numeric parameter');
+    return Number(raw);
+  };
   const algorithm = (uri.searchParams.get('algorithm') ?? 'SHA1').toUpperCase();
-  const digits = Number(uri.searchParams.get('digits') ?? '6');
-  const period = Number(uri.searchParams.get('period') ?? '30');
-  const counter = Number(uri.searchParams.get('counter') ?? '0');
   const value = {
     type: uri.hostname as Otp['type'],
     secret: (uri.searchParams.get('secret') ?? '').toUpperCase().replace(/\s/g, ''),
-    algorithm: algorithm as Otp['algorithm'], digits: digits as Otp['digits'],
-    period, counter, issuer: uri.searchParams.get('issuer') ?? '',
-    account: name.slice(0, 255)
+    algorithm: algorithm as Otp['algorithm'],
+    digits: decimal('digits','6') as Otp['digits'],
+    period: decimal('period','30'),
+    counter: decimal('counter','0'),
+    issuer,
+    account
   };
   if (!validOtp(value)) throw Error('Invalid or unsupported OTP URI');
   return value;

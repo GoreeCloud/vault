@@ -69,19 +69,65 @@ class VaultOtp {
     }
     if (source.length > 2500) throw const FormatException('OTP URI too large');
     final uri = Uri.parse(source);
-    if (uri.scheme != 'otpauth' || !['totp', 'hotp'].contains(uri.host)) {
-      throw const FormatException('Unsupported OTP URI');
+    if (uri.scheme != 'otpauth' ||
+        !['totp', 'hotp'].contains(uri.host) ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasPort ||
+        uri.hasFragment) {
+      throw const FormatException('Unsupported or ambiguous OTP URI');
+    }
+    if (uri.pathSegments.length != 1 ||
+        uri.pathSegments.single.trim().isEmpty ||
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(uri.pathSegments.single)) {
+      throw const FormatException('Invalid OTP account label');
+    }
+    const essential = [
+      'secret',
+      'issuer',
+      'algorithm',
+      'digits',
+      'period',
+      'counter'
+    ];
+    for (final key in essential) {
+      if ((uri.queryParametersAll[key]?.length ?? 0) > 1) {
+        throw const FormatException('Duplicate OTP configuration parameter');
+      }
+    }
+    if (uri.host == 'hotp' && !uri.queryParameters.containsKey('counter')) {
+      throw const FormatException('HOTP requires an explicit counter');
     }
     final p = uri.queryParameters;
+    final label = uri.pathSegments.single;
+    final colon = label.indexOf(':');
+    final prefix = colon < 0 ? '' : label.substring(0, colon).trim();
+    final account = (colon < 0 ? label : label.substring(colon + 1)).trim();
+    final queryIssuer = (p['issuer'] ?? '').trim();
+    if (account.isEmpty ||
+        (colon >= 0 && prefix.isEmpty) ||
+        (prefix.isNotEmpty &&
+            queryIssuer.isNotEmpty &&
+            prefix != queryIssuer)) {
+      throw const FormatException('Conflicting or empty OTP issuer/account');
+    }
+    final issuer = queryIssuer.isNotEmpty ? queryIssuer : prefix;
+    int decimal(String key, String fallback) {
+      final text = p[key] ?? fallback;
+      if (!RegExp(r'^[0-9]+$').hasMatch(text)) {
+        throw const FormatException('Invalid OTP numeric parameter');
+      }
+      return int.parse(text);
+    }
+
     final otp = VaultOtp(
         type: uri.host,
         secret: (p['secret'] ?? '').toUpperCase().replaceAll(RegExp(r'\s'), ''),
         algorithm: (p['algorithm'] ?? 'SHA1').toUpperCase(),
-        digits: int.parse(p['digits'] ?? '6'),
-        period: int.parse(p['period'] ?? '30'),
-        counter: int.parse(p['counter'] ?? '0'),
-        issuer: p['issuer'] ?? '',
-        account: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '');
+        digits: decimal('digits', '6'),
+        period: decimal('period', '30'),
+        counter: decimal('counter', '0'),
+        issuer: issuer,
+        account: account);
     otp.validate();
     return otp;
   }
