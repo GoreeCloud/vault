@@ -116,3 +116,40 @@ test('explicit interaction resets the inactivity timer',async({page})=>{
   await page.clock.fastForward(181_000);
   await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
 });
+
+test('external encrypted replacement cannot be silently overwritten by an unlocked web editor', async({page})=>{
+  await initialize(page);
+  await page.locator('.quick-create').getByRole('button',{name:/Secure note/}).click();
+  await page.locator('.editor input[required]').fill('Stale synthetic note');
+  await page.locator('.editor textarea').fill('NOT-PRIVATE-PENDING-NOTE');
+  const externallyChanged=await page.evaluate(()=>{
+    const key='goreecloud.vault.encrypted.v1';
+    const current=JSON.parse(localStorage.getItem(key)!);
+    // Simulates another authorized writer changing the encrypted envelope,
+    // without creating, disclosing or storing any real credentials.
+    current.cipher.nonce='AQAAAAAAAAAAAAAA';
+    const changed=JSON.stringify(current);
+    localStorage.setItem(key,changed);
+    return changed;
+  });
+  await page.getByRole('button',{name:'Save encrypted'}).click();
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Encrypted vault changed');
+  expect(await page.evaluate(()=>localStorage.getItem('goreecloud.vault.encrypted.v1')))
+    .toBe(externallyChanged);
+});
+
+test('storage changes from a different tab immediately lock an unlocked web vault', async({page,context})=>{
+  await initialize(page);
+  const other=await context.newPage();
+  await other.goto('/');
+  await other.evaluate(()=>{
+    const key='goreecloud.vault.encrypted.v1';
+    const current=JSON.parse(localStorage.getItem(key)!);
+    current.cipher.nonce='AQAAAAAAAAAAAAAA';
+    localStorage.setItem(key,JSON.stringify(current));
+  });
+  await expect(page.getByRole('heading',{name:'Unlock your vault'})).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Encrypted vault changed in another tab');
+  await other.close();
+});

@@ -6,6 +6,7 @@ import { generateOtp, parseOtp } from './otp';
 import {normalizePasskeyRpId} from './passkey_rp';
 import { bitwardenImportWarning, parseBitwardenPlaintextJson } from './import_bitwarden';
 import { parseProtonPassPlaintextJson, protonImportWarning } from './import_proton';
+import {sameStoredVault} from './storage_guard';
 import './style.css';
 
 const blank = (kind: VaultKind): Entry =>
@@ -52,6 +53,17 @@ function App() {
     document.addEventListener('visibilitychange', onHide);
     return () => document.removeEventListener('visibilitychange', onHide);
   }, []);
+  useEffect(() => {
+    const onExternalVaultChange = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage ||
+          (event.key !== STORAGE_KEY && event.key !== null)) return;
+      lock();
+      setNotice('Encrypted vault changed in another tab. Reload this page before continuing.');
+    };
+    window.addEventListener('storage', onExternalVaultChange);
+    return () => window.removeEventListener('storage', onExternalVaultChange);
+  }, []);
+
   useEffect(() => {
     if (entries === null) return;
     // Deliberate auto-lock after 5 minutes without a local user gesture.
@@ -105,10 +117,14 @@ function App() {
       if (envelope) {
         const result = await unlock(master, envelope);
         if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
+        if (!sameStoredVault(envelope, localStorage.getItem(STORAGE_KEY)))
+          throw Error('Ciphertext changed while unlocking');
         key.current = result.key; setEntries(result.entries);
       } else {
         const result = await initialize(master);
         if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
+        if (!sameStoredVault(null, localStorage.getItem(STORAGE_KEY)))
+          throw Error('A vault already exists; reload before creating');
         localStorage.setItem(STORAGE_KEY, JSON.stringify(result.envelope));
         key.current = result.key; setEnvelope(result.envelope); setEntries([]);
       }
@@ -125,6 +141,11 @@ function App() {
     try {
       const sealed = await encryptEntries(next, key.current, envelope.kdf.salt);
       if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return false;
+      if (!sameStoredVault(envelope, localStorage.getItem(STORAGE_KEY))) {
+        lock();
+        setNotice('Encrypted vault changed outside this session. Reload before editing; no changes were saved.');
+        return false;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sealed));
       setEnvelope(sealed); setEntries(next); setEdit(null);
       return true;
@@ -136,6 +157,11 @@ function App() {
 
   function downloadBackup() {
     if (!envelope) return;
+    if (!sameStoredVault(envelope, localStorage.getItem(STORAGE_KEY))) {
+      lock();
+      setNotice('Encrypted vault changed. Reload before exporting a recovery backup.');
+      return;
+    }
     const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
     const href = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -148,6 +174,7 @@ function App() {
     event.target.value = '';
     if (!file) return;
     if (file.size > 5_000_000) { setNotice('Backup is too large.'); return; }
+    const destinationBefore = localStorage.getItem(STORAGE_KEY);
     const password = window.prompt('Enter the MASTER PASSWORD of this encrypted backup:');
     if (password == null) return;
     const epoch = lockEpoch.current;
@@ -158,6 +185,8 @@ function App() {
       if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
       if (!window.confirm('Replace this device\'s encrypted vault? Export a backup first. This does not merge items.')) return;
       if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
+      if (localStorage.getItem(STORAGE_KEY) !== destinationBefore)
+        throw Error('Encrypted destination changed during restore');
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       lock();
       setEnvelope(parsed);

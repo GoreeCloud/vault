@@ -99,3 +99,16 @@ form. It never submits or fills cross-origin frames. This protects against
 accidental template/honeypot selection but cannot prevent a malicious
 same-origin website from observing a password after an intentional fill.
 Automated DOM fixture tests are not a signed Firefox add-on acceptance test.
+
+## Encrypted storage freshness guards
+
+Before an existing popup changes an encrypted record, imports a plaintext
+migration, exports a recovery backup, or replaces the vault from a backup, it
+reads extension storage again and rejects an unexpectedly changed ciphertext.
+Creating a first vault also checks the store is still empty after key
+derivation. A mismatch never silently overwrites a different popup's stored
+envelope. These are best-effort checks: Firefox storage.local reads and writes
+are separate asynchronous operations, not a transactional compare-and-swap,
+and malicious privileged extensions or filesystem-level tampering are not
+covered. Separate extension popups must not be used as a synchronization
+mechanism. Protected backups and an actual restore rehearsal remain necessary.
