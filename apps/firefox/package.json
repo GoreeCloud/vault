@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
+    "verify:bundle": "node --test scripts/check_release.test.mjs && node scripts/check_release.mjs",
     "lint:extension": "web-ext lint --source-dir dist --output json",
     "package": "web-ext build --source-dir dist --artifacts-dir artifacts --overwrite-dest",
     "test": "vitest run src",
