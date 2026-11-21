@@ -30,6 +30,8 @@ jobs:
         run: npm ci --ignore-scripts --no-fund --no-audit
       - name: Type check and build
         run: npm run build
+      - name: Enforce offline production web bundle and CSP boundary
+        run: npm run verify:bundle
       - name: Synthetic security and format tests
         run: npm test
       - name: Dependency audit (production)
@@ -154,6 +156,8 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
       - name: Exercise synthetic encrypted backup and OTP flows in real browsers
         run: npm run test:e2e
+      - name: Smoke-test offline production assets in Chromium and Firefox
+        run: npm run test:prod
       - name: Install Firefox extension popup test dependencies
         working-directory: apps/firefox
         run: npm ci --ignore-scripts --no-fund --no-audit
