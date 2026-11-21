@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:goreecloud_vault/vault_crypto.dart';
+import 'package:goreecloud_vault/vault_backup.dart';
 import 'package:goreecloud_vault/vault_store.dart';
 
 void main() {
@@ -154,6 +155,144 @@ void main() {
       await expectLater(store.loadForUnlock(previouslyObserved: newer),
           throwsFormatException);
       expect(await store.loadForUnlock(), isNull);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('two concurrent cooperative native mutations cannot both win', () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-write-lock-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (key, original) =
+          await VaultCrypto.initialize('synthetic-cooperative-write-test');
+      await store.save(original);
+      final one = await VaultCrypto.seal([
+        const VaultEntry(
+          id: 'first-writer',
+          title: 'One test writer',
+          kind: 'note',
+          username: '',
+          password: '',
+          website: '',
+          notes: 'NOT-A-REAL-NOTE',
+        )
+      ], key, original.salt);
+      final two = await VaultCrypto.seal([
+        const VaultEntry(
+          id: 'second-writer',
+          title: 'Second test writer',
+          kind: 'note',
+          username: '',
+          password: '',
+          website: '',
+          notes: 'ANOTHER-FAKE-NOTE',
+        )
+      ], key, original.salt);
+      final outcomes = await Future.wait<bool>([
+        store
+            .saveIfUnchanged(original, one)
+            .then((_) => true, onError: (Object _) => false),
+        store
+            .saveIfUnchanged(original, two)
+            .then((_) => true, onError: (Object _) => false),
+      ]);
+      expect(outcomes.where((ok) => ok).length, 1);
+      final current = (await store.load())!;
+      final items = await VaultCrypto.decrypt(key, current);
+      expect(items, hasLength(1));
+      expect([one.serialize(), two.serialize()], contains(current.serialize()));
+      final path =
+          File([temp.path, 'vault.enc.json'].join(Platform.pathSeparator));
+      expect(await path.readAsString(), isNot(contains('NOT-A-REAL-NOTE')));
+      expect(await path.readAsString(), isNot(contains('ANOTHER-FAKE-NOTE')));
+      final lockPath =
+          File([temp.path, 'vault.enc.json.lock'].join(Platform.pathSeparator));
+      expect(await lockPath.exists(), true);
+      if (Platform.isLinux) {
+        expect((await lockPath.stat()).mode & 0x1ff, 0x180);
+      }
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('locked first-run creation refuses a second, already present vault',
+      () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-first-lock-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (_, first) =
+          await VaultCrypto.initialize('synthetic-first-creation');
+      final (_, second) =
+          await VaultCrypto.initialize('synthetic-second-creation');
+      await store.saveIfUnchanged(null, first);
+      final bytes = VaultBackupCodec.exportEncrypted(first);
+      await expectLater(
+          store.saveIfUnchanged(null, second), throwsFormatException);
+      expect(VaultBackupCodec.exportEncrypted((await store.load())!), bytes);
+      await expectLater(
+          store.saveIfUnchanged(first, second, canCommit: () => false),
+          throwsStateError);
+      expect(VaultBackupCodec.exportEncrypted((await store.load())!), bytes);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('an invalidated session aborts before ciphertext rename', () async {
+    final temp = await Directory.systemTemp.createTemp('gcv-revoked-write-');
+    try {
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (key, first) =
+          await VaultCrypto.initialize('synthetic-revoked-master-key');
+      await store.save(first);
+      final next = await VaultCrypto.seal([
+        const VaultEntry(
+          id: 'never-committed',
+          title: 'Canceled after encryption',
+          kind: 'note',
+          username: '',
+          password: '',
+          website: '',
+          notes: 'FAKE-SECRET-CANCELED',
+        )
+      ], key, first.salt);
+      final path =
+          File([temp.path, 'vault.enc.json'].join(Platform.pathSeparator));
+      final oldBytes = await path.readAsBytes();
+      var checks = 0;
+      await expectLater(
+          store.saveIfUnchanged(first, next, canCommit: () {
+            checks++;
+            return checks == 1;
+          }),
+          throwsStateError);
+      expect(checks, 2);
+      expect(await path.readAsBytes(), oldBytes);
+      expect(await temp.list().where((e) => e.path.endsWith('.tmp')).isEmpty,
+          true);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('rejects a symlinked native vault lockfile', () async {
+    if (!Platform.isLinux) return;
+    final temp = await Directory.systemTemp.createTemp('gcv-lock-symlink-');
+    try {
+      final target =
+          File([temp.path, 'target.txt'].join(Platform.pathSeparator));
+      await target.writeAsString('KEEP-SYNTHETIC');
+      final lock =
+          Link([temp.path, 'vault.enc.json.lock'].join(Platform.pathSeparator));
+      await lock.create(target.path);
+      final store = VaultStore(supportDirectory: () async => temp);
+      final (_, env) = await VaultCrypto.initialize('fake-lock-symlink-key');
+      await expectLater(store.saveIfUnchanged(null, env),
+          throwsA(isA<FileSystemException>()));
+      expect(await target.readAsString(), 'KEEP-SYNTHETIC');
+      expect(await store.load(), isNull);
     } finally {
       await temp.delete(recursive: true);
     }
