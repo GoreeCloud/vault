@@ -22,7 +22,7 @@ function App() {
     if (!raw) return null;
     try { return parseEnvelope(raw); } catch { return null; }
   });
-  const [corruptedAtLoad] = useState(() => {
+  const [corruptedAtLoad, setCorruptedAtLoad] = useState(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     try { parseEnvelope(raw); return false; } catch { return true; }
@@ -31,6 +31,9 @@ function App() {
   // Incremented on every lock so in-flight KDF/encryption promises cannot
   // reopen the vault after the document was hidden or explicitly locked.
   const lockEpoch = useRef(0);
+  // Backup recovery must serialize within this document even before React
+  // has rerendered its disabled/busy controls.
+  const restoreInFlight = useRef(false);
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [master, setMaster] = useState('');
   const [notice, setNotice] = useState('');
@@ -169,17 +172,34 @@ function App() {
     setTimeout(() => URL.revokeObjectURL(href), 1000);
   }
 
+  function preserveDamagedStorage() {
+    if (!corruptedAtLoad || busy) return;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      setNotice('Damaged vault storage is no longer present. Reload before recovery.');
+      return;
+    }
+    if (!window.confirm('This UNVERIFIED storage may contain sensitive data. Save it privately and never upload or share it. Export raw damaged storage?')) return;
+    const blob = new Blob([raw], {type:'application/octet-stream'});
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href; a.download = 'goreecloud-vault-damaged-unverified.txt'; a.click();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  }
+
   async function importBackup(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (!file || busy || restoreInFlight.current) return;
     if (file.size > 5_000_000) { setNotice('Backup is too large.'); return; }
-    const destinationBefore = localStorage.getItem(STORAGE_KEY);
-    const password = window.prompt('Enter the MASTER PASSWORD of this encrypted backup:');
-    if (password == null) return;
+    restoreInFlight.current = true;
     const epoch = lockEpoch.current;
     setBusy(true); setNotice('');
     try {
+      // Pin even malformed destination bytes until confirmed replacement.
+      const destinationBefore = localStorage.getItem(STORAGE_KEY);
+      const password = window.prompt('Enter the MASTER PASSWORD of this encrypted backup:');
+      if (password == null) return;
       const parsed = parseEnvelope(await file.text());
       await unlock(password, parsed);
       if (epoch !== lockEpoch.current || document.visibilityState !== 'visible') return;
@@ -190,10 +210,16 @@ function App() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
       lock();
       setEnvelope(parsed);
+      // Only a verified and successfully committed backup exits recovery mode.
+      setCorruptedAtLoad(false);
       setNotice('Encrypted backup restored. Unlock it with its master password.');
     } catch {
-      if (epoch === lockEpoch.current) setNotice('Restore failed. File is invalid or the backup password is wrong. Existing data is unchanged.');
-    } finally { setBusy(false); }
+      if (epoch === lockEpoch.current)
+        setNotice('Restore failed. File is invalid, storage changed, or the backup password is wrong. Existing data is unchanged.');
+    } finally {
+      restoreInFlight.current = false;
+      setBusy(false);
+    }
   }
 
   async function importBitwarden(event: React.ChangeEvent<HTMLInputElement>) {
@@ -323,7 +349,21 @@ function App() {
     {corruptedAtLoad ? <main className="onboarding"><div className="intro">
       <span className="eyebrow">RECOVERY REQUIRED</span><h1>Encrypted data needs attention.</h1>
       <p>Stored vault data is damaged or unsupported. It has not been overwritten.
-        Export and preserve the damaged storage before attempting recovery.</p>
+        Preserve the original bytes before attempting a confirmed recovery.</p>
+    </div><div className="surface unlock">
+      <h2>Recover from a trusted backup</h2>
+      <p>Export the damaged bytes privately before replacing them. Unverified
+        storage might contain sensitive information; do not share it.</p>
+      <button className="quiet" type="button" disabled={busy}
+        onClick={preserveDamagedStorage}>Preserve unverified storage</button>
+      <label className="quiet import-label">Import valid encrypted backup
+        <input type="file" accept=".json,application/json"
+          aria-label="Recovery encrypted backup JSON file" hidden disabled={busy}
+          onChange={e=>void importBackup(e)} />
+      </label>
+      <p className="field-note">A valid backup and its correct master password are
+        required. This replaces stored data, never merges it.</p>
+      {notice && <p className="error" role="alert">{notice}</p>}
     </div></main> : entries === null ? <main className="onboarding">
       <div className="intro"><span className="eyebrow">YOUR SECRETS. YOUR DEVICE.</span>
         <h1>Security that feels <em>effortless.</em></h1>
