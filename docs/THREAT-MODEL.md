@@ -45,3 +45,13 @@ Do not describe the product as zero-knowledge cloud sync, security audited, pass
 ## Acceptance before real-password use
 
 Independent protocol and source review; threat modeling across web, native and future sync; strict dependency/security scans; browser/Android/Linux runtime and malicious-input tests; backup/import/restore validation; secure-release signing; meaningful migration tests; deployment and privacy review. Maintain a rollback plan and publish a real security-advisory process.
+
+## Browser encrypted-snapshot freshness
+
+Before web edits, new vault creation and encrypted export, the client compares
+the stored ciphertext to the last observed envelope. Unlock revalidates after
+PBKDF2; another-tab storage changes lock the current session. User-approved
+backup restore pins the original raw destination even if it is malformed, and
+refuses to replace ciphertext that changes during validation. These checks
+are local best-effort protection, not a multi-device transaction, anti-rollback
+protocol, or defense against a compromised browser or operating system.
